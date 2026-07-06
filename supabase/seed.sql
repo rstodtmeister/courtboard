@@ -1,0 +1,1 @@
+-- Local seed data can be added here once the first admin account exists.
