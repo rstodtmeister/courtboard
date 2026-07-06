@@ -211,8 +211,10 @@ function AdminDashboard() {
       const saved = await saveTournament(nextTournament);
       setTournament(saved);
       setMessage("Turnier gespeichert.");
+      return true;
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Turnier konnte nicht gespeichert werden.");
+      return false;
     }
   }
 
@@ -513,7 +515,7 @@ function TournamentSettings({
   onSyncGames: () => void;
   onOpenCourtDisplay: () => void;
   onSignOut: () => Promise<void>;
-  onSave: (tournament: Tournament) => Promise<void>;
+  onSave: (tournament: Tournament) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState(() => ({
     name: tournament.name,
@@ -523,8 +525,12 @@ function TournamentSettings({
     courts: tournament.courts.join(", "),
   }));
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
+    if (dirty) {
+      return;
+    }
     setDraft({
       name: tournament.name,
       hvv_edit_url: tournament.hvv_edit_url,
@@ -532,12 +538,17 @@ function TournamentSettings({
       token_base_url: tournament.token_base_url ?? "",
       courts: tournament.courts.join(", "),
     });
-  }, [tournament]);
+  }, [dirty, tournament]);
+
+  function updateDraft(update: Partial<typeof draft>) {
+    setDirty(true);
+    setDraft((current) => ({ ...current, ...update }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
-    await onSave({
+    const saved = await onSave({
       ...tournament,
       name: draft.name.trim(),
       hvv_edit_url: draft.hvv_edit_url.trim(),
@@ -545,10 +556,14 @@ function TournamentSettings({
       token_base_url: draft.token_base_url.trim() || null,
       courts: draft.courts.split(",").map((court) => court.trim()).filter(Boolean),
     });
+    if (saved) {
+      setDirty(false);
+    }
     setSaving(false);
   }
 
   function addCourt() {
+    setDirty(true);
     setDraft((current) => {
       const courts = current.courts.split(",").map((court) => court.trim()).filter(Boolean);
       const courtNumbers = courts.map(courtNumber).filter((court) => court > 0);
@@ -568,23 +583,23 @@ function TournamentSettings({
       </div>
       <label>
         Name
-        <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
+        <input value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
       </label>
       <label>
         HVV Edit-URL
-        <input value={draft.hvv_edit_url} onChange={(event) => setDraft((current) => ({ ...current, hvv_edit_url: event.target.value }))} />
+        <input value={draft.hvv_edit_url} onChange={(event) => updateDraft({ hvv_edit_url: event.target.value })} />
       </label>
       <label>
         HVV Public-URL
-        <input value={draft.hvv_public_url} onChange={(event) => setDraft((current) => ({ ...current, hvv_public_url: event.target.value }))} />
+        <input value={draft.hvv_public_url} onChange={(event) => updateDraft({ hvv_public_url: event.target.value })} />
       </label>
       <label>
         Token Basis-URL
-        <input value={draft.token_base_url} onChange={(event) => setDraft((current) => ({ ...current, token_base_url: event.target.value }))} placeholder="http://192.168.x.x:5173" />
+        <input value={draft.token_base_url} onChange={(event) => updateDraft({ token_base_url: event.target.value })} placeholder="http://192.168.x.x:5173" />
       </label>
       <label>
         Courts
-        <input value={draft.courts} onChange={(event) => setDraft((current) => ({ ...current, courts: event.target.value }))} />
+        <input value={draft.courts} onChange={(event) => updateDraft({ courts: event.target.value })} />
       </label>
       <div className="config-actions">
         <button type="button" className="secondary" onClick={addCourt}>Court hinzufuegen</button>
