@@ -258,7 +258,7 @@ export async function getTournament(): Promise<Tournament> {
 
   const { data, error } = await getSupabase()
     .from("tournaments")
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url")
+    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
     .order("created_at", { ascending: true })
     .limit(1)
     .single();
@@ -268,7 +268,8 @@ export async function getTournament(): Promise<Tournament> {
   }
 
   const games = await listGames();
-  const courts = [...new Set(games.map((game) => game.court).filter(Boolean) as string[])];
+  const gameCourts = games.map((game) => game.court).filter(Boolean) as string[];
+  const courts = [...new Set([...(data.courts ?? []), ...gameCourts])];
   return { ...data, courts };
 }
 
@@ -286,16 +287,17 @@ export async function saveTournament(tournament: Tournament): Promise<Tournament
       hvv_edit_url: tournament.hvv_edit_url,
       hvv_public_url: tournament.hvv_public_url,
       token_base_url: tournament.token_base_url,
+      courts: tournament.courts,
     })
     .eq("id", tournament.id)
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url")
+    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
     .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return { ...data, courts: tournament.courts };
+  return data;
 }
 
 export async function saveGame(game: Game, draft: GameDraft): Promise<Game> {
