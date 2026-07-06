@@ -258,11 +258,10 @@ function AdminDashboard() {
     setLinkText("");
 
     try {
-      const data = await createScoreLinkData({
+      await createScoreLinkData({
         tournamentId,
         court,
       });
-      setLinkText(scoreUrl(data.token, tournament?.token_base_url));
       setScoreLinks(await listScoreLinks());
       setMessage(`Ergebnislink fuer Court ${court} erzeugt.`);
     } catch (linkError) {
@@ -281,8 +280,7 @@ function AdminDashboard() {
       if (lockedGame) {
         await unlockScoreGame(lockedGame.id);
       }
-      const data = await createScoreLinkData({ tournamentId, court });
-      setLinkText(scoreUrl(data.token, tournament?.token_base_url));
+      await createScoreLinkData({ tournamentId, court });
       setScoreLinks(await listScoreLinks());
       setGames(await listGames());
       setMessage(`QR-Code fuer Court ${court} ersetzt.`);
