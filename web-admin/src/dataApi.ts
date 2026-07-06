@@ -406,14 +406,14 @@ export async function listScoreLinks(): Promise<ScoreLink[]> {
 
   const { data, error } = await getSupabase()
     .from("score_entry_links")
-    .select("id,tournament_id,game_id,court,expires_at,used_at,created_at")
+    .select("id,tournament_id,game_id,court,token,expires_at,used_at,created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((link) => ({ ...link, token: null, disabled_at: null }));
+  return (data ?? []).map((link) => ({ ...link, token: link.token ?? null, disabled_at: null }));
 }
 
 export async function disableScoreLink(linkId: string): Promise<void> {

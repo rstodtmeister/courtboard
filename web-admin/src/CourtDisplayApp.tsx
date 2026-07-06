@@ -378,15 +378,21 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
   if (courts.length === 0) {
     return [1, 2, 3, 4];
   }
-  return courts.slice(0, 4);
+  return courts.sort((left, right) => left - right);
 }
 
 function sortGames(games: Game[]) {
   return [...games].sort((left, right) => gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de"));
 }
 
-function numericCourtOptions(games: Game[]): string[] {
-  const courts = [...new Set(games.map((game) => courtLabel(game.court)).filter((court): court is string => court !== "-"))];
+function numericCourtOptions(games: Game[], tournament: Tournament | null = null): string[] {
+  const configuredCourts = tournament?.courts
+    .map((court) => court.trim())
+    .filter((court) => courtNumber(court) > 0) ?? [];
+  const gameCourts = games
+    .map((game) => courtLabel(game.court))
+    .filter((court): court is string => court !== "-");
+  const courts = [...new Set([...configuredCourts, ...gameCourts])];
   const sorted = courts.sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
   return sorted.length > 0 ? sorted : ["1", "2", "3", "4"];
 }

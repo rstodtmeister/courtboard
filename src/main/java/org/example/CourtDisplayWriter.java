@@ -20,7 +20,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class CourtDisplayWriter {
-    private static final int[] COURTS = {1, 2, 3, 4};
     private static final Pattern RESULT_WIN_PATTERN = Pattern.compile("(\\d+)\\s*[:\\-]\\s*(\\d+)");
     private static final Comparator<GameRow> GAME_NUMBER_COMPARATOR =
             Comparator.comparingInt((GameRow game) -> gameNumberSortKey(game.number()))
@@ -69,8 +68,7 @@ public class CourtDisplayWriter {
                       font-family: Arial, Helvetica, sans-serif;
                       background: #ffffff;
                       color: #000000;
-                      height: 100vh;
-                      overflow: hidden;
+                      min-height: 100vh;
                       display: grid;
                       grid-template-columns: minmax(0, 1fr) max-content;
                       gap: var(--outer-gap);
@@ -79,7 +77,7 @@ public class CourtDisplayWriter {
                     main {
                       display: grid;
                       grid-template-columns: repeat(2, minmax(0, 1fr));
-                      grid-template-rows: repeat(2, minmax(0, 1fr));
+                      grid-auto-rows: minmax(360px, 1fr);
                       gap: var(--outer-gap);
                       min-height: 0;
                     }
@@ -94,6 +92,7 @@ public class CourtDisplayWriter {
                     }
                     .court-section {
                       container-type: size;
+                      min-height: 360px;
                     }
                     .court-heading {
                       display: flex;
@@ -344,7 +343,7 @@ public class CourtDisplayWriter {
                 """);
 
         builder.append("  <main>\n");
-        for (int court : COURTS) {
+        for (int court : displayCourts(sortedGames)) {
             appendCourt(builder, court, gamesForCourt(sortedGames, court));
         }
         builder.append("  </main>\n");
@@ -639,6 +638,21 @@ public class CourtDisplayWriter {
         List<GameRow> sortedGames = new ArrayList<>(games);
         sortedGames.sort(GAME_NUMBER_COMPARATOR);
         return sortedGames;
+    }
+
+    private List<Integer> displayCourts(List<GameRow> games) {
+        List<Integer> courts = new ArrayList<>();
+        for (GameRow game : games) {
+            int court = courtNumber(game.court());
+            if (court > 0 && !courts.contains(court)) {
+                courts.add(court);
+            }
+        }
+        if (courts.isEmpty()) {
+            return List.of(1, 2, 3, 4);
+        }
+        courts.sort(Integer::compareTo);
+        return courts;
     }
 
     private static int gameNumberSortKey(String number) {

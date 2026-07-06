@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
       tournament_id: body.tournamentId,
       game_id: body.gameId ?? null,
       court: body.court ?? null,
+      token,
       token_hash: tokenHash,
       expires_at: body.expiresAt ?? null,
       created_by: userData.user.id,

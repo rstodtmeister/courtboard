@@ -400,7 +400,7 @@ function AdminDashboard() {
       ) : (
         <div className="admin-tab-panel">
           {activeTab === "games" && (
-            <GamesEditor games={games} onSave={saveGame} onUnlockGame={unlockGame} onPrintPdf={printPdf} printing={printing} />
+            <GamesEditor games={games} tournament={tournament} onSave={saveGame} onUnlockGame={unlockGame} onPrintPdf={printPdf} printing={printing} />
           )}
           {activeTab === "courts" && (
             courts.length > 0 ? (
@@ -548,6 +548,18 @@ function TournamentSettings({
     setSaving(false);
   }
 
+  function addCourt() {
+    setDraft((current) => {
+      const courts = current.courts.split(",").map((court) => court.trim()).filter(Boolean);
+      const courtNumbers = courts.map(courtNumber).filter((court) => court > 0);
+      const nextCourt = courtNumbers.length > 0 ? Math.max(...courtNumbers) + 1 : 1;
+      return {
+        ...current,
+        courts: [...courts, String(nextCourt)].join(", "),
+      };
+    });
+  }
+
   return (
     <form className="config-panel" onSubmit={submit}>
       <div>
@@ -575,6 +587,7 @@ function TournamentSettings({
         <input value={draft.courts} onChange={(event) => setDraft((current) => ({ ...current, courts: event.target.value }))} />
       </label>
       <div className="config-actions">
+        <button type="button" className="secondary" onClick={addCourt}>Court hinzufuegen</button>
         <button type="button" className="secondary" onClick={onSyncGames} disabled={loading || syncing}>
           {syncing ? "Laedt..." : "HVV laden"}
         </button>
@@ -638,6 +651,10 @@ function CourtLinksPanel({
                   <QrCode value={value} compact />
                   <CompactLink value={value} hideQr />
                 </div>
+              ) : link ? (
+                <button type="button" onClick={() => onReplaceCourtLink(entry.court, entry.tournamentId, link.id)}>
+                  QR-Code neu erzeugen
+                </button>
               ) : (
                 <button type="button" onClick={() => onCreateCourtLink(entry.court, entry.tournamentId)}>
                   QR-Code erzeugen
@@ -646,7 +663,7 @@ function CourtLinksPanel({
               <button type="button" className="secondary" onClick={() => onUnlockCourt(entry.court)} disabled={!lockedGame}>
                 Court entsperren
               </button>
-              {link && (
+              {link && value && (
                 <button type="button" className="secondary" onClick={() => onReplaceCourtLink(entry.court, entry.tournamentId, link.id)}>
                   QR-Code ersetzen
                 </button>
@@ -661,12 +678,14 @@ function CourtLinksPanel({
 
 function GamesEditor({
   games,
+  tournament,
   onSave,
   onUnlockGame,
   onPrintPdf,
   printing,
 }: {
   games: Game[];
+  tournament: Tournament | null;
   onSave: (game: Game, draft: GameDraft) => Promise<boolean>;
   onUnlockGame: (gameId: string) => Promise<void>;
   onPrintPdf: (games: Game[], sheetType: PdfSheetType) => Promise<void>;
@@ -678,7 +697,7 @@ function GamesEditor({
   const visibleGames = showCompletedGames ? games.filter(isCompleted) : games.filter((game) => !isCompleted(game));
   const selectedGames = games.filter((game) => selectedGameIds.includes(game.id));
   const allVisibleSelected = visibleGames.length > 0 && visibleGames.every((game) => selectedGameIds.includes(game.id));
-  const courtOptions = useMemo(() => numericCourtOptions(games), [games]);
+  const courtOptions = useMemo(() => numericCourtOptions(games, tournament), [games, tournament]);
   const refereeOptions = useMemo(() => assignmentOptions(games), [games]);
 
   function toggleGame(gameId: string, checked: boolean) {
@@ -1317,15 +1336,21 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
   if (courts.length === 0) {
     return [1, 2, 3, 4];
   }
-  return courts.slice(0, 4);
+  return courts.sort((left, right) => left - right);
 }
 
 function sortGames(games: Game[]) {
   return [...games].sort((left, right) => gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de"));
 }
 
-function numericCourtOptions(games: Game[]): string[] {
-  const courts = [...new Set(games.map((game) => courtLabel(game.court)).filter((court): court is string => court !== "-"))];
+function numericCourtOptions(games: Game[], tournament: Tournament | null = null): string[] {
+  const configuredCourts = tournament?.courts
+    .map((court) => court.trim())
+    .filter((court) => courtNumber(court) > 0) ?? [];
+  const gameCourts = games
+    .map((game) => courtLabel(game.court))
+    .filter((court): court is string => court !== "-");
+  const courts = [...new Set([...configuredCourts, ...gameCourts])];
   const sorted = courts.sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
   return sorted.length > 0 ? sorted : ["1", "2", "3", "4"];
 }
