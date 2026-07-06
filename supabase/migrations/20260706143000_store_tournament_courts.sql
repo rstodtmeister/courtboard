@@ -6,9 +6,14 @@ set courts = coalesce(court_values.courts, array[]::text[])
 from (
   select
     tournament_id,
-    array_agg(distinct court order by court) as courts
-  from public.games
-  where court is not null and btrim(court) <> ''
+    array_agg(court order by court) as courts
+  from (
+    select distinct
+      tournament_id,
+      btrim(court) as court
+    from public.games
+    where court is not null and btrim(court) <> ''
+  ) game_courts
   group by tournament_id
 ) court_values
 where tournament.id = court_values.tournament_id
