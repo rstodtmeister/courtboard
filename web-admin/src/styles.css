@@ -1375,6 +1375,10 @@ tbody tr:nth-child(even) {
   background: white;
 }
 
+.qr-code.loading {
+  display: block;
+}
+
 .qr-code.compact {
   width: 76px;
   height: 76px;

@@ -10,7 +10,6 @@ import {
   listGames,
   listScoreLinks,
   loadScoreEntry,
-  localApiUrl,
   onSessionChange,
   saveGame as saveGameData,
   saveTournament,
@@ -49,6 +48,7 @@ import type {
   ServerSetupStep,
   TeamKey,
 } from "./workflowTypes";
+import { QrCode } from "./QrCode";
 import "./styles.css";
 
 function App() {
@@ -1272,16 +1272,6 @@ async function copyText(value: string, input: HTMLInputElement | null) {
   } catch {
     return false;
   }
-}
-
-function QrCode({ value, compact = false }: { value: string; compact?: boolean }) {
-  return (
-    <img
-      className={compact ? "qr-code compact" : "qr-code"}
-      src={`${localApiUrl}/api/qr?value=${encodeURIComponent(value)}`}
-      alt="QR-Code fuer Ergebnislink"
-    />
-  );
 }
 
 function scoreUrl(token: string, baseUrl?: string | null) {

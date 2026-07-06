@@ -1,18 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { getTournament, listGames, localApiUrl } from "./dataApi";
+import { getTournament, listGames } from "./dataApi";
 import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, resultFromCompletedSetScores, scoreForSet } from "./scoreLogic";
 import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
-
-function QrCode({ value, compact = false }: { value: string; compact?: boolean }) {
-  return (
-    <img
-      className={compact ? "qr-code compact" : "qr-code"}
-      src={`${localApiUrl}/api/qr?value=${encodeURIComponent(value)}`}
-      alt="QR-Code fuer Ergebnislink"
-    />
-  );
-}
+import { QrCode } from "./QrCode";
 
 export function CourtDisplayApp({ court }: { court: string }) {
   const [games, setGames] = useState<Game[]>([]);
