@@ -68,6 +68,7 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const status = currentGame ? singleCourtGameStatus(currentGame) : "";
+  const inProgress = currentGame ? isGameInProgress(currentGame) : false;
   return (
     <main className="single-court-page">
       <a className="single-court-back" href={displayUrl()}>Alle Courts</a>
@@ -78,22 +79,26 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
       <section className="single-court-card">
         {currentGame ? (
           <>
-            <div className="single-court-match">
+            <div className={inProgress ? "single-court-match" : "single-court-match not-started"}>
               <div className="single-court-team">
                 <strong>{currentGame.team_a || "Team A offen"}</strong>
-                <span>{result?.pointsA ?? "0"}</span>
+                {inProgress && <span>{result?.pointsA ?? "0"}</span>}
               </div>
-              <SingleCourtPointFlow game={currentGame} />
+              {inProgress && <SingleCourtPointFlow game={currentGame} />}
               <div className="single-court-team">
                 <strong>{currentGame.team_b || "Team B offen"}</strong>
-                <span>{result?.pointsB ?? "0"}</span>
+                {inProgress && <span>{result?.pointsB ?? "0"}</span>}
               </div>
             </div>
-            <div className="single-court-setscore">
-              <span>Sätze</span>
-              <strong>{result?.sets ?? "0:0"}</strong>
-            </div>
-            <SingleCourtSetHistory game={currentGame} />
+            {inProgress && (
+              <>
+                <div className="single-court-setscore">
+                  <span>Sätze</span>
+                  <strong>{result?.sets ?? "0:0"}</strong>
+                </div>
+                <SingleCourtSetHistory game={currentGame} />
+              </>
+            )}
             {currentGame.referee && <div className="single-court-referee">Schiedsrichter: {currentGame.referee}</div>}
           </>
         ) : (

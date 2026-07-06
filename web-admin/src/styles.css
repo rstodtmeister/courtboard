@@ -3144,6 +3144,12 @@ tbody tr:nth-child(even) {
   align-items: center;
 }
 
+.single-court-match.not-started {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: min(100%, 1500px);
+  justify-self: center;
+}
+
 .single-court-team {
   display: grid;
   align-content: center;
@@ -3153,6 +3159,10 @@ tbody tr:nth-child(even) {
   padding: clamp(12px, 2.4vmin, 28px);
   background: #f3f4f6;
   border: 1px solid #d1d5db;
+}
+
+.single-court-match.not-started .single-court-team {
+  min-height: clamp(220px, 38vh, 440px);
 }
 
 .single-court-team strong {
@@ -3676,11 +3686,19 @@ tbody tr:nth-child(even) {
     gap: 8px;
   }
 
+  .single-court-match.not-started {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .single-court-team {
     align-content: center;
     gap: 12px;
     min-height: 0;
     padding: 8px;
+  }
+
+  .single-court-match.not-started .single-court-team {
+    min-height: clamp(140px, 34vh, 260px);
   }
 
   .single-court-team strong {
@@ -4059,9 +4077,17 @@ tbody tr:nth-child(even) {
     gap: 10px;
   }
 
+  .single-court-match.not-started {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .single-court-team {
     min-height: 0;
     padding: 8px;
+  }
+
+  .single-court-match.not-started .single-court-team {
+    min-height: clamp(120px, 38vh, 240px);
   }
 
   .single-court-team strong {
