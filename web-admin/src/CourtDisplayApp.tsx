@@ -67,8 +67,9 @@ export function CourtDisplayApp({ court }: { court: string }) {
 function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
-  const status = currentGame ? singleCourtGameStatus(currentGame) : "";
-  const inProgress = currentGame ? isGameInProgress(currentGame) : false;
+  const scoreState = currentGame ? gameScoreState(currentGame) : null;
+  const status = currentGame && scoreState ? singleCourtGameStatus(currentGame, scoreState) : "";
+  const started = scoreState ? hasStartedScore(scoreState) : false;
   return (
     <main className="single-court-page">
       <a className="single-court-back" href={displayUrl()}>Alle Courts</a>
@@ -79,18 +80,18 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
       <section className="single-court-card">
         {currentGame ? (
           <>
-            <div className={inProgress ? "single-court-match" : "single-court-match not-started"}>
+            <div className={started ? "single-court-match" : "single-court-match not-started"}>
               <div className="single-court-team">
                 <strong>{currentGame.team_a || "Team A offen"}</strong>
-                {inProgress && <span>{result?.pointsA ?? "0"}</span>}
+                {started && <span>{result?.pointsA ?? "0"}</span>}
               </div>
-              {inProgress && <SingleCourtPointFlow game={currentGame} />}
+              {started && <SingleCourtPointFlow game={currentGame} />}
               <div className="single-court-team">
                 <strong>{currentGame.team_b || "Team B offen"}</strong>
-                {inProgress && <span>{result?.pointsB ?? "0"}</span>}
+                {started && <span>{result?.pointsB ?? "0"}</span>}
               </div>
             </div>
-            {inProgress && (
+            {started && (
               <>
                 <div className="single-court-setscore">
                   <span>Sätze</span>
@@ -109,26 +110,36 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
   );
 }
 
-function singleCourtGameStatus(game: Game) {
-  if (isGameInProgress(game)) {
+function singleCourtGameStatus(game: Game, scoreState: ReturnType<typeof gameScoreState>) {
+  if (hasStartedScore(scoreState)) {
     return "Live";
+  }
+  if (game.score_locked_by_device) {
+    return "Schiedsgericht angemeldet";
   }
   return "Noch nicht gestartet";
 }
 
-function isGameInProgress(game: Game) {
-  if (game.score_locked_by_device || parsePointHistory(game.point_history).length > 0) {
+function gameScoreState(game: Game) {
+  return {
+    hasPointHistory: parsePointHistory(game.point_history).length > 0,
+    setScores: [
+      game.set1_team_a,
+      game.set1_team_b,
+      game.set2_team_a,
+      game.set2_team_b,
+      game.set3_team_a,
+      game.set3_team_b,
+    ],
+  };
+}
+
+function hasStartedScore(scoreState: ReturnType<typeof gameScoreState>) {
+  if (scoreState.hasPointHistory) {
     return true;
   }
 
-  return [
-    game.set1_team_a,
-    game.set1_team_b,
-    game.set2_team_a,
-    game.set2_team_b,
-    game.set3_team_a,
-    game.set3_team_b,
-  ].some((score) => {
+  return scoreState.setScores.some((score) => {
     const value = parseScore(score);
     return value !== null && value > 0;
   });
