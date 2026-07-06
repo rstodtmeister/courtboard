@@ -2692,22 +2692,33 @@ tbody tr:nth-child(even) {
 .display-court-section {
   background: #ffffff;
   border: 4px solid #000000;
+  color: inherit;
   display: flex;
   flex-direction: column;
   min-height: 360px;
   overflow: hidden;
   container-type: size;
+  position: relative;
+  text-decoration: none;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.display-court-section:hover,
+.display-court-section:focus-visible {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 6px rgba(29, 78, 216, .18);
+  transform: translateY(-2px);
 }
 
 .display-court-heading {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
   padding: clamp(8px, 4cqh, 20px) clamp(10px, 4cqw, 24px);
   background: #1f1f1f;
   color: #ffffff;
   border-bottom: 4px solid #000000;
-  text-decoration: none;
 }
 
 .display-court-heading h2 {
@@ -2715,6 +2726,29 @@ tbody tr:nth-child(even) {
   font-size: clamp(42px, 13cqw, 96px);
   font-weight: 900;
   line-height: .92;
+}
+
+.display-court-open {
+  position: absolute;
+  top: clamp(6px, 1.8cqh, 12px);
+  right: clamp(6px, 1.8cqw, 12px);
+  display: grid;
+  place-items: center;
+  width: clamp(28px, 5.4cqw, 44px);
+  aspect-ratio: 1;
+  border: 2px solid rgba(255, 255, 255, .72);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .12);
+  color: #ffffff;
+  font-size: clamp(16px, 3.4cqw, 26px);
+  line-height: 1;
+  font-weight: 900;
+}
+
+.display-court-section:hover .display-court-open,
+.display-court-section:focus-visible .display-court-open {
+  background: #ffffff;
+  color: #1f1f1f;
 }
 
 .display-games {
@@ -2734,7 +2768,7 @@ tbody tr:nth-child(even) {
   overflow: hidden;
 }
 
-.display-court-heading:focus-visible {
+.display-court-section:focus-visible {
   outline: 6px solid #f4c430;
   outline-offset: -6px;
 }
@@ -3784,6 +3818,13 @@ tbody tr:nth-child(even) {
     line-height: 1;
   }
 
+  .display-court-open {
+    width: 34px;
+    top: 7px;
+    right: 8px;
+    font-size: 1.15rem;
+  }
+
   .display-games {
     display: block;
     min-height: 0;
@@ -3930,6 +3971,13 @@ tbody tr:nth-child(even) {
 
   .display-court-heading h2 {
     font-size: 1.7rem;
+  }
+
+  .display-court-open {
+    width: 30px;
+    top: 6px;
+    right: 7px;
+    font-size: 1rem;
   }
 
   .display-games {

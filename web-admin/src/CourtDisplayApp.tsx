@@ -215,9 +215,13 @@ function SingleCourtSetHistory({ game }: { game: Game }) {
 }
 
 function CourtPanel({ court, games }: { court: number; games: Game[] }) {
+  const courtUrl = singleCourtUrl(court);
   return (
-    <section className="display-court-section">
-      <a className="display-court-heading" href={singleCourtUrl(court)}><h2>Court {court}</h2></a>
+    <a className="display-court-section" href={courtUrl} aria-label={`Court ${court} Einzelansicht oeffnen`} title="Einzelansicht oeffnen">
+      <div className="display-court-heading">
+        <h2>Court {court}</h2>
+        <span className="display-court-open" aria-hidden="true">↗</span>
+      </div>
       {games.length === 0 ? (
         <div className="display-empty">Kein Spiel eingetragen</div>
       ) : (
@@ -231,7 +235,7 @@ function CourtPanel({ court, games }: { court: number; games: Game[] }) {
           })}
         </div>
       )}
-    </section>
+    </a>
   );
 }
 
