@@ -67,12 +67,13 @@ export function CourtDisplayApp({ court }: { court: string }) {
 function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
+  const status = currentGame ? singleCourtGameStatus(currentGame) : "";
   return (
     <main className="single-court-page">
       <a className="single-court-back" href={displayUrl()}>Alle Courts</a>
       <header className="single-court-meta">
-        <h1>Court {court} Live</h1>
-        {currentGame && <div>Spiel {currentGame.number}</div>}
+        <h1>Court {court}</h1>
+        {currentGame && <div>{[`Spiel ${currentGame.number}`.trim(), status].filter(Boolean).join(" · ")}</div>}
       </header>
       <section className="single-court-card">
         {currentGame ? (
@@ -101,6 +102,31 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
       </section>
     </main>
   );
+}
+
+function singleCourtGameStatus(game: Game) {
+  if (isGameInProgress(game)) {
+    return "Live";
+  }
+  return "Noch nicht gestartet";
+}
+
+function isGameInProgress(game: Game) {
+  if (game.score_locked_by_device || parsePointHistory(game.point_history).length > 0) {
+    return true;
+  }
+
+  return [
+    game.set1_team_a,
+    game.set1_team_b,
+    game.set2_team_a,
+    game.set2_team_b,
+    game.set3_team_a,
+    game.set3_team_b,
+  ].some((score) => {
+    const value = parseScore(score);
+    return value !== null && value > 0;
+  });
 }
 
 function SingleCourtPointFlow({ game }: { game: Game }) {
