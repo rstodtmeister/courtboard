@@ -707,7 +707,8 @@ function GamesEditor({
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
   const [showCompletedGames, setShowCompletedGames] = useState(false);
-  const visibleGames = showCompletedGames ? games.filter(isCompleted) : games.filter((game) => !isCompleted(game));
+  const sortedGames = useMemo(() => sortGames(games), [games]);
+  const visibleGames = showCompletedGames ? sortedGames.filter(isCompleted) : sortedGames.filter((game) => !isCompleted(game));
   const selectedGames = games.filter((game) => selectedGameIds.includes(game.id));
   const allVisibleSelected = visibleGames.length > 0 && visibleGames.every((game) => selectedGameIds.includes(game.id));
   const courtOptions = useMemo(() => numericCourtOptions(games, tournament), [games, tournament]);
