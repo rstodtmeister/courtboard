@@ -90,6 +90,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   const [lockedMessage, setLockedMessage] = useState("");
   const [liveError, setLiveError] = useState("");
   const [message, setMessage] = useState("");
+  const sideSwapTimeouts = useRef<number[]>([]);
 
   async function loadEntry() {
     setLoading(true);
@@ -164,6 +165,13 @@ export function ScoreEntryApp({ token }: { token: string }) {
     }, 1000);
     return () => window.clearTimeout(timeoutId);
   }, [activeTimeoutTeam, timeoutRemaining]);
+
+  useEffect(() => {
+    return () => {
+      sideSwapTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      sideSwapTimeouts.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     if (!resumeReady || !selectedGameId || !draft || workflowStep === "confirm" || workflowStep === "done") {
@@ -350,6 +358,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
     if (!servingTeam || !nextSideChangeInterval) {
       return;
     }
+    cancelPendingSideSwap();
     setSideChangeInterval(nextSideChangeInterval);
     setServerSetupStep("serve-team");
     const nextScore = scoreForSet(draft, activeSet);
@@ -388,6 +397,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
       ...current,
       {
         draft,
+        leftTeam,
         setScore,
         servingTeam,
         serverIndex,
@@ -432,15 +442,14 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function undoLastPoint() {
-    if (isSwappingSides) {
-      return;
-    }
+    cancelPendingSideSwap();
     const previous = pointHistory[pointHistory.length - 1];
     if (!previous) {
       return;
     }
     setPointHistory((current) => current.slice(0, -1));
     setDraft(previous.draft);
+    setLeftTeam(previous.leftTeam);
     setSetScore(previous.setScore);
     setServingTeam(previous.servingTeam);
     setServerIndex(previous.serverIndex);
@@ -454,15 +463,24 @@ export function ScoreEntryApp({ token }: { token: string }) {
     if (isSwappingSides) {
       return;
     }
+    cancelPendingSideSwap();
     const totalPoints = setScore.A + setScore.B;
     setIsSwappingSides(true);
-    window.setTimeout(() => {
+    const switchTimeout = window.setTimeout(() => {
       setLeftTeam((current) => current === "A" ? "B" : "A");
       setSideChangeAck(totalPoints);
     }, 1260);
-    window.setTimeout(() => {
+    const doneTimeout = window.setTimeout(() => {
       setIsSwappingSides(false);
+      sideSwapTimeouts.current = [];
     }, 1300);
+    sideSwapTimeouts.current = [switchTimeout, doneTimeout];
+  }
+
+  function cancelPendingSideSwap() {
+    sideSwapTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    sideSwapTimeouts.current = [];
+    setIsSwappingSides(false);
   }
 
   function takeTimeout(team: TeamKey) {
@@ -1311,7 +1329,10 @@ function LiveSetStep({
           <section className="side-change-dialog" role="dialog" aria-modal="true" aria-labelledby="side-change-title">
             <h3 id="side-change-title">Seitenwechsel</h3>
             <p>{setScore.A}:{setScore.B}</p>
-            <button type="button" onClick={onSwapSides}>Seiten gewechselt</button>
+            <div className="side-change-actions">
+              <button type="button" className="secondary" onClick={onUndo} disabled={!canUndo}>Punkt zurück</button>
+              <button type="button" onClick={onSwapSides}>Seiten gewechselt</button>
+            </div>
           </section>
         </div>
       )}
@@ -1341,7 +1362,12 @@ function LiveSetStep({
             <span className="swap-arrows" aria-hidden="true"><b>←</b><b>→</b></span>
             <span className="swap-label">Wechsel</span>
           </button>
-          <button type="button" className="undo-point-button" onClick={onUndo} disabled={!canUndo || sideChangeBlocking} aria-label="Letzte Punkteingabe rückgängig">↶</button>
+          <button type="button" className="undo-point-button" onClick={onUndo} disabled={!canUndo || sideChangeBlocking} aria-label="Letzte Punkteingabe rückgängig">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 7H4v5" />
+              <path d="M4.5 12a8 8 0 1 0 2.4-5.7L4 9" />
+            </svg>
+          </button>
           <button type="button" className={showActions ? "more-actions-button active" : "more-actions-button"} onClick={() => setShowActions((current) => !current)} disabled={sideChangeBlocking} aria-label="Weitere Aktionen">⋯</button>
         </div>
         <LiveTeamPanel

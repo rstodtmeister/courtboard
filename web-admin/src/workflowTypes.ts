@@ -23,6 +23,7 @@ export type TimeoutHistoryEntry = {
 
 export type LiveSnapshot = {
   draft: GameDraft;
+  leftTeam: TeamKey;
   setScore: Record<TeamKey, number>;
   servingTeam: TeamKey | "";
   serverIndex: Record<TeamKey, number>;

@@ -2046,6 +2046,11 @@ tbody tr:nth-child(even) {
   font-size: .95rem;
 }
 
+.side-change-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .timeout-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -2171,7 +2176,18 @@ tbody tr:nth-child(even) {
 }
 
 .undo-point-button {
-  font-size: 1.55rem;
+  display: grid;
+  place-items: center;
+}
+
+.undo-point-button svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .more-actions-button {
