@@ -1716,11 +1716,24 @@ function teamOptions(games: Game[]): string[] {
 }
 
 function playersForTeam(team: string | null, players?: string[]) {
-  if (players && players.length >= 2) {
-    return players.slice(0, 2);
+  const explicitPlayers = players?.map((player) => player.trim()).filter(Boolean);
+  if (explicitPlayers && explicitPlayers.length >= 2) {
+    return explicitPlayers.slice(0, 2);
+  }
+  const teamPlayers = playersFromTeamName(team);
+  if (teamPlayers.length >= 2) {
+    return teamPlayers.slice(0, 2);
   }
   const teamName = team || "Team";
   return [`${teamName} Spieler 1`, `${teamName} Spieler 2`];
+}
+
+function playersFromTeamName(team: string | null) {
+  return (team ?? "")
+    .replace(/\s*\(\d+\)\s*$/, "")
+    .split(/\s*(?:\/|\s+-\s+)\s*/)
+    .map((player) => player.trim())
+    .filter(Boolean);
 }
 
 function shortTeamLabel(value: string | null | undefined, fallback: string) {
