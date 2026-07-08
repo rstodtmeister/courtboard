@@ -466,7 +466,6 @@ export function ScoreEntryApp({ token }: { token: string }) {
     }
     cancelPendingSideSwap();
     const totalPoints = setScore.A + setScore.B;
-    setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
     setIsSwappingSides(true);
     const switchTimeout = window.setTimeout(() => {
       setLeftTeam((current) => current === "A" ? "B" : "A");
