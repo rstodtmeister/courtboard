@@ -2381,6 +2381,16 @@ tbody tr:nth-child(even) {
   line-height: 1;
 }
 
+.timeout-end-button {
+  min-height: 34px;
+  padding: 5px 12px;
+  border-color: #d97706;
+  background: #ffffff;
+  color: #7c2d12;
+  font-size: .82rem;
+  font-weight: 900;
+}
+
 .finish-set-dialog {
   width: min(360px, 100%);
   display: grid;
@@ -4910,6 +4920,12 @@ tbody tr:nth-child(even) {
 
   .timeout-overlay strong {
     font-size: 1.6rem;
+  }
+
+  .timeout-end-button {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: .72rem;
   }
 
   .finish-set-dialog {

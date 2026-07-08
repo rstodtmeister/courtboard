@@ -389,22 +389,23 @@ export function ScoreEntryApp({ token }: { token: string }) {
     }
   }
 
+  function currentLiveSnapshot(nextDraft: GameDraft): LiveSnapshot {
+    return {
+      draft: nextDraft,
+      leftTeam,
+      setScore,
+      servingTeam,
+      serverIndex,
+      serveCounts,
+      sideChangeAck,
+    };
+  }
+
   function changeSetPoint(team: TeamKey, delta: 1 | -1) {
     if (!draft || isSwappingSides) {
       return;
     }
-    setPointHistory((current) => [
-      ...current,
-      {
-        draft,
-        leftTeam,
-        setScore,
-        servingTeam,
-        serverIndex,
-        serveCounts,
-        sideChangeAck,
-      },
-    ]);
+    setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
 
     const nextScore = { ...setScore, [team]: Math.max(0, setScore[team] + delta) };
     const baseDraft = draftWithSetScore(draft, activeSet, nextScore);
@@ -460,11 +461,12 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function swapSides() {
-    if (isSwappingSides) {
+    if (!draft || isSwappingSides) {
       return;
     }
     cancelPendingSideSwap();
     const totalPoints = setScore.A + setScore.B;
+    setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
     setIsSwappingSides(true);
     const switchTimeout = window.setTimeout(() => {
       setLeftTeam((current) => current === "A" ? "B" : "A");
@@ -507,6 +509,11 @@ export function ScoreEntryApp({ token }: { token: string }) {
     };
     setDraft(nextDraft);
     void persistLiveDraft(nextDraft);
+  }
+
+  function endTimeout() {
+    setActiveTimeoutTeam(null);
+    setTimeoutRemaining(0);
   }
 
   async function finishCurrentSet() {
@@ -736,6 +743,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
                 onSwapSides={swapSides}
                 onPointChange={changeSetPoint}
                 onTimeout={takeTimeout}
+                onEndTimeout={endTimeout}
                 onUndo={undoLastPoint}
                 onToggleCorrection={() => setCorrectionMode((current) => !current)}
                 onBack={() => setWorkflowStep("servers")}
@@ -1250,6 +1258,7 @@ function LiveSetStep({
   onSwapSides,
   onPointChange,
   onTimeout,
+  onEndTimeout,
   onUndo,
   onToggleCorrection,
   onBack,
@@ -1280,6 +1289,7 @@ function LiveSetStep({
   onSwapSides: () => void;
   onPointChange: (team: TeamKey, delta: 1 | -1) => void;
   onTimeout: (team: TeamKey) => void;
+  onEndTimeout: () => void;
   onUndo: () => void;
   onToggleCorrection: () => void;
   onBack: () => void;
@@ -1330,7 +1340,6 @@ function LiveSetStep({
             <h3 id="side-change-title">Seitenwechsel</h3>
             <p>{setScore.A}:{setScore.B}</p>
             <div className="side-change-actions">
-              <button type="button" className="secondary" onClick={onUndo} disabled={!canUndo}>Punkt zurück</button>
               <button type="button" onClick={onSwapSides}>Seiten gewechselt</button>
             </div>
           </section>
@@ -1340,6 +1349,7 @@ function LiveSetStep({
         <div className="timeout-overlay" aria-live="polite">
           <span>Auszeit {activeTimeoutTeamName}</span>
           <strong>{timeoutRemaining}s</strong>
+          <button type="button" className="timeout-end-button" onClick={onEndTimeout}>Beenden</button>
         </div>
       )}
 
@@ -1364,8 +1374,8 @@ function LiveSetStep({
           </button>
           <button type="button" className="undo-point-button" onClick={onUndo} disabled={!canUndo || sideChangeBlocking} aria-label="Letzte Punkteingabe rückgängig">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M9 7H4v5" />
-              <path d="M4.5 12a8 8 0 1 0 2.4-5.7L4 9" />
+              <path d="M9 14 4 9l5-5" />
+              <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
             </svg>
           </button>
           <button type="button" className={showActions ? "more-actions-button active" : "more-actions-button"} onClick={() => setShowActions((current) => !current)} disabled={sideChangeBlocking} aria-label="Weitere Aktionen">⋯</button>
