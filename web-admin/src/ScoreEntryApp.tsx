@@ -448,15 +448,29 @@ export function ScoreEntryApp({ token }: { token: string }) {
     if (!previous) {
       return;
     }
+    const shouldAnimateSideUndo = previous.leftTeam !== leftTeam;
     setPointHistory((current) => current.slice(0, -1));
     setDraft(previous.draft);
-    setLeftTeam(previous.leftTeam);
     setSetScore(previous.setScore);
     setServingTeam(previous.servingTeam);
     setServerIndex(previous.serverIndex);
     setServeCounts(previous.serveCounts);
-    setSideChangeAck(previous.sideChangeAck);
     setLastPointTeam(null);
+    if (shouldAnimateSideUndo) {
+      setIsSwappingSides(true);
+      const switchTimeout = window.setTimeout(() => {
+        setLeftTeam(previous.leftTeam);
+        setSideChangeAck(previous.sideChangeAck);
+      }, 1260);
+      const doneTimeout = window.setTimeout(() => {
+        setIsSwappingSides(false);
+        sideSwapTimeouts.current = [];
+      }, 1300);
+      sideSwapTimeouts.current = [switchTimeout, doneTimeout];
+    } else {
+      setLeftTeam(previous.leftTeam);
+      setSideChangeAck(previous.sideChangeAck);
+    }
     void persistLiveDraft(previous.draft);
   }
 
