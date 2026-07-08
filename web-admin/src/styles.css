@@ -2595,6 +2595,69 @@ tbody tr:nth-child(even) {
   gap: 14px;
 }
 
+.final-review-card h2 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(1.8rem, 7vw, 3.4rem);
+  line-height: 1;
+  text-align: center;
+}
+
+.final-winner-panel {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 14px;
+  border: 2px solid #15803d;
+  border-radius: 8px;
+  background: #ecfdf3;
+  color: #111827;
+  text-align: center;
+}
+
+.final-winner-panel span {
+  color: #166534;
+  font-size: .9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.final-winner-panel strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.35rem, 6vw, 2.4rem);
+  line-height: 1.05;
+}
+
+.final-set-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.final-set-summary div {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 12px;
+  border: 1px solid #dde3ec;
+  border-radius: 6px;
+  background: #fbfcfe;
+  text-align: center;
+}
+
+.final-set-summary span {
+  min-width: 0;
+  color: #4b5563;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.final-set-summary strong {
+  color: #111827;
+  font-size: 2rem;
+  line-height: 1;
+}
+
 .thank-you-card {
   display: grid;
   gap: 14px;
@@ -3663,6 +3726,72 @@ tbody tr:nth-child(even) {
 
   .final-score-board {
     grid-template-columns: 74px repeat(2, minmax(0, 1fr));
+  }
+
+  .score-panel.final-review-mode {
+    align-content: start;
+    overflow: hidden;
+  }
+
+  .score-panel.final-review-mode .score-context-box {
+    display: none;
+  }
+
+  .score-panel.final-review-mode .score-form {
+    gap: 0;
+  }
+
+  .final-review-mode .final-review-card {
+    gap: 8px;
+    min-height: calc(100svh - 12px);
+    align-content: start;
+  }
+
+  .final-review-mode .final-review-card h2 {
+    font-size: clamp(1.35rem, 6vw, 2rem);
+  }
+
+  .final-review-mode .final-winner-panel {
+    gap: 3px;
+    padding: 8px;
+  }
+
+  .final-review-mode .final-winner-panel span {
+    font-size: .72rem;
+  }
+
+  .final-review-mode .final-winner-panel strong {
+    font-size: clamp(1.05rem, 5.5vw, 1.55rem);
+  }
+
+  .final-review-mode .final-set-summary {
+    gap: 6px;
+  }
+
+  .final-review-mode .final-set-summary div {
+    gap: 3px;
+    padding: 7px;
+  }
+
+  .final-review-mode .final-set-summary span {
+    font-size: .78rem;
+    line-height: 1.05;
+  }
+
+  .final-review-mode .final-set-summary strong {
+    font-size: 1.45rem;
+  }
+
+  .final-review-mode .score-flow-actions {
+    grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+    gap: 6px;
+  }
+
+  .final-review-mode .score-flow-actions button {
+    min-height: 38px;
+    padding: 7px 6px;
+    font-size: .78rem;
+    line-height: 1.1;
   }
 
   .swap-sides-button {

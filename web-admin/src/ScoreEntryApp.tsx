@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions, noRefereeSelection, specialGameRatingOptions } from "./appConfig";
 import { loadScoreEntry, submitScore } from "./dataApi";
-import { clearSetScore, completedSetRows, draftFromGame, draftWithSetScore, finalSetRows, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, scoreForSet, secondServer, serializePointHistory, serviceOrder, setScoreForSide, validateManualResult, withScoreAutomation } from "./scoreLogic";
+import { clearSetScore, completedSetRows, draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, scoreForSet, secondServer, serializePointHistory, serviceOrder, setScoreForSide, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import type { Game, GameDraft, ScoreEntryData } from "./types";
 import type { LiveSnapshot, ScoreEntryResumeState, ScoreWorkflowStep, ServerSetupStep, TeamKey } from "./workflowTypes";
 
@@ -643,7 +643,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
 
   return (
     <main className="score-app">
-      <section className="score-panel">
+      <section className={workflowStep === "scoring" && !finalEditing ? "score-panel final-review-mode" : "score-panel"}>
         <h1>{workflowStep === "scoring" && finalEditing && !draft?.referee ? "Ergebnis erfassen" : "Schiedsrichterbogen"}</h1>
         {!loading && !lockedMessage && selectedGame && draft && workflowStep !== "live" && (
           <ScoreContextBox game={selectedGame} draft={draft} showReferee={workflowStep !== "confirm"} />
@@ -796,7 +796,6 @@ export function ScoreEntryApp({ token }: { token: string }) {
                   draft={draft}
                   saving={saving}
                   onBack={() => draft.referee ? setWorkflowStep("live") : setFinalEditing(true)}
-                  onEdit={() => setFinalEditing(true)}
                   onConfirm={() => confirmFinalResult(draft)}
                 />
               )
@@ -1491,50 +1490,34 @@ function FinalReviewStep({
   draft,
   saving,
   onBack,
-  onEdit,
   onConfirm,
 }: {
   game: Game;
   draft: GameDraft;
   saving: boolean;
   onBack: () => void;
-  onEdit: () => void;
   onConfirm: () => void;
 }) {
-  const rows = finalSetRows(draft);
+  const result = completedResultParts({ ...game, ...draft });
   return (
     <section className="final-review-card">
-      <div className="step-kicker">Spiel pruefen</div>
-      <MatchHeading game={game} />
-      <div className="final-score-board">
-        <div></div>
-        <strong>{game.team_a || "Team A"}</strong>
-        <strong>{game.team_b || "Team B"}</strong>
-        {rows.map((row) => (
-          <React.Fragment key={row.label}>
-            <span>{row.label}</span>
-            <strong>{row.teamA || "-"}</strong>
-            <strong>{row.teamB || "-"}</strong>
-          </React.Fragment>
-        ))}
+      <h2>Spiel abschließen?</h2>
+      <div className="final-winner-panel">
+        <span>Sieger</span>
+        <strong>{draft.winner_team || "nicht eindeutig"}</strong>
       </div>
-      <div className="final-result-panel">
+      <div className="final-set-summary">
         <div>
-          <span>Saetze</span>
-          <strong>{draft.result || "-"}</strong>
+          <span>{game.team_a || "Team A"}</span>
+          <strong>{result.teamA}</strong>
         </div>
         <div>
-          <span>Siegerteam</span>
-          <strong>{draft.winner_team || "nicht eindeutig"}</strong>
-        </div>
-        <div>
-          <span>Wertung</span>
-          <strong>{draft.game_rating || "Normal"}</strong>
+          <span>{game.team_b || "Team B"}</span>
+          <strong>{result.teamB}</strong>
         </div>
       </div>
       <div className="score-flow-actions">
         <button type="button" className="secondary" onClick={onBack}>Zurück</button>
-        <button type="button" className="secondary" onClick={onEdit}>Bearbeiten</button>
         <button type="button" onClick={onConfirm} disabled={saving}>{saving ? "Speichert..." : `Sieger bestätigen: ${draft.winner_team || "-"}`}</button>
       </div>
     </section>
