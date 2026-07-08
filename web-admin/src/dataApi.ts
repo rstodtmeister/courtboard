@@ -193,7 +193,7 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
   });
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Spiele konnten nicht von HVV geladen werden.");
+    throw new Error(await supabaseFunctionErrorMessage(error, "Spiele konnten nicht von HVV geladen werden."));
   }
 
   return data;
@@ -366,7 +366,7 @@ export async function createScoreLink(params: { tournamentId: string; gameId?: s
   });
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Link konnte nicht erzeugt werden.");
+    throw new Error(await supabaseFunctionErrorMessage(error, "Link konnte nicht erzeugt werden."));
   }
 
   return data;
@@ -394,7 +394,7 @@ export async function loadScoreEntry(token: string): Promise<ScoreEntryData> {
   );
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Der Ergebnislink konnte nicht geladen werden.");
+    throw new Error(await supabaseFunctionErrorMessage(error, "Der Ergebnislink konnte nicht geladen werden."));
   }
 
   return data;
@@ -506,8 +506,38 @@ export async function submitScore(token: string, game: Game, draft: GameDraft): 
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(await supabaseFunctionErrorMessage(error, "Ergebnis konnte nicht gespeichert werden."));
   }
+}
+
+async function supabaseFunctionErrorMessage(error: unknown, fallback: string) {
+  if (!error) {
+    return fallback;
+  }
+
+  const context = typeof error === "object" && "context" in error
+    ? (error as { context?: unknown }).context
+    : null;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json() as { error?: unknown; message?: unknown };
+      const message = typeof body.error === "string" ? body.error : typeof body.message === "string" ? body.message : "";
+      if (message) {
+        return message;
+      }
+    } catch {
+      try {
+        const text = await context.clone().text();
+        if (text.trim()) {
+          return text.trim();
+        }
+      } catch {
+        // Fall back to the Supabase error message below.
+      }
+    }
+  }
+
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function readStore(): LocalStore {
