@@ -5,9 +5,12 @@ import { ScoreEntryApp } from "./ScoreEntryApp";
 import {
   createScoreLink as createScoreLinkData,
   disableScoreLink,
+  getHvvCredentialsStatus,
   getSession,
   getTournament,
+  inviteAdminUser,
   listGames,
+  listAdminUsers,
   listScoreLinks,
   loadScoreEntry,
   onSessionChange,
@@ -15,6 +18,7 @@ import {
   saveTournament,
   signIn,
   signOut,
+  setHvvCredentials,
   syncGamesFromHvv,
   submitScore,
   unlockScoreGame,
@@ -39,7 +43,7 @@ import {
   validateManualResult,
   withScoreAutomation,
 } from "./scoreLogic";
-import type { AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, Tournament } from "./types";
+import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, Tournament } from "./types";
 import type {
   AdminTab,
   LiveSnapshot,
@@ -87,7 +91,7 @@ function AdminApp() {
 
   return (
     <Shell>
-      {session ? <AdminDashboard /> : <LoginForm />}
+      {session ? <AdminDashboard session={session} /> : <LoginForm />}
     </Shell>
   );
 }
@@ -144,10 +148,11 @@ function LoginForm() {
   );
 }
 
-function AdminDashboard() {
+function AdminDashboard({ session }: { session: AppSession }) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scoreLinks, setScoreLinks] = useState<ScoreLink[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusSyncing, setStatusSyncing] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -158,6 +163,9 @@ function AdminDashboard() {
   const [linkText, setLinkText] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [pendingSyncOverwriteCourts, setPendingSyncOverwriteCourts] = useState<boolean | null>(null);
+  const [showHvvCredentialsDialog, setShowHvvCredentialsDialog] = useState(false);
+  const isSuperadmin = session.user.role === "superadmin";
 
   const loadDashboard = useCallback(async (options: { silent?: boolean; initial?: boolean } = {}) => {
     const silent = options.silent ?? false;
@@ -172,14 +180,16 @@ function AdminDashboard() {
     }
 
     try {
-      const [gameData, tournamentData, linkData] = await Promise.all([
+      const [gameData, tournamentData, linkData, adminsData] = await Promise.all([
         listGames(),
         getTournament(),
         listScoreLinks(),
+        isSuperadmin ? listAdminUsers() : Promise.resolve([]),
       ]);
       setGames(gameData);
       setTournament(tournamentData);
       setScoreLinks(linkData);
+      setAdminUsers(adminsData);
       setLastSyncedAt(formatSyncTime(new Date()));
     } catch (gamesError) {
       if (!silent) {
@@ -193,7 +203,7 @@ function AdminDashboard() {
         setStatusSyncing(false);
       }
     }
-  }, []);
+  }, [isSuperadmin]);
 
   useEffect(() => {
     loadDashboard({ initial: true });
@@ -327,6 +337,11 @@ function AdminDashboard() {
 
   async function syncGames(overwriteCourts: boolean) {
     setShowSyncDialog(false);
+    if (!getHvvCredentialsStatus().active) {
+      setPendingSyncOverwriteCourts(overwriteCourts);
+      setShowHvvCredentialsDialog(true);
+      return;
+    }
     setSyncing(true);
     setError("");
     setMessage("");
@@ -338,6 +353,29 @@ function AdminDashboard() {
       setError(syncError instanceof Error ? syncError.message : "Spiele konnten nicht geladen werden.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function continuePendingSync() {
+    const overwriteCourts = pendingSyncOverwriteCourts;
+    setPendingSyncOverwriteCourts(null);
+    setShowHvvCredentialsDialog(false);
+    if (overwriteCourts !== null) {
+      await syncGames(overwriteCourts);
+    }
+  }
+
+  async function inviteAdmin(email: string, role: AdminRole) {
+    setError("");
+    setMessage("");
+    try {
+      await inviteAdminUser({ email, role });
+      setAdminUsers(await listAdminUsers());
+      setMessage(`Einladung an ${email} gesendet.`);
+      return true;
+    } catch (adminError) {
+      setError(adminError instanceof Error ? adminError.message : "Admin konnte nicht eingeladen werden.");
+      return false;
     }
   }
 
@@ -389,6 +427,8 @@ function AdminDashboard() {
         activeTab={activeTab}
         gamesCount={games.length}
         courtsCount={courts.length}
+        adminCount={adminUsers.length}
+        isSuperadmin={isSuperadmin}
         onChange={setActiveTab}
       />
 
@@ -430,6 +470,9 @@ function AdminDashboard() {
               />
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
+          {activeTab === "admins" && isSuperadmin && (
+            <AdminUsersPanel admins={adminUsers} onInvite={inviteAdmin} />
+          )}
         </div>
       )}
       {showSyncDialog && (
@@ -441,6 +484,18 @@ function AdminDashboard() {
           onSecondary={() => syncGames(false)}
           onPrimary={() => syncGames(true)}
           onClose={() => setShowSyncDialog(false)}
+        />
+      )}
+      {showHvvCredentialsDialog && (
+        <HvvCredentialsDialog
+          onSave={(username, password) => {
+            setHvvCredentials(username, password);
+            void continuePendingSync();
+          }}
+          onClose={() => {
+            setPendingSyncOverwriteCourts(null);
+            setShowHvvCredentialsDialog(false);
+          }}
         />
       )}
     </section>
@@ -467,11 +522,15 @@ function AdminTabs({
   activeTab,
   gamesCount,
   courtsCount,
+  adminCount,
+  isSuperadmin,
   onChange,
 }: {
   activeTab: AdminTab;
   gamesCount: number;
   courtsCount: number;
+  adminCount: number;
+  isSuperadmin: boolean;
   onChange: (tab: AdminTab) => void;
 }) {
   const tabs: Array<{ id: AdminTab; label: string; count?: number }> = [
@@ -479,6 +538,9 @@ function AdminTabs({
     { id: "courts", label: "Courts", count: courtsCount },
     { id: "settings", label: "Turnier" },
   ];
+  if (isSuperadmin) {
+    tabs.push({ id: "admins", label: "Admins", count: adminCount });
+  }
 
   return (
     <nav className="admin-tabs" aria-label="Admin Bereiche">
@@ -495,6 +557,119 @@ function AdminTabs({
         </button>
       ))}
     </nav>
+  );
+}
+
+function HvvCredentialsDialog({
+  onSave,
+  onClose,
+}: {
+  onSave: (username: string, password: string) => void;
+  onClose: () => void;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!username.trim() || !password) {
+      setError("HVV-Benutzer und Passwort sind erforderlich.");
+      return;
+    }
+    onSave(username.trim(), password);
+  }
+
+  return (
+    <div className="app-dialog-backdrop" role="presentation">
+      <section className="app-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-credentials-title">
+        <h3 id="hvv-credentials-title">HVV-Zugang</h3>
+        <p>Der Zugang wird nur fuer diese laufende Admin-Sitzung gehalten und beim Abmelden oder nach Ablauf geloescht.</p>
+        <form className="form-grid" onSubmit={submit}>
+          <label>
+            HVV-Benutzer
+            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
+          </label>
+          <label>
+            HVV-Passwort
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
+          </label>
+          {error && <div className="error">{error}</div>}
+          <div className="app-dialog-actions">
+            <button type="button" className="secondary" onClick={onClose}>Abbrechen</button>
+            <button type="submit">Fortfahren</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function AdminUsersPanel({
+  admins,
+  onInvite,
+}: {
+  admins: AdminUser[];
+  onInvite: (email: string, role: AdminRole) => Promise<boolean>;
+}) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<AdminRole>("admin");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    const ok = await onInvite(email.trim(), role);
+    if (ok) {
+      setEmail("");
+      setRole("admin");
+    }
+    setSaving(false);
+  }
+
+  return (
+    <section className="admin-users-panel">
+      <form className="admin-invite-form" onSubmit={submit}>
+        <div>
+          <h3>Admin einladen</h3>
+          <p>Der neue Admin bekommt eine E-Mail und setzt seinen Zugang ueber Supabase Auth.</p>
+        </div>
+        <label>
+          E-Mail
+          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </label>
+        <label>
+          Rolle
+          <select value={role} onChange={(event) => setRole(event.target.value as AdminRole)}>
+            <option value="admin">Admin</option>
+            <option value="superadmin">Superadmin</option>
+          </select>
+        </label>
+        <button type="submit" disabled={saving}>{saving ? "Sendet..." : "Einladen"}</button>
+      </form>
+      <div className="table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>E-Mail</th>
+              <th>Rolle</th>
+              <th>Status</th>
+              <th>Angelegt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {admins.map((admin) => (
+              <tr key={admin.user_id}>
+                <td>{admin.email}</td>
+                <td>{admin.role === "superadmin" ? "Superadmin" : "Admin"}</td>
+                <td>{admin.email_confirmed_at ? "E-Mail bestaetigt" : "Einladung offen"}</td>
+                <td>{formatDateTime(admin.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -1320,6 +1495,16 @@ function formatSyncTime(date: Date) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function displayUrl() {

@@ -13,7 +13,7 @@ Ziel: Die bestehende Desktop-Anwendung bleibt erhalten. Parallel entsteht eine g
   - Ergebnislink erzeugen
   - Ergebnislink pruefen und Ergebnis speichern
 
-HVV-Zugangsdaten und Supabase Secret Keys duerfen nie in der GitHub-Pages-App liegen.
+HVV-Zugangsdaten und Supabase Secret Keys duerfen nie dauerhaft in der GitHub-Pages-App liegen. Der HVV-Zugang wird im Web-Admin nur fuer die laufende Sitzung im Speicher gehalten, beim Abmelden geloescht und bei HVV-Aktionen an Backend/Edge Function uebergeben.
 
 ## Schritt 1: Datenmodell
 
@@ -25,7 +25,7 @@ supabase/migrations/20260629161000_initial_admin_schema.sql
 
 Sie legt an:
 
-- `admin_users`: Supabase-User, die Admin-Rechte haben
+- `admin_users`: Supabase-User, die Admin- oder Superadmin-Rechte haben
 - `tournaments`: Turniere mit HVV-URLs
 - `games`: Spiele inklusive Teams, Court, Wertung, Satzpunkten, Edit-Daten und Druckstatus
 - `score_entry_links`: tokenbasierte Links fuer Anwender ohne Benutzerkonto
@@ -42,12 +42,14 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Danach den ersten Admin-Benutzer in Supabase Auth anlegen und dessen User-ID in `admin_users` eintragen:
+Danach den ersten Superadmin-Benutzer in Supabase Auth anlegen, E-Mail bestaetigen und dessen User-ID in `admin_users` eintragen:
 
 ```sql
-insert into public.admin_users (user_id)
-values ('<auth-user-id>');
+insert into public.admin_users (user_id, role)
+values ('<auth-user-id>', 'superadmin');
 ```
+
+Nur Superadmins koennen in der Web-App weitere Admins einladen. Die Einladung laeuft per E-Mail ueber Supabase Auth; der neue Admin muss den Link bestaetigen und seinen Zugang einrichten. Lokale Supabase-Auth ist auf E-Mail-Bestaetigung konfiguriert.
 
 Lokal wurde die Supabase-Struktur bereits initialisiert. Fuer die lokale Entwicklung:
 
@@ -75,6 +77,7 @@ Geplante Functions:
 
 - `sync-games`: HVV-Seite abrufen, Spiele parsen, `games` aktualisieren
 - `save-game`: Spielwerte aus der Admin-UI entgegennehmen und an HVV speichern
+- `manage-admins`: Superadmin laedt weitere Admins per E-Mail ein
 - `create-score-link`: Admin erzeugt Link fuer ein Spiel oder einen Court
 - `submit-score`: Anwender ohne Login speichert Ergebnis ueber Token
 
@@ -118,6 +121,7 @@ Lokaler Offline-Modus:
 - Beispielspiele werden beim ersten Start automatisch angelegt.
 - Die Spieleliste ist HVV-getrieben. Spiele koennen nicht manuell angelegt oder geloescht werden.
 - Lokal gibt es einen `HVV laden`-Button, der die lokale Java-API nutzt.
+- Der HVV-Zugang wird beim ersten HVV-Laden abgefragt und nur temporaer fuer die laufende Browser-Sitzung gehalten.
 - Court, Schiri, Ergebnis/Satzpunkte, PDF-Druckstatus, Spiel-Tokens und Court-Tokens werden lokal persistiert.
 - Ergebnis und Sieger werden aus den Satzpunkten automatisch abgeleitet.
 - Turnierdaten wie Name, HVV-URLs und Courts werden lokal konfiguriert.

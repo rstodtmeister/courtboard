@@ -73,7 +73,18 @@ export type ScoreEntryData = {
 export type AppSession = {
   user: {
     email: string;
+    role?: AdminRole;
   };
+};
+
+export type AdminRole = "superadmin" | "admin";
+
+export type AdminUser = {
+  user_id: string;
+  email: string;
+  role: AdminRole;
+  created_at: string;
+  email_confirmed_at: string | null;
 };
 
 export type GameDraft = Pick<

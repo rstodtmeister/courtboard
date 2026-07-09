@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse, Tournament } from "./types";
+import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse, Tournament } from "./types";
 
 const gameSelect =
   "id,tournament_id,number,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
@@ -56,14 +56,23 @@ type StoredScoreLink = {
 
 type LocalStore = {
   session: AppSession | null;
+  admins: AdminUser[];
   tournament: Tournament;
   games: Game[];
   links: StoredScoreLink[];
 };
 
+type HvvCredentials = {
+  username: string;
+  password: string;
+  expiresAt: number;
+};
+
 const storeKey = "courtboard.localData.v1";
 const deviceIdKey = "courtboard.deviceId.v1";
 let supabaseClient: SupabaseClient | null = null;
+let hvvCredentials: HvvCredentials | null = null;
+const hvvCredentialsTtlMs = 60 * 60 * 1000;
 
 function getSupabase() {
   if (!supabaseClient) {
@@ -81,8 +90,12 @@ export async function getSession(): Promise<AppSession | null> {
   }
 
   const { data } = await getSupabase().auth.getSession();
-  const email = data.session?.user.email;
-  return email ? { user: { email } } : null;
+  const user = data.session?.user;
+  if (!user?.email) {
+    return null;
+  }
+
+  return { user: { email: user.email, role: await currentAdminRole(user.id) } };
 }
 
 export function onSessionChange(callback: (session: AppSession | null) => void) {
@@ -97,8 +110,12 @@ export function onSessionChange(callback: (session: AppSession | null) => void) 
   }
 
   const { data } = getSupabase().auth.onAuthStateChange((_event, session) => {
-    const email = session?.user.email;
-    callback(email ? { user: { email } } : null);
+    const user = session?.user;
+    if (!user?.email) {
+      callback(null);
+      return;
+    }
+    currentAdminRole(user.id).then((role) => callback({ user: { email: user.email!, role } }));
   });
 
   return () => data.subscription.unsubscribe();
@@ -110,7 +127,8 @@ export async function signIn(email: string, password: string): Promise<{ error?:
       return { error: "E-Mail und Passwort sind erforderlich." };
     }
 
-    updateStore({ session: { user: { email } } });
+    const admin = readStore().admins.find((item) => item.email.toLowerCase() === email.toLowerCase());
+    updateStore({ session: { user: { email, role: admin?.role ?? "admin" } } });
     return {};
   }
 
@@ -119,12 +137,105 @@ export async function signIn(email: string, password: string): Promise<{ error?:
 }
 
 export async function signOut() {
+  clearHvvCredentials();
   if (dataMode === "local") {
     updateStore({ session: null });
     return;
   }
 
   await getSupabase().auth.signOut();
+}
+
+async function currentAdminRole(userId: string): Promise<AdminRole> {
+  const { data, error } = await getSupabase()
+    .from("admin_users")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data?.role) {
+    return "admin";
+  }
+
+  return data.role === "superadmin" ? "superadmin" : "admin";
+}
+
+export function getHvvCredentialsStatus() {
+  const credentials = activeHvvCredentials();
+  return credentials ? { active: true, username: credentials.username, expiresAt: credentials.expiresAt } : { active: false };
+}
+
+export function setHvvCredentials(username: string, password: string) {
+  hvvCredentials = {
+    username,
+    password,
+    expiresAt: Date.now() + hvvCredentialsTtlMs,
+  };
+}
+
+export function clearHvvCredentials() {
+  hvvCredentials = null;
+}
+
+function activeHvvCredentials() {
+  if (!hvvCredentials || hvvCredentials.expiresAt <= Date.now()) {
+    hvvCredentials = null;
+    return null;
+  }
+  return hvvCredentials;
+}
+
+function requireHvvCredentials() {
+  const credentials = activeHvvCredentials();
+  if (!credentials) {
+    throw new Error("HVV-Zugangsdaten fehlen. Bitte HVV-Zugang fuer diese Sitzung eingeben.");
+  }
+  return credentials;
+}
+
+export async function listAdminUsers(): Promise<AdminUser[]> {
+  if (dataMode === "local") {
+    return readStore().admins;
+  }
+
+  const { data, error } = await getSupabase().functions.invoke<{ admins: AdminUser[] }>("manage-admins", {
+    method: "GET",
+  });
+
+  if (error || !data) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "Admins konnten nicht geladen werden."));
+  }
+
+  return data.admins;
+}
+
+export async function inviteAdminUser(params: { email: string; role: AdminRole }): Promise<AdminUser> {
+  if (dataMode === "local") {
+    const store = readStore();
+    const existing = store.admins.find((admin) => admin.email.toLowerCase() === params.email.toLowerCase());
+    if (existing) {
+      throw new Error("Dieser Admin existiert bereits.");
+    }
+    const admin: AdminUser = {
+      user_id: createId("local-admin"),
+      email: params.email,
+      role: params.role,
+      created_at: new Date().toISOString(),
+      email_confirmed_at: new Date().toISOString(),
+    };
+    writeStore({ ...store, admins: [...store.admins, admin] });
+    return admin;
+  }
+
+  const { data, error } = await getSupabase().functions.invoke<{ admin: AdminUser }>("manage-admins", {
+    body: params,
+  });
+
+  if (error || !data) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "Admin konnte nicht eingeladen werden."));
+  }
+
+  return data.admin;
 }
 
 export async function listGames(): Promise<Game[]> {
@@ -151,6 +262,7 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
 
   if (dataMode === "local") {
     const store = readStore();
+    const credentials = requireHvvCredentials();
     try {
       const existingGames = (await localJson<LocalGamesResponse>("/api/games")).games;
       const response = await fetch(`${localApiUrl}/api/games/sync`, {
@@ -158,8 +270,8 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: source,
-          username: "",
-          password: "",
+          username: credentials.username,
+          password: credentials.password,
         }),
       });
       const body = await response.json();
@@ -189,7 +301,12 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
   }
 
   const { data, error } = await getSupabase().functions.invoke<SyncGamesResult>("sync-games", {
-    body: { tournamentId: tournament.id, overwriteCourts: options.overwriteCourts, overwriteReferees: false },
+    body: {
+      tournamentId: tournament.id,
+      overwriteCourts: options.overwriteCourts,
+      overwriteReferees: false,
+      hvvCredentials: requireHvvCredentials(),
+    },
   });
 
   if (error || !data) {
@@ -577,7 +694,16 @@ function writeStore(store: LocalStore) {
 function seedStore(): LocalStore {
   const tournamentId = "local-tournament-1";
   return {
-    session: { user: { email: "admin@local.test" } },
+    session: { user: { email: "admin@local.test", role: "superadmin" } },
+    admins: [
+      {
+        user_id: "local-superadmin-1",
+        email: "admin@local.test",
+        role: "superadmin",
+        created_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString(),
+      },
+    ],
     tournament: {
       id: tournamentId,
       name: "Lokales Beispielturnier",
@@ -606,7 +732,10 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
   };
 
   return {
-    session: store.session ?? seeded.session,
+    session: store.session
+      ? { user: { ...store.session.user, role: store.session.user.role ?? seeded.admins[0].role } }
+      : seeded.session,
+    admins: store.admins ?? seeded.admins,
     tournament: {
       ...tournament,
       token_base_url: tournament.token_base_url ?? "",

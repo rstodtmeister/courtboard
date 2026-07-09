@@ -360,6 +360,35 @@ select {
   justify-content: center;
 }
 
+.admin-users-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-invite-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 1fr) minmax(140px, .6fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.admin-invite-form h3 {
+  margin: 0;
+}
+
+.admin-invite-form p {
+  margin: 5px 0 0;
+  color: #656d78;
+}
+
+.admin-table {
+  min-width: 720px;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid #dde3ec;
