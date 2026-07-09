@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { CourtDisplayApp } from "./CourtDisplayApp";
 import { ScoreEntryApp } from "./ScoreEntryApp";
 import {
+  completeAuthRedirect,
   createScoreLink as createScoreLinkData,
   deleteAdminUser,
   disableScoreLink,
@@ -58,9 +59,14 @@ import "./styles.css";
 
 function App() {
   const params = new URLSearchParams(window.location.search);
+  const auth = params.get("auth") ?? "";
   const token = params.get("token") ?? "";
   const view = params.get("view") ?? "";
   const court = params.get("court") ?? "";
+
+  if (auth === "confirmed") {
+    return <AuthConfirmedApp />;
+  }
 
   if (token) {
     return <ScoreEntryApp token={token} />;
@@ -71,6 +77,41 @@ function App() {
   }
 
   return <AdminApp />;
+}
+
+function AuthConfirmedApp() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    completeAuthRedirect().then((result) => {
+      if (result.error) {
+        setError(result.error);
+      }
+      setLoading(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      url.searchParams.delete("auth");
+      url.hash = "";
+      window.history.replaceState({}, "", url.toString());
+    });
+  }, []);
+
+  return (
+    <Shell>
+      <section className="panel login-panel">
+        <h2>E-Mail bestaetigt</h2>
+        {loading ? (
+          <div className="status">Bestaetigung wird abgeschlossen...</div>
+        ) : error ? (
+          <div className="error">{error}</div>
+        ) : (
+          <p className="login-hint">Dein Admin-Zugang wurde bestaetigt. Du kannst dich jetzt anmelden.</p>
+        )}
+        <a className="button-link" href={loginUrl()}>Zur Anmeldung</a>
+      </section>
+    </Shell>
+  );
 }
 
 function AdminApp() {
@@ -1535,6 +1576,13 @@ function scoreUrl(token: string, baseUrl?: string | null) {
   url.search = "";
   url.hash = "";
   url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function loginUrl() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
   return url.toString();
 }
 

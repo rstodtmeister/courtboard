@@ -12,6 +12,20 @@ type DeleteAdminRequest = {
   userId?: string;
 };
 
+function authRedirectUrl(req: Request) {
+  const referer = req.headers.get("referer");
+  const origin = req.headers.get("origin");
+  const baseUrl = referer ?? origin;
+  if (!baseUrl) {
+    return undefined;
+  }
+  const url = new URL(baseUrl);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("auth", "confirmed");
+  return url.toString();
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) {
@@ -55,9 +69,13 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "email is required" }, 400);
   }
 
-  const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { role },
-  });
+  const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+    email,
+    {
+      data: { role },
+      redirectTo: authRedirectUrl(req),
+    },
+  );
 
   if (inviteError || !invited.user) {
     return jsonResponse({ error: inviteError?.message ?? "Invite failed" }, 500);

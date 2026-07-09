@@ -98,6 +98,32 @@ export async function getSession(): Promise<AppSession | null> {
   return { user: { email: user.email, role: await currentAdminRole(user.id) } };
 }
 
+export async function completeAuthRedirect(): Promise<{ error?: string }> {
+  if (dataMode === "local") {
+    return {};
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const redirectError = params.get("error_description") ?? params.get("error");
+  if (redirectError) {
+    return { error: redirectError };
+  }
+  const code = params.get("code");
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  if (code) {
+    const { error } = await getSupabase().auth.exchangeCodeForSession(code);
+    if (error) {
+      return { error: error.message };
+    }
+  } else if (hashParams.has("access_token") || hashParams.has("refresh_token")) {
+    await getSupabase().auth.getSession();
+  }
+
+  await getSupabase().auth.signOut();
+  return {};
+}
+
 export function onSessionChange(callback: (session: AppSession | null) => void) {
   if (dataMode === "local") {
     const listener = (event: StorageEvent) => {
