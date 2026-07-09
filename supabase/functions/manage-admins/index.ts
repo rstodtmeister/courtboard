@@ -36,6 +36,9 @@ function authRedirectUrl(req: Request) {
   const configuredUrl = Deno.env.get("ADMIN_APP_URL");
   if (configuredUrl) {
     const url = new URL(configuredUrl);
+    if (isLocalUrl(url)) {
+      return null;
+    }
     url.search = "";
     url.hash = "";
     url.searchParams.set("auth", "confirmed");
@@ -46,11 +49,11 @@ function authRedirectUrl(req: Request) {
   const origin = req.headers.get("origin");
   const baseUrl = referer ?? origin;
   if (!baseUrl) {
-    return undefined;
+    return null;
   }
   const url = new URL(baseUrl);
   if (isLocalUrl(url)) {
-    return undefined;
+    return null;
   }
   url.search = "";
   url.hash = "";
@@ -128,12 +131,18 @@ async function inviteAdmin(
 ) {
   let inviteEmailSent = true;
   let emailError: string | null = null;
+  const redirectTo = authRedirectUrl(req);
+  if (!redirectTo) {
+    return jsonResponse({
+      error: "ADMIN_APP_URL muss auf die oeffentliche Admin-Web-App zeigen, bevor Einladungen versendet werden koennen.",
+    }, 500);
+  }
 
   const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
     {
       data: { role },
-      redirectTo: authRedirectUrl(req),
+      redirectTo,
     },
   );
 
@@ -230,6 +239,12 @@ async function updateAdmin(
   }
 
   if (body.action === "resendInvite") {
+    const redirectTo = authRedirectUrl(req);
+    if (!redirectTo) {
+      return jsonResponse({
+        error: "ADMIN_APP_URL muss auf die oeffentliche Admin-Web-App zeigen, bevor Einladungen versendet werden koennen.",
+      }, 500);
+    }
     const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId);
     const email = userData.user?.email;
     if (userError || !email) {
@@ -237,7 +252,7 @@ async function updateAdmin(
     }
     const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: { role: target.row.role },
-      redirectTo: authRedirectUrl(req),
+      redirectTo,
     });
     if (error) {
       return jsonResponse({ error: error.message }, 500);

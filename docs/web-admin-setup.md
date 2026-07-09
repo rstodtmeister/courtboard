@@ -51,6 +51,19 @@ values ('<auth-user-id>', 'superadmin', false);
 
 Nur Superadmins koennen in der Web-App weitere Admins einladen. Die Einladung laeuft per E-Mail ueber Supabase Auth; der neue Admin muss den Link bestaetigen und seinen Zugang einrichten. Lokale Supabase-Auth ist auf E-Mail-Bestaetigung konfiguriert.
 
+Damit Einladungs-E-Mails nicht auf `localhost` zeigen, muss die Edge Function die oeffentliche Admin-URL kennen:
+
+```bash
+supabase secrets set ADMIN_APP_URL=https://<github-user>.github.io/<repo>/
+supabase functions deploy manage-admins
+```
+
+Dieselbe URL muss in Supabase Auth als erlaubte Redirect URL eingetragen sein, inklusive Auth-Parameter:
+
+```text
+https://<github-user>.github.io/<repo>/?auth=confirmed
+```
+
 Lokal wurde die Supabase-Struktur bereits initialisiert. Fuer die lokale Entwicklung:
 
 ```bash
