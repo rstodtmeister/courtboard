@@ -8,13 +8,17 @@ type InviteAdminRequest = {
   role?: AdminRole;
 };
 
+type DeleteAdminRequest = {
+  userId?: string;
+};
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) {
     return cors;
   }
 
-  if (req.method !== "GET" && req.method !== "POST") {
+  if (req.method !== "GET" && req.method !== "POST" && req.method !== "DELETE") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
@@ -37,6 +41,10 @@ Deno.serve(async (req) => {
 
   if (req.method === "GET") {
     return listAdmins(adminClient);
+  }
+
+  if (req.method === "DELETE") {
+    return deleteAdmin(req, adminClient, userData.user.id);
   }
 
   const body = await req.json() as InviteAdminRequest;
@@ -77,6 +85,59 @@ Deno.serve(async (req) => {
     },
   });
 });
+
+async function deleteAdmin(
+  req: Request,
+  adminClient: ReturnType<typeof createAdminClient>,
+  currentUserId: string,
+) {
+  const body = await req.json() as DeleteAdminRequest;
+  const userId = body.userId?.trim();
+
+  if (!userId) {
+    return jsonResponse({ error: "userId is required" }, 400);
+  }
+
+  const { data: targetAdmin, error: targetError } = await adminClient
+    .from("admin_users")
+    .select("user_id,role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (targetError) {
+    return jsonResponse({ error: targetError.message }, 500);
+  }
+
+  if (!targetAdmin) {
+    return jsonResponse({ error: "Admin not found" }, 404);
+  }
+
+  if (targetAdmin.role === "superadmin") {
+    const { count, error: countError } = await adminClient
+      .from("admin_users")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "superadmin");
+
+    if (countError) {
+      return jsonResponse({ error: countError.message }, 500);
+    }
+
+    if ((count ?? 0) <= 1) {
+      return jsonResponse({ error: "Der letzte Superadmin kann nicht geloescht werden." }, 400);
+    }
+  }
+
+  if (userId === currentUserId && targetAdmin.role === "superadmin") {
+    return jsonResponse({ error: "Du kannst deinen eigenen Superadmin-Zugang nicht loeschen." }, 400);
+  }
+
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+  if (deleteError) {
+    return jsonResponse({ error: deleteError.message }, 500);
+  }
+
+  return jsonResponse({ ok: true });
+}
 
 async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
   const { data: rows, error } = await adminClient

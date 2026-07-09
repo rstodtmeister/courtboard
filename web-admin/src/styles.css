@@ -389,6 +389,16 @@ select {
   min-width: 720px;
 }
 
+.danger-button {
+  border-color: #e6b8b8;
+  color: #9a1c1c;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: #c84a4a;
+  background: #fff1f1;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid #dde3ec;

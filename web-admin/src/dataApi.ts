@@ -238,6 +238,31 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
   return data.admin;
 }
 
+export async function deleteAdminUser(userId: string): Promise<void> {
+  if (dataMode === "local") {
+    const store = readStore();
+    const target = store.admins.find((admin) => admin.user_id === userId);
+    if (!target) {
+      throw new Error("Admin nicht gefunden.");
+    }
+    const superadminCount = store.admins.filter((admin) => admin.role === "superadmin").length;
+    if (target.role === "superadmin" && superadminCount <= 1) {
+      throw new Error("Der letzte Superadmin kann nicht geloescht werden.");
+    }
+    writeStore({ ...store, admins: store.admins.filter((admin) => admin.user_id !== userId) });
+    return;
+  }
+
+  const { error } = await getSupabase().functions.invoke("manage-admins", {
+    method: "DELETE",
+    body: { userId },
+  });
+
+  if (error) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "Admin konnte nicht geloescht werden."));
+  }
+}
+
 export async function listGames(): Promise<Game[]> {
   if (dataMode === "local") {
     const data = await localJson<LocalGamesResponse>("/api/games");

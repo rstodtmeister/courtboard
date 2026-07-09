@@ -4,6 +4,7 @@ import { CourtDisplayApp } from "./CourtDisplayApp";
 import { ScoreEntryApp } from "./ScoreEntryApp";
 import {
   createScoreLink as createScoreLinkData,
+  deleteAdminUser,
   disableScoreLink,
   getHvvCredentialsStatus,
   getSession,
@@ -379,6 +380,20 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
+  async function deleteAdmin(admin: AdminUser) {
+    setError("");
+    setMessage("");
+    try {
+      await deleteAdminUser(admin.user_id);
+      setAdminUsers(await listAdminUsers());
+      setMessage(`Admin ${admin.email || admin.user_id} geloescht.`);
+      return true;
+    } catch (adminError) {
+      setError(adminError instanceof Error ? adminError.message : "Admin konnte nicht geloescht werden.");
+      return false;
+    }
+  }
+
   async function printPdf(selectedGames: Game[], sheetType: PdfSheetType) {
     setError("");
     setMessage("");
@@ -471,7 +486,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
           {activeTab === "admins" && isSuperadmin && (
-            <AdminUsersPanel admins={adminUsers} onInvite={inviteAdmin} />
+            <AdminUsersPanel admins={adminUsers} currentUserEmail={session.user.email} onInvite={inviteAdmin} onDelete={deleteAdmin} />
           )}
         </div>
       )}
@@ -607,14 +622,20 @@ function HvvCredentialsDialog({
 
 function AdminUsersPanel({
   admins,
+  currentUserEmail,
   onInvite,
+  onDelete,
 }: {
   admins: AdminUser[];
+  currentUserEmail: string;
   onInvite: (email: string, role: AdminRole) => Promise<boolean>;
+  onDelete: (admin: AdminUser) => Promise<boolean>;
 }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AdminRole>("admin");
   const [saving, setSaving] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState("");
+  const superadminCount = admins.filter((admin) => admin.role === "superadmin").length;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -625,6 +646,16 @@ function AdminUsersPanel({
       setRole("admin");
     }
     setSaving(false);
+  }
+
+  async function deleteSelected(admin: AdminUser) {
+    const label = admin.email || admin.user_id;
+    if (!window.confirm(`Admin ${label} wirklich loeschen? Der Zugang wird aus Supabase Auth entfernt.`)) {
+      return;
+    }
+    setDeletingUserId(admin.user_id);
+    await onDelete(admin);
+    setDeletingUserId("");
   }
 
   return (
@@ -655,17 +686,34 @@ function AdminUsersPanel({
               <th>Rolle</th>
               <th>Status</th>
               <th>Angelegt</th>
+              <th>Aktionen</th>
             </tr>
           </thead>
           <tbody>
-            {admins.map((admin) => (
-              <tr key={admin.user_id}>
-                <td>{admin.email}</td>
-                <td>{admin.role === "superadmin" ? "Superadmin" : "Admin"}</td>
-                <td>{admin.email_confirmed_at ? "E-Mail bestaetigt" : "Einladung offen"}</td>
-                <td>{formatDateTime(admin.created_at)}</td>
-              </tr>
-            ))}
+            {admins.map((admin) => {
+              const isCurrentUser = admin.email.toLowerCase() === currentUserEmail.toLowerCase();
+              const isLastSuperadmin = admin.role === "superadmin" && superadminCount <= 1;
+              const deleteDisabled = deletingUserId === admin.user_id || isCurrentUser || isLastSuperadmin;
+              return (
+                <tr key={admin.user_id}>
+                  <td>{admin.email}</td>
+                  <td>{admin.role === "superadmin" ? "Superadmin" : "Admin"}</td>
+                  <td>{admin.email_confirmed_at ? "E-Mail bestaetigt" : "Einladung offen"}</td>
+                  <td>{formatDateTime(admin.created_at)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="secondary danger-button"
+                      onClick={() => deleteSelected(admin)}
+                      disabled={deleteDisabled}
+                      title={isCurrentUser ? "Eigenen Zugang nicht hier loeschen" : isLastSuperadmin ? "Letzter Superadmin kann nicht geloescht werden" : "Admin loeschen"}
+                    >
+                      {deletingUserId === admin.user_id ? "Loescht..." : "Loeschen"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
