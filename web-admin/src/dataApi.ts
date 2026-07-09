@@ -235,7 +235,13 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
   return data.admins;
 }
 
-export async function inviteAdminUser(params: { email: string; role: AdminRole }): Promise<AdminUser> {
+export type InviteAdminResult = {
+  admin: AdminUser;
+  inviteEmailSent: boolean;
+  warning?: string | null;
+};
+
+export async function inviteAdminUser(params: { email: string; role: AdminRole }): Promise<InviteAdminResult> {
   if (dataMode === "local") {
     const store = readStore();
     const existing = store.admins.find((admin) => admin.email.toLowerCase() === params.email.toLowerCase());
@@ -250,10 +256,10 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
       email_confirmed_at: new Date().toISOString(),
     };
     writeStore({ ...store, admins: [...store.admins, admin] });
-    return admin;
+    return { admin, inviteEmailSent: true, warning: null };
   }
 
-  const { data, error } = await getSupabase().functions.invoke<{ admin: AdminUser }>("manage-admins", {
+  const { data, error } = await getSupabase().functions.invoke<{ admin: AdminUser; invite_email_sent?: boolean; warning?: string | null }>("manage-admins", {
     body: params,
   });
 
@@ -261,7 +267,11 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
     throw new Error(await supabaseFunctionErrorMessage(error, "Admin konnte nicht eingeladen werden."));
   }
 
-  return data.admin;
+  return {
+    admin: data.admin,
+    inviteEmailSent: data.invite_email_sent ?? true,
+    warning: data.warning ?? null,
+  };
 }
 
 export async function updateAdminUser(params: {

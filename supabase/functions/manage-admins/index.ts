@@ -8,6 +8,16 @@ type InviteAdminRequest = {
   role?: AdminRole;
 };
 
+type AdminPayload = {
+  user_id: string;
+  email: string;
+  role: AdminRole;
+  created_at: string;
+  email_confirmed_at: string | null;
+  banned_until?: string | null;
+  last_sign_in_at?: string | null;
+};
+
 type DeleteAdminRequest = {
   userId?: string;
 };
@@ -104,6 +114,19 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "email is required" }, 400);
   }
 
+  return inviteAdmin(req, adminClient, userData.user.id, email, role);
+});
+
+async function inviteAdmin(
+  req: Request,
+  adminClient: ReturnType<typeof createAdminClient>,
+  invitedBy: string,
+  email: string,
+  role: AdminRole,
+) {
+  let inviteEmailSent = true;
+  let emailError: string | null = null;
+
   const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
     {
@@ -112,32 +135,55 @@ Deno.serve(async (req) => {
     },
   );
 
-  if (inviteError || !invited.user) {
-    return jsonResponse({ error: inviteError?.message ?? "Invite failed" }, 500);
+  let user = invited.user;
+
+  if (inviteError || !user) {
+    inviteEmailSent = false;
+    emailError = inviteError?.message ?? "Invite email could not be sent.";
+
+    const existingUser = await findUserByEmail(adminClient, email);
+    if ("error" in existingUser) {
+      return existingUser.error;
+    }
+
+    if (existingUser.user) {
+      user = existingUser.user;
+    } else {
+      const created = await adminClient.auth.admin.createUser({
+        email,
+        email_confirm: false,
+        user_metadata: { role },
+      });
+
+      if (created.error || !created.data.user) {
+        return jsonResponse({ error: created.error?.message ?? emailError }, 500);
+      }
+
+      user = created.data.user;
+    }
   }
 
-  const { error: upsertError } = await adminClient
+  const { data: row, error: upsertError } = await adminClient
     .from("admin_users")
     .upsert({
-      user_id: invited.user.id,
+      user_id: user.id,
       role,
-      invited_by: userData.user.id,
-    }, { onConflict: "user_id" });
+      invited_by: invitedBy,
+    }, { onConflict: "user_id" })
+    .select("user_id,role,created_at")
+    .single();
 
   if (upsertError) {
     return jsonResponse({ error: upsertError.message }, 500);
   }
 
+  const admin = await adminFromUser(adminClient, row, user.email ?? email);
   return jsonResponse({
-    admin: {
-      user_id: invited.user.id,
-      email: invited.user.email ?? email,
-      role,
-      created_at: invited.user.created_at,
-      email_confirmed_at: invited.user.email_confirmed_at,
-    },
+    admin,
+    invite_email_sent: inviteEmailSent,
+    warning: inviteEmailSent ? null : emailError,
   });
-});
+}
 
 async function updateAdmin(
   req: Request,
@@ -315,17 +361,62 @@ async function adminPayload(
   row: { user_id: string; role: AdminRole; created_at: string },
 ) {
   const { data } = await adminClient.auth.admin.getUserById(row.user_id);
-  return jsonResponse({
-    admin: {
-      user_id: row.user_id,
-      email: data.user?.email ?? "",
-      role: row.role,
-      created_at: row.created_at,
-      email_confirmed_at: data.user?.email_confirmed_at ?? null,
-      banned_until: data.user?.banned_until ?? null,
-      last_sign_in_at: data.user?.last_sign_in_at ?? null,
-    },
-  });
+  return jsonResponse({ admin: adminFromAuthUser(row, data.user) });
+}
+
+async function adminFromUser(
+  adminClient: ReturnType<typeof createAdminClient>,
+  row: { user_id: string; role: AdminRole; created_at: string },
+  fallbackEmail = "",
+) {
+  const { data } = await adminClient.auth.admin.getUserById(row.user_id);
+  return adminFromAuthUser(row, data.user, fallbackEmail);
+}
+
+function adminFromAuthUser(
+  row: { user_id: string; role: AdminRole; created_at: string },
+  user: {
+    email?: string;
+    email_confirmed_at?: string | null;
+    banned_until?: string | null;
+    last_sign_in_at?: string | null;
+  } | null,
+  fallbackEmail = "",
+): AdminPayload {
+  return {
+    user_id: row.user_id,
+    email: user?.email ?? fallbackEmail,
+    role: row.role,
+    created_at: row.created_at,
+    email_confirmed_at: user?.email_confirmed_at ?? null,
+    banned_until: user?.banned_until ?? null,
+    last_sign_in_at: user?.last_sign_in_at ?? null,
+  };
+}
+
+async function findUserByEmail(
+  adminClient: ReturnType<typeof createAdminClient>,
+  email: string,
+): Promise<{ user: { id: string; email?: string; created_at: string; email_confirmed_at?: string | null } | null } | { error: Response }> {
+  const normalizedEmail = email.toLowerCase();
+
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) {
+      return { error: jsonResponse({ error: error.message }, 500) };
+    }
+
+    const user = data.users.find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
+    if (user) {
+      return { user };
+    }
+
+    if (data.users.length < 1000) {
+      return { user: null };
+    }
+  }
+
+  return { user: null };
 }
 
 async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
@@ -338,18 +429,7 @@ async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
     return jsonResponse({ error: error.message }, 500);
   }
 
-  const admins = await Promise.all((rows ?? []).map(async (row) => {
-    const { data } = await adminClient.auth.admin.getUserById(row.user_id);
-    return {
-      user_id: row.user_id,
-      email: data.user?.email ?? "",
-      role: row.role,
-      created_at: row.created_at,
-      email_confirmed_at: data.user?.email_confirmed_at ?? null,
-      banned_until: data.user?.banned_until ?? null,
-      last_sign_in_at: data.user?.last_sign_in_at ?? null,
-    };
-  }));
+  const admins = await Promise.all((rows ?? []).map((row) => adminFromUser(adminClient, row)));
 
   return jsonResponse({ admins });
 }

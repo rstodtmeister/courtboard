@@ -412,9 +412,11 @@ function AdminDashboard({ session }: { session: AppSession }) {
     setError("");
     setMessage("");
     try {
-      await inviteAdminUser({ email, role });
+      const result = await inviteAdminUser({ email, role });
       setAdminUsers(await listAdminUsers());
-      setMessage(`Einladung an ${email} gesendet.`);
+      setMessage(result.inviteEmailSent
+        ? `Einladung an ${email} gesendet.`
+        : `Admin ${email} angelegt, aber die E-Mail wurde nicht gesendet. Du kannst ihn manuell freischalten.`);
       return true;
     } catch (adminError) {
       setError(adminError instanceof Error ? adminError.message : "Admin konnte nicht eingeladen werden.");
