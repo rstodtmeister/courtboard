@@ -401,7 +401,27 @@ select {
 }
 
 .admin-table {
-  min-width: 720px;
+  min-width: 1080px;
+}
+
+.admin-role-select {
+  min-width: 132px;
+}
+
+.admin-status-list,
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-status-list .badge {
+  margin-top: 0;
+}
+
+.admin-actions button {
+  white-space: nowrap;
 }
 
 .danger-button {
@@ -915,6 +935,11 @@ tbody tr:nth-child(even) {
 .badge.active {
   background: #edf8f2;
   color: #17603a;
+}
+
+.badge.danger {
+  background: #fff1f1;
+  color: #9a1c1c;
 }
 
 .badge.muted {

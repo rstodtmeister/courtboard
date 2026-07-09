@@ -85,6 +85,8 @@ export type AdminUser = {
   role: AdminRole;
   created_at: string;
   email_confirmed_at: string | null;
+  banned_until?: string | null;
+  last_sign_in_at?: string | null;
 };
 
 export type GameDraft = Pick<

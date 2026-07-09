@@ -24,6 +24,7 @@ import {
   syncGamesFromHvv,
   submitScore,
   unlockScoreGame,
+  updateAdminUser,
 } from "./dataApi";
 import { gameRatingOptions, noRefereeSelection, specialGameRatingOptions } from "./appConfig";
 import type { PdfSheetType } from "./pdfExport";
@@ -435,6 +436,27 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
+  async function updateAdmin(admin: AdminUser, action: "confirm" | "resendInvite" | "updateRole" | "setSuspended", params: { role?: AdminRole; suspended?: boolean } = {}) {
+    setError("");
+    setMessage("");
+    try {
+      await updateAdminUser({ userId: admin.user_id, action, ...params });
+      setAdminUsers(await listAdminUsers());
+      const label = admin.email || admin.user_id;
+      const messages: Record<typeof action, string> = {
+        confirm: `Admin ${label} freigeschaltet.`,
+        resendInvite: `Einladung an ${label} erneut gesendet.`,
+        updateRole: `Rolle fuer ${label} aktualisiert.`,
+        setSuspended: params.suspended ? `Admin ${label} gesperrt.` : `Admin ${label} entsperrt.`,
+      };
+      setMessage(messages[action]);
+      return true;
+    } catch (adminError) {
+      setError(adminError instanceof Error ? adminError.message : "Admin konnte nicht aktualisiert werden.");
+      return false;
+    }
+  }
+
   async function printPdf(selectedGames: Game[], sheetType: PdfSheetType) {
     setError("");
     setMessage("");
@@ -527,7 +549,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
           {activeTab === "admins" && isSuperadmin && (
-            <AdminUsersPanel admins={adminUsers} currentUserEmail={session.user.email} onInvite={inviteAdmin} onDelete={deleteAdmin} />
+            <AdminUsersPanel admins={adminUsers} currentUserEmail={session.user.email} onInvite={inviteAdmin} onUpdate={updateAdmin} onDelete={deleteAdmin} />
           )}
         </div>
       )}
@@ -665,17 +687,20 @@ function AdminUsersPanel({
   admins,
   currentUserEmail,
   onInvite,
+  onUpdate,
   onDelete,
 }: {
   admins: AdminUser[];
   currentUserEmail: string;
   onInvite: (email: string, role: AdminRole) => Promise<boolean>;
+  onUpdate: (admin: AdminUser, action: "confirm" | "resendInvite" | "updateRole" | "setSuspended", params?: { role?: AdminRole; suspended?: boolean }) => Promise<boolean>;
   onDelete: (admin: AdminUser) => Promise<boolean>;
 }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AdminRole>("admin");
   const [saving, setSaving] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState("");
+  const [busyAction, setBusyAction] = useState("");
   const superadminCount = admins.filter((admin) => admin.role === "superadmin").length;
 
   async function submit(event: FormEvent) {
@@ -697,6 +722,13 @@ function AdminUsersPanel({
     setDeletingUserId(admin.user_id);
     await onDelete(admin);
     setDeletingUserId("");
+  }
+
+  async function runAction(admin: AdminUser, action: "confirm" | "resendInvite" | "updateRole" | "setSuspended", params: { role?: AdminRole; suspended?: boolean } = {}) {
+    const key = `${admin.user_id}:${action}`;
+    setBusyAction(key);
+    await onUpdate(admin, action, params);
+    setBusyAction("");
   }
 
   return (
@@ -727,6 +759,7 @@ function AdminUsersPanel({
               <th>Rolle</th>
               <th>Status</th>
               <th>Angelegt</th>
+              <th>Letzter Login</th>
               <th>Aktionen</th>
             </tr>
           </thead>
@@ -734,14 +767,57 @@ function AdminUsersPanel({
             {admins.map((admin) => {
               const isCurrentUser = admin.email.toLowerCase() === currentUserEmail.toLowerCase();
               const isLastSuperadmin = admin.role === "superadmin" && superadminCount <= 1;
+              const isSuspended = isAdminSuspended(admin);
               const deleteDisabled = deletingUserId === admin.user_id || isCurrentUser || isLastSuperadmin;
+              const actionDisabled = isCurrentUser || busyAction.startsWith(`${admin.user_id}:`);
               return (
                 <tr key={admin.user_id}>
                   <td>{admin.email}</td>
-                  <td>{admin.role === "superadmin" ? "Superadmin" : "Admin"}</td>
-                  <td>{admin.email_confirmed_at ? "E-Mail bestaetigt" : "Einladung offen"}</td>
-                  <td>{formatDateTime(admin.created_at)}</td>
                   <td>
+                    <select
+                      className="admin-role-select"
+                      value={admin.role}
+                      onChange={(event) => runAction(admin, "updateRole", { role: event.target.value as AdminRole })}
+                      disabled={actionDisabled || isLastSuperadmin}
+                      title={isCurrentUser ? "Eigene Rolle nicht hier aendern" : isLastSuperadmin ? "Letzter Superadmin kann nicht geaendert werden" : "Rolle aendern"}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="superadmin">Superadmin</option>
+                    </select>
+                  </td>
+                  <td><AdminStatus admin={admin} /></td>
+                  <td>{formatDateTime(admin.created_at)}</td>
+                  <td>{admin.last_sign_in_at ? formatDateTime(admin.last_sign_in_at) : "-"}</td>
+                  <td className="admin-actions">
+                    {!admin.email_confirmed_at && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => runAction(admin, "confirm")}
+                        disabled={actionDisabled}
+                      >
+                        {busyAction === `${admin.user_id}:confirm` ? "Schaltet frei..." : "Freischalten"}
+                      </button>
+                    )}
+                    {!admin.email_confirmed_at && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => runAction(admin, "resendInvite")}
+                        disabled={actionDisabled}
+                      >
+                        {busyAction === `${admin.user_id}:resendInvite` ? "Sendet..." : "E-Mail erneut"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => runAction(admin, "setSuspended", { suspended: !isSuspended })}
+                      disabled={actionDisabled || (isLastSuperadmin && !isSuspended)}
+                      title={isCurrentUser ? "Eigenen Zugang nicht hier sperren" : isLastSuperadmin ? "Letzter Superadmin kann nicht gesperrt werden" : isSuspended ? "Admin entsperren" : "Admin sperren"}
+                    >
+                      {busyAction === `${admin.user_id}:setSuspended` ? "Aendert..." : isSuspended ? "Entsperren" : "Sperren"}
+                    </button>
                     <button
                       type="button"
                       className="secondary danger-button"
@@ -760,6 +836,25 @@ function AdminUsersPanel({
       </div>
     </section>
   );
+}
+
+function AdminStatus({ admin }: { admin: AdminUser }) {
+  const suspended = isAdminSuspended(admin);
+  return (
+    <div className="admin-status-list">
+      {suspended && <span className="badge danger">Gesperrt</span>}
+      {admin.email_confirmed_at ? <span className="badge active">Bestaetigt</span> : <span className="badge">Einladung offen</span>}
+      {admin.role === "superadmin" && <span className="badge">Superadmin</span>}
+    </div>
+  );
+}
+
+function isAdminSuspended(admin: AdminUser) {
+  if (!admin.banned_until) {
+    return false;
+  }
+  const bannedUntil = Date.parse(admin.banned_until);
+  return Number.isNaN(bannedUntil) || bannedUntil > Date.now();
 }
 
 function TournamentSettings({

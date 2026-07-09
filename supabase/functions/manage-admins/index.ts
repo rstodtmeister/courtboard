@@ -12,7 +12,25 @@ type DeleteAdminRequest = {
   userId?: string;
 };
 
+type AdminAction = "confirm" | "resendInvite" | "updateRole" | "setSuspended";
+
+type UpdateAdminRequest = {
+  userId?: string;
+  action?: AdminAction;
+  role?: AdminRole;
+  suspended?: boolean;
+};
+
 function authRedirectUrl(req: Request) {
+  const configuredUrl = Deno.env.get("ADMIN_APP_URL");
+  if (configuredUrl) {
+    const url = new URL(configuredUrl);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("auth", "confirmed");
+    return url.toString();
+  }
+
   const referer = req.headers.get("referer");
   const origin = req.headers.get("origin");
   const baseUrl = referer ?? origin;
@@ -20,10 +38,23 @@ function authRedirectUrl(req: Request) {
     return undefined;
   }
   const url = new URL(baseUrl);
+  if (isLocalUrl(url)) {
+    return undefined;
+  }
   url.search = "";
   url.hash = "";
   url.searchParams.set("auth", "confirmed");
   return url.toString();
+}
+
+function isLocalUrl(url: URL) {
+  const hostname = url.hostname.toLowerCase();
+  return hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.startsWith("192.168.") ||
+    hostname.startsWith("10.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
 }
 
 Deno.serve(async (req) => {
@@ -32,7 +63,7 @@ Deno.serve(async (req) => {
     return cors;
   }
 
-  if (req.method !== "GET" && req.method !== "POST" && req.method !== "DELETE") {
+  if (req.method !== "GET" && req.method !== "POST" && req.method !== "PATCH" && req.method !== "DELETE") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
@@ -59,6 +90,10 @@ Deno.serve(async (req) => {
 
   if (req.method === "DELETE") {
     return deleteAdmin(req, adminClient, userData.user.id);
+  }
+
+  if (req.method === "PATCH") {
+    return updateAdmin(req, adminClient, userData.user.id);
   }
 
   const body = await req.json() as InviteAdminRequest;
@@ -104,6 +139,96 @@ Deno.serve(async (req) => {
   });
 });
 
+async function updateAdmin(
+  req: Request,
+  adminClient: ReturnType<typeof createAdminClient>,
+  currentUserId: string,
+) {
+  const body = await req.json() as UpdateAdminRequest;
+  const userId = body.userId?.trim();
+
+  if (!userId) {
+    return jsonResponse({ error: "userId is required" }, 400);
+  }
+
+  if (!body.action) {
+    return jsonResponse({ error: "action is required" }, 400);
+  }
+
+  const target = await getAdminRow(adminClient, userId);
+  if ("error" in target) {
+    return target.error;
+  }
+
+  if (body.action === "confirm") {
+    const { error } = await adminClient.auth.admin.updateUserById(userId, { email_confirm: true });
+    if (error) {
+      return jsonResponse({ error: error.message }, 500);
+    }
+    return adminPayload(adminClient, target.row);
+  }
+
+  if (body.action === "resendInvite") {
+    const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId);
+    const email = userData.user?.email;
+    if (userError || !email) {
+      return jsonResponse({ error: userError?.message ?? "Admin email not found" }, 500);
+    }
+    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: { role: target.row.role },
+      redirectTo: authRedirectUrl(req),
+    });
+    if (error) {
+      return jsonResponse({ error: error.message }, 500);
+    }
+    return adminPayload(adminClient, target.row);
+  }
+
+  if (body.action === "updateRole") {
+    const role = body.role === "superadmin" ? "superadmin" : "admin";
+    if (target.row.role === "superadmin" && role !== "superadmin") {
+      const protection = await ensureCanRemoveSuperadmin(adminClient, userId, currentUserId, "degradieren");
+      if (protection) {
+        return protection;
+      }
+    }
+    const { data: row, error } = await adminClient
+      .from("admin_users")
+      .update({ role })
+      .eq("user_id", userId)
+      .select("user_id,role,created_at")
+      .single();
+    if (error) {
+      return jsonResponse({ error: error.message }, 500);
+    }
+    await adminClient.auth.admin.updateUserById(userId, { user_metadata: { role } });
+    return adminPayload(adminClient, row);
+  }
+
+  if (body.action === "setSuspended") {
+    if (body.suspended) {
+      if (userId === currentUserId) {
+        return jsonResponse({ error: "Du kannst deinen eigenen Zugang nicht sperren." }, 400);
+      }
+      if (target.row.role === "superadmin") {
+        const protection = await ensureCanRemoveSuperadmin(adminClient, userId, currentUserId, "sperren");
+        if (protection) {
+          return protection;
+        }
+      }
+    }
+    const { error } = await adminClient.auth.admin.updateUserById(userId, {
+      ban_duration: body.suspended ? "876000h" : "none",
+    });
+    if (error) {
+      return jsonResponse({ error: error.message }, 500);
+    }
+    return adminPayload(adminClient, target.row);
+  }
+
+  return jsonResponse({ error: "Unknown action" }, 400);
+}
+
 async function deleteAdmin(
   req: Request,
   adminClient: ReturnType<typeof createAdminClient>,
@@ -116,36 +241,17 @@ async function deleteAdmin(
     return jsonResponse({ error: "userId is required" }, 400);
   }
 
-  const { data: targetAdmin, error: targetError } = await adminClient
-    .from("admin_users")
-    .select("user_id,role")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (targetError) {
-    return jsonResponse({ error: targetError.message }, 500);
+  const target = await getAdminRow(adminClient, userId);
+  if ("error" in target) {
+    return target.error;
   }
 
-  if (!targetAdmin) {
-    return jsonResponse({ error: "Admin not found" }, 404);
-  }
-
-  if (targetAdmin.role === "superadmin") {
-    const { count, error: countError } = await adminClient
-      .from("admin_users")
-      .select("user_id", { count: "exact", head: true })
-      .eq("role", "superadmin");
-
-    if (countError) {
-      return jsonResponse({ error: countError.message }, 500);
+  if (target.row.role === "superadmin") {
+    const protection = await ensureCanRemoveSuperadmin(adminClient, userId, currentUserId, "loeschen");
+    if (protection) {
+      return protection;
     }
-
-    if ((count ?? 0) <= 1) {
-      return jsonResponse({ error: "Der letzte Superadmin kann nicht geloescht werden." }, 400);
-    }
-  }
-
-  if (userId === currentUserId && targetAdmin.role === "superadmin") {
+  } else if (userId === currentUserId) {
     return jsonResponse({ error: "Du kannst deinen eigenen Superadmin-Zugang nicht loeschen." }, 400);
   }
 
@@ -155,6 +261,71 @@ async function deleteAdmin(
   }
 
   return jsonResponse({ ok: true });
+}
+
+async function getAdminRow(adminClient: ReturnType<typeof createAdminClient>, userId: string): Promise<
+  | { row: { user_id: string; role: AdminRole; created_at: string } }
+  | { error: Response }
+> {
+  const { data, error } = await adminClient
+    .from("admin_users")
+    .select("user_id,role,created_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return { error: jsonResponse({ error: error.message }, 500) };
+  }
+
+  if (!data) {
+    return { error: jsonResponse({ error: "Admin not found" }, 404) };
+  }
+
+  return { row: data };
+}
+
+async function ensureCanRemoveSuperadmin(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+  currentUserId: string,
+  action: string,
+) {
+  if (userId === currentUserId) {
+    return jsonResponse({ error: `Du kannst deinen eigenen Superadmin-Zugang nicht ${action}.` }, 400);
+  }
+
+  const { count, error } = await adminClient
+    .from("admin_users")
+    .select("user_id", { count: "exact", head: true })
+    .eq("role", "superadmin");
+
+  if (error) {
+    return jsonResponse({ error: error.message }, 500);
+  }
+
+  if ((count ?? 0) <= 1) {
+    return jsonResponse({ error: `Der letzte Superadmin kann nicht ${action} werden.` }, 400);
+  }
+
+  return null;
+}
+
+async function adminPayload(
+  adminClient: ReturnType<typeof createAdminClient>,
+  row: { user_id: string; role: AdminRole; created_at: string },
+) {
+  const { data } = await adminClient.auth.admin.getUserById(row.user_id);
+  return jsonResponse({
+    admin: {
+      user_id: row.user_id,
+      email: data.user?.email ?? "",
+      role: row.role,
+      created_at: row.created_at,
+      email_confirmed_at: data.user?.email_confirmed_at ?? null,
+      banned_until: data.user?.banned_until ?? null,
+      last_sign_in_at: data.user?.last_sign_in_at ?? null,
+    },
+  });
 }
 
 async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
@@ -175,6 +346,8 @@ async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
       role: row.role,
       created_at: row.created_at,
       email_confirmed_at: data.user?.email_confirmed_at ?? null,
+      banned_until: data.user?.banned_until ?? null,
+      last_sign_in_at: data.user?.last_sign_in_at ?? null,
     };
   }));
 
