@@ -17,6 +17,7 @@ import {
   loadScoreEntry,
   onSessionChange,
   saveGame as saveGameData,
+  setAdminPassword,
   saveTournament,
   signIn,
   signOut,
@@ -83,11 +84,18 @@ function App() {
 function AuthConfirmedApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordRepeat, setPasswordRepeat] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [complete, setComplete] = useState(false);
 
   useEffect(() => {
     completeAuthRedirect().then((result) => {
       if (result.error) {
         setError(result.error);
+      } else {
+        setEmail(result.email ?? "");
       }
       setLoading(false);
       const url = new URL(window.location.href);
@@ -98,18 +106,58 @@ function AuthConfirmedApp() {
     });
   }, []);
 
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    if (password.length < 6) {
+      setError("Das Passwort muss mindestens 6 Zeichen lang sein.");
+      return;
+    }
+
+    if (password !== passwordRepeat) {
+      setError("Die Passwoerter stimmen nicht ueberein.");
+      return;
+    }
+
+    setSaving(true);
+    const result = await setAdminPassword(password);
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setComplete(true);
+  }
+
   return (
     <Shell>
       <section className="panel login-panel">
-        <h2>E-Mail bestaetigt</h2>
+        <h2>{complete ? "Passwort gespeichert" : "Passwort festlegen"}</h2>
         {loading ? (
           <div className="status">Bestaetigung wird abgeschlossen...</div>
-        ) : error ? (
+        ) : error && !email ? (
           <div className="error">{error}</div>
+        ) : complete ? (
+          <p className="login-hint">Dein Admin-Zugang ist eingerichtet. Du kannst dich jetzt anmelden.</p>
         ) : (
-          <p className="login-hint">Dein Admin-Zugang wurde bestaetigt. Du kannst dich jetzt anmelden.</p>
+          <>
+            <p className="login-hint">{email ? `Lege das Passwort fuer ${email} fest.` : "Lege dein Admin-Passwort fest."}</p>
+            <form onSubmit={submit} className="form-grid">
+              <label>
+                Neues Passwort
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
+              </label>
+              <label>
+                Passwort wiederholen
+                <input type="password" value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} autoComplete="new-password" required />
+              </label>
+              {error && <div className="error">{error}</div>}
+              <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Passwort speichern"}</button>
+            </form>
+          </>
         )}
-        <a className="button-link" href={loginUrl()}>Zur Anmeldung</a>
+        {complete && <a className="button-link" href={loginUrl()}>Zur Anmeldung</a>}
       </section>
     </Shell>
   );
@@ -446,7 +494,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       setAdminUsers(await listAdminUsers());
       const label = admin.email || admin.user_id;
       const messages: Record<typeof action, string> = {
-        confirm: `Admin ${label} freigeschaltet.`,
+        confirm: `E-Mail fuer ${label} bestaetigt. Das Passwort muss weiterhin ueber den Einladungslink gesetzt werden.`,
         resendInvite: `Einladung an ${label} erneut gesendet.`,
         updateRole: `Rolle fuer ${label} aktualisiert.`,
         setSuspended: params.suspended ? `Admin ${label} gesperrt.` : `Admin ${label} entsperrt.`,
@@ -738,7 +786,7 @@ function AdminUsersPanel({
       <form className="admin-invite-form" onSubmit={submit}>
         <div>
           <h3>Admin einladen</h3>
-          <p>Der neue Admin bekommt eine E-Mail und setzt seinen Zugang ueber Supabase Auth.</p>
+          <p>Der neue Admin bekommt eine E-Mail und legt sein Passwort ueber den Einladungslink fest.</p>
         </div>
         <label>
           E-Mail
@@ -846,6 +894,7 @@ function AdminStatus({ admin }: { admin: AdminUser }) {
     <div className="admin-status-list">
       {suspended && <span className="badge danger">Gesperrt</span>}
       {admin.email_confirmed_at ? <span className="badge active">Bestaetigt</span> : <span className="badge">Einladung offen</span>}
+      {admin.password_setup_required ? <span className="badge">Passwort fehlt</span> : <span className="badge active">Passwort eingerichtet</span>}
       {admin.role === "superadmin" && <span className="badge">Superadmin</span>}
     </div>
   );

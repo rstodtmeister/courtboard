@@ -12,6 +12,7 @@ type AdminPayload = {
   user_id: string;
   email: string;
   role: AdminRole;
+  password_setup_required: boolean;
   created_at: string;
   email_confirmed_at: string | null;
   banned_until?: string | null;
@@ -88,6 +89,7 @@ Deno.serve(async (req) => {
     .from("admin_users")
     .select("user_id,role")
     .eq("user_id", userData.user.id)
+    .eq("password_setup_required", false)
     .maybeSingle();
 
   if (currentAdminError || !currentAdmin || currentAdmin.role !== "superadmin") {
@@ -163,14 +165,27 @@ async function inviteAdmin(
     }
   }
 
+  const { data: existingAdminRow, error: existingAdminError } = await adminClient
+    .from("admin_users")
+    .select("password_setup_required")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingAdminError) {
+    return jsonResponse({ error: existingAdminError.message }, 500);
+  }
+
+  const passwordSetupRequired = existingAdminRow?.password_setup_required ?? true;
+
   const { data: row, error: upsertError } = await adminClient
     .from("admin_users")
     .upsert({
       user_id: user.id,
       role,
       invited_by: invitedBy,
+      password_setup_required: passwordSetupRequired,
     }, { onConflict: "user_id" })
-    .select("user_id,role,created_at")
+    .select("user_id,role,password_setup_required,created_at")
     .single();
 
   if (upsertError) {
@@ -242,7 +257,7 @@ async function updateAdmin(
       .from("admin_users")
       .update({ role })
       .eq("user_id", userId)
-      .select("user_id,role,created_at")
+      .select("user_id,role,password_setup_required,created_at")
       .single();
     if (error) {
       return jsonResponse({ error: error.message }, 500);
@@ -310,12 +325,12 @@ async function deleteAdmin(
 }
 
 async function getAdminRow(adminClient: ReturnType<typeof createAdminClient>, userId: string): Promise<
-  | { row: { user_id: string; role: AdminRole; created_at: string } }
+  | { row: { user_id: string; role: AdminRole; password_setup_required: boolean; created_at: string } }
   | { error: Response }
 > {
   const { data, error } = await adminClient
     .from("admin_users")
-    .select("user_id,role,created_at")
+    .select("user_id,role,password_setup_required,created_at")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -358,7 +373,7 @@ async function ensureCanRemoveSuperadmin(
 
 async function adminPayload(
   adminClient: ReturnType<typeof createAdminClient>,
-  row: { user_id: string; role: AdminRole; created_at: string },
+  row: { user_id: string; role: AdminRole; password_setup_required: boolean; created_at: string },
 ) {
   const { data } = await adminClient.auth.admin.getUserById(row.user_id);
   return jsonResponse({ admin: adminFromAuthUser(row, data.user) });
@@ -366,7 +381,7 @@ async function adminPayload(
 
 async function adminFromUser(
   adminClient: ReturnType<typeof createAdminClient>,
-  row: { user_id: string; role: AdminRole; created_at: string },
+  row: { user_id: string; role: AdminRole; password_setup_required: boolean; created_at: string },
   fallbackEmail = "",
 ) {
   const { data } = await adminClient.auth.admin.getUserById(row.user_id);
@@ -374,7 +389,7 @@ async function adminFromUser(
 }
 
 function adminFromAuthUser(
-  row: { user_id: string; role: AdminRole; created_at: string },
+  row: { user_id: string; role: AdminRole; password_setup_required: boolean; created_at: string },
   user: {
     email?: string;
     email_confirmed_at?: string | null;
@@ -387,6 +402,7 @@ function adminFromAuthUser(
     user_id: row.user_id,
     email: user?.email ?? fallbackEmail,
     role: row.role,
+    password_setup_required: row.password_setup_required,
     created_at: row.created_at,
     email_confirmed_at: user?.email_confirmed_at ?? null,
     banned_until: user?.banned_until ?? null,
@@ -422,7 +438,7 @@ async function findUserByEmail(
 async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
   const { data: rows, error } = await adminClient
     .from("admin_users")
-    .select("user_id,role,created_at")
+    .select("user_id,role,password_setup_required,created_at")
     .order("created_at", { ascending: true });
 
   if (error) {

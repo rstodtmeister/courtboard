@@ -45,8 +45,8 @@ supabase db push
 Danach den ersten Superadmin-Benutzer in Supabase Auth anlegen, E-Mail bestaetigen und dessen User-ID in `admin_users` eintragen:
 
 ```sql
-insert into public.admin_users (user_id, role)
-values ('<auth-user-id>', 'superadmin');
+insert into public.admin_users (user_id, role, password_setup_required)
+values ('<auth-user-id>', 'superadmin', false);
 ```
 
 Nur Superadmins koennen in der Web-App weitere Admins einladen. Die Einladung laeuft per E-Mail ueber Supabase Auth; der neue Admin muss den Link bestaetigen und seinen Zugang einrichten. Lokale Supabase-Auth ist auf E-Mail-Bestaetigung konfiguriert.

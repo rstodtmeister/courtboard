@@ -95,12 +95,18 @@ export async function getSession(): Promise<AppSession | null> {
     return null;
   }
 
-  return { user: { email: user.email, role: await currentAdminRole(user.id) } };
+  const role = await currentAdminRole(user.id);
+  if (!role) {
+    await getSupabase().auth.signOut();
+    return null;
+  }
+
+  return { user: { email: user.email, role } };
 }
 
-export async function completeAuthRedirect(): Promise<{ error?: string }> {
+export async function completeAuthRedirect(): Promise<{ email?: string; error?: string }> {
   if (dataMode === "local") {
-    return {};
+    return { email: "admin@local.test" };
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -118,6 +124,30 @@ export async function completeAuthRedirect(): Promise<{ error?: string }> {
     }
   } else if (hashParams.has("access_token") || hashParams.has("refresh_token")) {
     await getSupabase().auth.getSession();
+  }
+
+  const { data } = await getSupabase().auth.getSession();
+  const email = data.session?.user.email;
+  if (!email) {
+    return { error: "Die Einladung konnte nicht bestaetigt werden. Bitte fordere eine neue Einladung an." };
+  }
+
+  return { email };
+}
+
+export async function setAdminPassword(password: string): Promise<{ error?: string }> {
+  if (dataMode === "local") {
+    return {};
+  }
+
+  const { error } = await getSupabase().auth.updateUser({ password });
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { error: statusError } = await getSupabase().rpc("mark_admin_password_setup_complete");
+  if (statusError) {
+    return { error: statusError.message };
   }
 
   await getSupabase().auth.signOut();
@@ -141,7 +171,13 @@ export function onSessionChange(callback: (session: AppSession | null) => void) 
       callback(null);
       return;
     }
-    currentAdminRole(user.id).then((role) => callback({ user: { email: user.email!, role } }));
+    currentAdminRole(user.id).then((role) => {
+      if (!role) {
+        callback(null);
+        return;
+      }
+      callback({ user: { email: user.email!, role } });
+    });
   });
 
   return () => data.subscription.unsubscribe();
@@ -172,7 +208,7 @@ export async function signOut() {
   await getSupabase().auth.signOut();
 }
 
-async function currentAdminRole(userId: string): Promise<AdminRole> {
+async function currentAdminRole(userId: string): Promise<AdminRole | null> {
   const { data, error } = await getSupabase()
     .from("admin_users")
     .select("role")
@@ -180,7 +216,7 @@ async function currentAdminRole(userId: string): Promise<AdminRole> {
     .maybeSingle();
 
   if (error || !data?.role) {
-    return "admin";
+    return null;
   }
 
   return data.role === "superadmin" ? "superadmin" : "admin";
@@ -252,8 +288,9 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
       user_id: createId("local-admin"),
       email: params.email,
       role: params.role,
+      password_setup_required: true,
       created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
+      email_confirmed_at: null,
     };
     writeStore({ ...store, admins: [...store.admins, admin] });
     return { admin, inviteEmailSent: true, warning: null };
@@ -798,6 +835,7 @@ function seedStore(): LocalStore {
         user_id: "local-superadmin-1",
         email: "admin@local.test",
         role: "superadmin",
+        password_setup_required: false,
         created_at: new Date().toISOString(),
         email_confirmed_at: new Date().toISOString(),
       },
@@ -833,7 +871,10 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
     session: store.session
       ? { user: { ...store.session.user, role: store.session.user.role ?? seeded.admins[0].role } }
       : seeded.session,
-    admins: store.admins ?? seeded.admins,
+    admins: (store.admins ?? seeded.admins).map((admin) => ({
+      ...admin,
+      password_setup_required: admin.password_setup_required ?? false,
+    })),
     tournament: {
       ...tournament,
       token_base_url: tournament.token_base_url ?? "",

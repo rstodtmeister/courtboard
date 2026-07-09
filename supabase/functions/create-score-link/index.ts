@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
     .from("admin_users")
     .select("user_id")
     .eq("user_id", userData.user.id)
+    .eq("password_setup_required", false)
     .maybeSingle();
 
   if (adminError || !adminUser) {
