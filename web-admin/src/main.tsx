@@ -1463,7 +1463,7 @@ function GameEditorRow({
       <td>
         <div>{formatResultWithSets(game) || "-"}</div>
         {completed && game.winner_team && <div className="muted-text">Sieger: {game.winner_team}</div>}
-        {game.game_rating && <div className="muted-text">{game.game_rating}</div>}
+        {game.game_rating && game.game_rating !== "Normal" && <div className="muted-text">{game.game_rating}</div>}
         {game.score_locked_by_device && !completed && <div className="muted-text">Eingabe auf einem Geraet aktiv</div>}
       </td>
       <td>
