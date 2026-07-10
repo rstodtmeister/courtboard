@@ -58,16 +58,17 @@ export async function submitGameToHvv(game: HvvGameUpdate, credentials: HvvCrede
   }
 
   const formFields = formData(form.html);
+  const resetResult = isNormalRating(game.game_rating) && !hasSetScores(game);
   let changedFields = 0;
   changedFields += replaceFormValue(form.html, formFields, game.court ?? "", ["court", "feld", "platz"]);
   changedFields += replaceFormValue(form.html, formFields, game.referee ?? "", ["schiri", "schieds", "referee"]);
   changedFields += replaceGameRating(form.html, formFields, game.game_rating ?? "");
-  changedFields += replaceFormValue(form.html, formFields, game.set1_team_a ?? "", ["s1pa", "satz1teama", "satz1a", "set1teama", "set1a"]);
-  changedFields += replaceFormValue(form.html, formFields, game.set1_team_b ?? "", ["s1pb", "satz1teamb", "satz1b", "set1teamb", "set1b"]);
-  changedFields += replaceFormValue(form.html, formFields, game.set2_team_a ?? "", ["s2pa", "satz2teama", "satz2a", "set2teama", "set2a"]);
-  changedFields += replaceFormValue(form.html, formFields, game.set2_team_b ?? "", ["s2pb", "satz2teamb", "satz2b", "set2teamb", "set2b"]);
-  changedFields += replaceFormValue(form.html, formFields, game.set3_team_a ?? "", ["s3pa", "satz3teama", "satz3a", "set3teama", "set3a"]);
-  changedFields += replaceFormValue(form.html, formFields, game.set3_team_b ?? "", ["s3pb", "satz3teamb", "satz3b", "set3teamb", "set3b"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set1_team_a, resetResult), ["s1pa", "satz1teama", "satz1a", "set1teama", "set1a"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set1_team_b, resetResult), ["s1pb", "satz1teamb", "satz1b", "set1teamb", "set1b"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set2_team_a, resetResult), ["s2pa", "satz2teama", "satz2a", "set2teama", "set2a"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set2_team_b, resetResult), ["s2pb", "satz2teamb", "satz2b", "set2teamb", "set2b"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set3_team_a, resetResult), ["s3pa", "satz3teama", "satz3a", "set3teama", "set3a"]);
+  changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set3_team_b, resetResult), ["s3pb", "satz3teamb", "satz3b", "set3teamb", "set3b"]);
 
   if (changedFields === 0) {
     throw new Error("Keine passenden Formularfelder fuer die HVV-Uebertragung gefunden.");
@@ -364,6 +365,23 @@ function replaceFormValue(form: string, formFields: Record<string, string>, valu
   }
   formFields[field.name] = formValue(field.html, value);
   return 1;
+}
+
+function scoreValue(value: string | null | undefined, resetResult: boolean) {
+  return resetResult && !value ? "0" : value ?? "";
+}
+
+function isNormalRating(value: string | null | undefined) {
+  const normalized = normalizeToken(value ?? "");
+  return !normalized || normalized === "normal";
+}
+
+function hasSetScores(game: HvvGameUpdate) {
+  return Boolean(
+    game.set1_team_a || game.set1_team_b ||
+      game.set2_team_a || game.set2_team_b ||
+      game.set3_team_a || game.set3_team_b,
+  );
 }
 
 function replaceGameRating(form: string, formFields: Record<string, string>, value: string) {

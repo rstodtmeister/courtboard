@@ -1532,7 +1532,20 @@ function GameEditDialog({
   async function resetCompleted() {
     setConfirmAction(null);
     setSaving(true);
-    await onSave({ ...draft, completed: false, game_rating: draft.game_rating === "Normal" ? "" : draft.game_rating });
+    await onSave({
+      ...draft,
+      result: "",
+      winner_team: "",
+      game_rating: "Normal",
+      set1_team_a: "",
+      set1_team_b: "",
+      set2_team_a: "",
+      set2_team_b: "",
+      set3_team_a: "",
+      set3_team_b: "",
+      completed: false,
+      point_history: null,
+    });
     setSaving(false);
   }
 
