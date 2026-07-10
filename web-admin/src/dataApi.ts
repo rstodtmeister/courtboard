@@ -20,6 +20,12 @@ export type SyncGamesResult = {
   message: string;
 };
 
+export type PushHvvResult = {
+  sent: number;
+  failed: number;
+  results: Array<{ gameId: string; number: string; ok: boolean; error?: string }>;
+};
+
 type ImportedGame = Omit<Game, "id" | "tournament_id" | "printed" | "dirty" | "completed"> & {
   edit_url?: string | null;
   edit_method?: string | null;
@@ -446,6 +452,26 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
 
   if (error || !data) {
     throw new Error(await supabaseFunctionErrorMessage(error, "Spiele konnten nicht von HVV geladen werden."));
+  }
+
+  return data;
+}
+
+export async function pushDirtyGamesToHvv(tournamentId: string): Promise<PushHvvResult> {
+  if (dataMode === "local") {
+    throw new Error("HVV-Uebertragung ist im lokalen Browsermodus nicht verfuegbar.");
+  }
+
+  const { data, error } = await getSupabase().functions.invoke<PushHvvResult>("save-game", {
+    body: {
+      mode: "dirty",
+      tournamentId,
+      hvvCredentials: requireHvvCredentials(),
+    },
+  });
+
+  if (error || !data) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "Geaenderte Spiele konnten nicht an HVV uebertragen werden."));
   }
 
   return data;

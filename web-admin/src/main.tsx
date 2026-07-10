@@ -16,6 +16,7 @@ import {
   listScoreLinks,
   loadScoreEntry,
   onSessionChange,
+  pushDirtyGamesToHvv,
   saveGame as saveGameData,
   setAdminPassword,
   saveTournament,
@@ -247,6 +248,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [loading, setLoading] = useState(true);
   const [statusSyncing, setStatusSyncing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pushingHvv, setPushingHvv] = useState(false);
   const [printing, setPrinting] = useState<PdfSheetType | "">("");
   const [activeTab, setActiveTab] = useState<AdminTab>("games");
   const [error, setError] = useState("");
@@ -456,6 +458,37 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
+  async function pushDirtyGames() {
+    if (!tournament) {
+      return;
+    }
+    if (!getHvvCredentialsStatus().active) {
+      setError("Bitte zuerst HVV-Zugang ueber HVV laden eingeben.");
+      setActiveTab("settings");
+      return;
+    }
+    setPushingHvv(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await pushDirtyGamesToHvv(tournament.id);
+      await loadDashboard();
+      if (result.failed > 0) {
+        const failed = result.results
+          .filter((item) => !item.ok)
+          .map((item) => `Spiel ${item.number}: ${item.error}`)
+          .join("; ");
+        setError(`${result.sent} Spiele an HVV uebertragen, ${result.failed} fehlgeschlagen. ${failed}`);
+      } else {
+        setMessage(`${result.sent} geaenderte Spiele an HVV uebertragen.`);
+      }
+    } catch (pushError) {
+      setError(pushError instanceof Error ? pushError.message : "Geaenderte Spiele konnten nicht an HVV uebertragen werden.");
+    } finally {
+      setPushingHvv(false);
+    }
+  }
+
   async function inviteAdmin(email: string, role: AdminRole) {
     setError("");
     setMessage("");
@@ -545,9 +578,14 @@ function AdminDashboard({ session }: { session: AppSession }) {
         <div>
           <p className="toolbar-status">{games.length} Spiele, {dirtyCount} geaendert{lastSyncedAt ? `, Sync ${lastSyncedAt}` : ""}</p>
         </div>
-        <button type="button" className="secondary sync-button" onClick={() => loadDashboard()} disabled={loading || statusSyncing}>
-          {statusSyncing ? "Sync..." : "Sync"}
-        </button>
+        <div className="actions">
+          <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
+            {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
+          </button>
+          <button type="button" className="secondary sync-button" onClick={() => loadDashboard()} disabled={loading || statusSyncing}>
+            {statusSyncing ? "Sync..." : "Sync"}
+          </button>
+        </div>
       </div>
       <TournamentProgress completed={completedGamesCount} total={games.length} />
 

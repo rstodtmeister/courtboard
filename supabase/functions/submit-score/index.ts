@@ -1,6 +1,7 @@
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { sha256Hex } from "../_shared/token.ts";
+import { hvvCredentialsFromEnv, submitGameToHvv } from "../_shared/hvv.ts";
 
 type SubmitScoreRequest = {
   token: string;
@@ -166,7 +167,7 @@ Deno.serve(async (req) => {
 
   const completed = body?.completed ?? false;
 
-  const { error: updateError } = await adminClient
+  const { data: updatedGame, error: updateError } = await adminClient
     .from("games")
     .update({
       score_locked_by_device: completed ? null : deviceId,
@@ -185,10 +186,31 @@ Deno.serve(async (req) => {
       point_history: body?.pointHistory ?? null,
       dirty: true,
     })
-    .eq("id", game.id);
+    .eq("id", game.id)
+    .select("id,tournament_id,number,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b")
+    .single();
 
   if (updateError) {
     return jsonResponse({ error: updateError.message }, 500);
+  }
+
+  let hvvSynced = false;
+  let hvvError = "";
+  if (completed && updatedGame) {
+    try {
+      await submitGameToHvv(updatedGame, hvvCredentialsFromEnv());
+      const { error: cleanError } = await adminClient
+        .from("games")
+        .update({ dirty: false })
+        .eq("id", game.id);
+      if (cleanError) {
+        hvvError = cleanError.message;
+      } else {
+        hvvSynced = true;
+      }
+    } catch (error) {
+      hvvError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   await adminClient
@@ -196,5 +218,5 @@ Deno.serve(async (req) => {
     .update({ used_at: new Date().toISOString() })
     .eq("id", link.id);
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, hvvSynced, hvvError: hvvError || null });
 });
