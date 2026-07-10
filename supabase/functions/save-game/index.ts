@@ -1,6 +1,6 @@
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, createUserClient } from "../_shared/supabase.ts";
-import { type HvvCredentials, submitGameToHvv } from "../_shared/hvv.ts";
+import { refreshTournamentGamesFromHvv, type HvvCredentials, submitGameToHvv } from "../_shared/hvv.ts";
 
 type SaveGameRequest = {
   gameId?: string;
@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
     try {
       await submitGameToHvv(game, credentials);
       await adminClient.from("games").update({ dirty: false }).eq("id", game.id);
+      await refreshTournamentGamesFromHvv(adminClient, game.tournament_id, credentials);
       return jsonResponse({ sent: 1, failed: 0, results: [{ gameId: game.id, number: game.number, ok: true }] });
     } catch (error) {
       return jsonResponse({
@@ -99,6 +100,10 @@ Deno.serve(async (req) => {
       failed++;
       results.push({ gameId: game.id, number: game.number, ok: false, error: errorMessage(error) });
     }
+  }
+
+  if (sent > 0) {
+    await refreshTournamentGamesFromHvv(adminClient, body.tournamentId, credentials);
   }
 
   return jsonResponse({ sent, failed, results }, failed > 0 ? 207 : 200);

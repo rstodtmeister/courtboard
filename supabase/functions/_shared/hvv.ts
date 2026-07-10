@@ -18,6 +18,16 @@ export type HvvGameUpdate = {
   set3_team_b?: string | null;
 };
 
+type HvvScheduleGame = {
+  number: string;
+  game_date: string;
+  team_a: string;
+  team_b: string;
+  edit_url: string;
+  edit_method: string;
+  edit_data: string;
+};
+
 export function hvvCredentialsFromEnv(): HvvCredentials {
   return {
     username: Deno.env.get("HVV_USERNAME") ?? "",
@@ -73,6 +83,78 @@ export async function submitGameToHvv(game: HvvGameUpdate, credentials: HvvCrede
     body: new URLSearchParams(formFields).toString(),
   });
   await response.text();
+}
+
+export async function refreshTournamentGamesFromHvv(
+  adminClient: { from: (table: string) => any },
+  tournamentId: string,
+  credentials: HvvCredentials,
+) {
+  const { data: tournament, error } = await adminClient
+    .from("tournaments")
+    .select("hvv_edit_url,hvv_public_url")
+    .eq("id", tournamentId)
+    .single();
+
+  if (error || !tournament) {
+    throw new Error(error?.message ?? "Tournament not found");
+  }
+
+  const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
+  if (!source) {
+    return 0;
+  }
+
+  const page = await loadSchedulePage(source, credentials);
+  const games = parseScheduleGames(page.html, page.url);
+  let updated = 0;
+  for (const game of games) {
+    const { error: updateError } = await adminClient
+      .from("games")
+      .update({
+        game_date: game.game_date,
+        team_a: game.team_a,
+        team_b: game.team_b,
+        edit_url: game.edit_url,
+        edit_method: game.edit_method,
+        edit_data: game.edit_data,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("number", game.number);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    updated++;
+  }
+  return updated;
+}
+
+async function loadSchedulePage(source: string, credentials: HvvCredentials) {
+  const cookies = new Map<string, string>();
+  let response = await fetchWithSession(source, credentials, cookies);
+  let html = await response.text();
+  let url = response.url || source;
+
+  if (hasHvvCredentials(credentials) && isLoginPage(html)) {
+    const login = loginRequest(html, url, credentials);
+    const loginResponse = await fetchWithSession(login.url, credentials, cookies, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: login.body,
+    });
+    await loginResponse.arrayBuffer();
+
+    response = await fetchWithSession(source, credentials, cookies);
+    html = await response.text();
+    url = response.url || source;
+  }
+
+  if (isLoginPage(html)) {
+    throw new Error("Anmeldung fehlgeschlagen oder Loginformular erneut angezeigt.");
+  }
+
+  return { html, url };
 }
 
 async function loadEditPage(game: HvvGameUpdate, credentials: HvvCredentials, cookies: Map<string, string>) {
@@ -366,6 +448,91 @@ function addSubmitButtonValue(form: string, formFields: Record<string, string>) 
   if (name) {
     formFields[name] = attr(submit, "value");
   }
+}
+
+function parseScheduleGames(html: string, baseUrl: string): HvvScheduleGame[] {
+  const rows = html.matchAll(/<tr\b[^>]*class=["'][^"']*\bbeachspielrow\b[^"']*["'][^>]*>[\s\S]*?<\/tr>/gi);
+  const games: HvvScheduleGame[] = [];
+
+  for (const rowMatch of rows) {
+    const row = rowMatch[0];
+    const number = textByColumn(row, 6);
+    const teamA = textByDataContent(row, "teamA") || textByColumn(row, 7);
+    const teamB = textByDataContent(row, "teamB") || textByColumn(row, 8);
+    if (!number || (!teamA && !teamB)) {
+      continue;
+    }
+
+    const edit = editRequest(row, baseUrl);
+    games.push({
+      number,
+      game_date: textByColumn(row, 1),
+      team_a: teamA,
+      team_b: teamB,
+      edit_url: edit.url,
+      edit_method: edit.method,
+      edit_data: edit.data,
+    });
+  }
+
+  return games;
+}
+
+function editRequest(row: string, baseUrl: string) {
+  const form = matchFirst(row, /<form\b[^>]*action=["'][^"']+["'][^>]*>[\s\S]*?<\/form>/i);
+  if (form) {
+    const action = attr(form, "action");
+    const method = attr(form, "method") || "GET";
+    return {
+      url: new URL(action, baseUrl).toString(),
+      method: method.toUpperCase(),
+      data: encodeFormData(form),
+    };
+  }
+
+  const links = [...row.matchAll(/<a\b[^>]*href=["'][^"']+["'][^>]*>[\s\S]*?<\/a>/gi)].map((match) => match[0]);
+  for (const link of links) {
+    const linkText = clean(`${textContent(link)} ${attr(link, "title")} ${attr(link, "class")} ${attr(link, "href")}`).toLowerCase();
+    if (linkText.includes("bearbeit") || linkText.includes("edit")) {
+      return { url: new URL(attr(link, "href"), baseUrl).toString(), method: "GET", data: "" };
+    }
+  }
+
+  if (links.length === 1) {
+    return { url: new URL(attr(links[0], "href"), baseUrl).toString(), method: "GET", data: "" };
+  }
+  return { url: "", method: "GET", data: "" };
+}
+
+function encodeFormData(form: string) {
+  const params = new URLSearchParams();
+  for (const inputMatch of form.matchAll(/<input\b[^>]*>/gi)) {
+    const input = inputMatch[0];
+    const name = attr(input, "name");
+    if (!name) {
+      continue;
+    }
+    const type = attr(input, "type").toLowerCase();
+    if (["button", "file", "image"].includes(type)) {
+      continue;
+    }
+    if ((type === "checkbox" || type === "radio") && !/\schecked(?:\s|=|>)/i.test(input)) {
+      continue;
+    }
+    params.set(name, attr(input, "value"));
+  }
+  return params.toString();
+}
+
+function textByColumn(row: string, index: number) {
+  const cells = [...row.matchAll(/<td\b[^>]*>[\s\S]*?<\/td>/gi)].map((match) => match[0]);
+  return index >= 0 && index < cells.length ? textContent(cells[index]) : "";
+}
+
+function textByDataContent(row: string, dataContent: string) {
+  const escaped = escapeRegex(dataContent);
+  const pattern = new RegExp(`<t[dh]\\b[^>]*data-content=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/t[dh]>`, "i");
+  return textContent(matchFirst(row, pattern));
 }
 
 function attr(html: string, name: string) {

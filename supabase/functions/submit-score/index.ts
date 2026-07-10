@@ -1,7 +1,7 @@
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { sha256Hex } from "../_shared/token.ts";
-import { hvvCredentialsFromEnv, submitGameToHvv } from "../_shared/hvv.ts";
+import { hvvCredentialsFromEnv, refreshTournamentGamesFromHvv, submitGameToHvv } from "../_shared/hvv.ts";
 
 type SubmitScoreRequest = {
   token: string;
@@ -198,7 +198,8 @@ Deno.serve(async (req) => {
   let hvvError = "";
   if (completed && updatedGame) {
     try {
-      await submitGameToHvv(updatedGame, hvvCredentialsFromEnv());
+      const hvvCredentials = hvvCredentialsFromEnv();
+      await submitGameToHvv(updatedGame, hvvCredentials);
       const { error: cleanError } = await adminClient
         .from("games")
         .update({ dirty: false })
@@ -206,6 +207,7 @@ Deno.serve(async (req) => {
       if (cleanError) {
         hvvError = cleanError.message;
       } else {
+        await refreshTournamentGamesFromHvv(adminClient, updatedGame.tournament_id, hvvCredentials);
         hvvSynced = true;
       }
     } catch (error) {
