@@ -379,9 +379,11 @@ export async function listGames(): Promise<Game[]> {
     return [...data.games].sort((left, right) => left.number.localeCompare(right.number, "de", { numeric: true }));
   }
 
+  const tournament = await getPrimaryTournament();
   const { data, error } = await getSupabase()
     .from("games")
     .select(gameSelect)
+    .eq("tournament_id", tournament.id)
     .order("number", { ascending: true });
 
   if (error) {
@@ -506,6 +508,22 @@ export async function getTournament(): Promise<Tournament> {
     return readStore().tournament;
   }
 
+  const data = await getPrimaryTournament();
+  const { data: games, error: gamesError } = await getSupabase()
+    .from("games")
+    .select("court")
+    .eq("tournament_id", data.id);
+
+  if (gamesError) {
+    throw new Error(gamesError.message);
+  }
+
+  const gameCourts = games.map((game) => game.court).filter(Boolean) as string[];
+  const courts = [...new Set([...(data.courts ?? []), ...gameCourts])];
+  return { ...data, courts };
+}
+
+async function getPrimaryTournament() {
   const { data, error } = await getSupabase()
     .from("tournaments")
     .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
@@ -517,10 +535,7 @@ export async function getTournament(): Promise<Tournament> {
     throw new Error(error.message);
   }
 
-  const games = await listGames();
-  const gameCourts = games.map((game) => game.court).filter(Boolean) as string[];
-  const courts = [...new Set([...(data.courts ?? []), ...gameCourts])];
-  return { ...data, courts };
+  return data;
 }
 
 export async function saveTournament(tournament: Tournament): Promise<Tournament> {
@@ -656,9 +671,11 @@ export async function listScoreLinks(): Promise<ScoreLink[]> {
     return data.links.sort((left, right) => right.created_at.localeCompare(left.created_at));
   }
 
+  const tournament = await getPrimaryTournament();
   const { data, error } = await getSupabase()
     .from("score_entry_links")
     .select("id,tournament_id,game_id,court,token,expires_at,used_at,created_at")
+    .eq("tournament_id", tournament.id)
     .order("created_at", { ascending: false });
 
   if (error) {
