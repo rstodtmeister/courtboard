@@ -399,7 +399,6 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
     const store = readStore();
     const credentials = requireHvvCredentials();
     try {
-      const existingGames = (await localJson<LocalGamesResponse>("/api/games")).games;
       const response = await fetch(`${localApiUrl}/api/games/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -416,16 +415,15 @@ export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): P
 
       const syncResponse = body as LocalSyncResponse;
       const importedGames = syncResponse.games.map((game) => importedGame(tournament.id, game));
-      const mergedGames = mergeImportedGames(importedGames, existingGames, options.overwriteCourts);
-      await Promise.all(mergedGames.map((game) => updateLocalGame(game)));
       writeStore({
         ...store,
-        games: mergedGames,
+        games: importedGames,
+        links: [],
       });
       return {
         imported: importedGames.length,
         source: syncResponse.source,
-        message: `Spiele von lokaler Java-API geladen: ${syncResponse.title}`,
+        message: `Spiele von lokaler Java-API neu geladen: ${syncResponse.title}`,
       };
     } catch (error) {
       if (error instanceof TypeError) {
@@ -911,34 +909,6 @@ function createGame(tournamentId: string, number: string, gameDate: string, cour
     dirty: false,
     completed: false,
   };
-}
-
-function mergeImportedGames(importedGames: Game[], existingGames: Game[], overwriteCourts: boolean) {
-  return importedGames.map((importedGame) => {
-    const existing = existingGames.find((game) => game.number === importedGame.number);
-    if (!existing) {
-      return importedGame;
-    }
-
-    return {
-      ...importedGame,
-      id: existing.id,
-      court: overwriteCourts ? importedGame.court : existing.court,
-      referee: existing.referee,
-      result: existing.result,
-      winner_team: existing.winner_team,
-      game_rating: existing.game_rating,
-      set1_team_a: existing.set1_team_a,
-      set1_team_b: existing.set1_team_b,
-      set2_team_a: existing.set2_team_a,
-      set2_team_b: existing.set2_team_b,
-      set3_team_a: existing.set3_team_a,
-      set3_team_b: existing.set3_team_b,
-      printed: existing.printed,
-      dirty: existing.dirty,
-      completed: existing.completed,
-    };
-  });
 }
 
 function createId(prefix: string) {

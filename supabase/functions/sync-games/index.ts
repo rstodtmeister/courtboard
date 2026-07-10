@@ -38,9 +38,6 @@ type ImportedGame = {
   completed: boolean;
 };
 
-const existingGameSelect =
-  "id,tournament_id,number,game_date,court,team_a,team_b,referee,result,winner_team,edit_url,edit_method,edit_data,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
-
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) {
@@ -93,36 +90,38 @@ Deno.serve(async (req) => {
     const page = await loadHvvPage(source, body.hvvCredentials ?? {});
     const importedGames = parseBeachGames(page.html, page.url, tournament.id);
 
-    const { data: existingGames, error: existingError } = await adminClient
-      .from("games")
-      .select(existingGameSelect)
+    const { error: linksDeleteError } = await adminClient
+      .from("score_entry_links")
+      .delete()
       .eq("tournament_id", tournament.id);
 
-    if (existingError) {
-      return jsonResponse({ error: existingError.message }, 500);
+    if (linksDeleteError) {
+      return jsonResponse({ error: linksDeleteError.message }, 500);
     }
 
-    const mergedGames = mergeImportedGames(
-      importedGames,
-      existingGames ?? [],
-      Boolean(body.overwriteCourts),
-      Boolean(body.overwriteReferees),
-    );
+    const { error: gamesDeleteError } = await adminClient
+      .from("games")
+      .delete()
+      .eq("tournament_id", tournament.id);
 
-    if (mergedGames.length > 0) {
-      const { error: upsertError } = await adminClient
+    if (gamesDeleteError) {
+      return jsonResponse({ error: gamesDeleteError.message }, 500);
+    }
+
+    if (importedGames.length > 0) {
+      const { error: insertError } = await adminClient
         .from("games")
-        .upsert(mergedGames, { onConflict: "tournament_id,number" });
+        .insert(importedGames);
 
-      if (upsertError) {
-        return jsonResponse({ error: upsertError.message }, 500);
+      if (insertError) {
+        return jsonResponse({ error: insertError.message }, 500);
       }
     }
 
     return jsonResponse({
       imported: importedGames.length,
       source,
-      message: `Spiele von HVV geladen: ${page.title || source}`,
+      message: `Spiele von HVV neu geladen: ${page.title || source}`,
     });
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -327,42 +326,6 @@ function parseBeachGames(html: string, baseUrl: string, tournamentId: string): I
   }
 
   return games;
-}
-
-function mergeImportedGames(
-  importedGames: ImportedGame[],
-  existingGames: Array<Record<string, unknown>>,
-  overwriteCourts: boolean,
-  overwriteReferees: boolean,
-) {
-  return importedGames.map((importedGame) => {
-    const existing = existingGames.find((game) => game.number === importedGame.number);
-    if (!existing) {
-      return importedGame;
-    }
-
-    return {
-      ...importedGame,
-      id: existing.id,
-      court: overwriteCourts ? importedGame.court : existing.court,
-      referee: overwriteReferees ? importedGame.referee : existing.referee,
-      result: existing.result,
-      winner_team: existing.winner_team,
-      game_rating: existing.game_rating,
-      set1_team_a: existing.set1_team_a,
-      set1_team_b: existing.set1_team_b,
-      set2_team_a: existing.set2_team_a,
-      set2_team_b: existing.set2_team_b,
-      set3_team_a: existing.set3_team_a,
-      set3_team_b: existing.set3_team_b,
-      printed: existing.printed,
-      dirty: existing.dirty,
-      completed: existing.completed,
-      point_history: existing.point_history,
-      score_locked_by_device: existing.score_locked_by_device,
-      score_locked_at: existing.score_locked_at,
-    };
-  });
 }
 
 function editRequest(row: string, baseUrl: string) {

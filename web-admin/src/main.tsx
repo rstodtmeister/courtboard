@@ -606,10 +606,10 @@ function AdminDashboard({ session }: { session: AppSession }) {
       {showSyncDialog && (
         <AppDialog
           title="Spiele laden"
-          message="Sollen die Courts aus HVV übernommen werden? Schiedsgerichte werden nicht aus HVV übernommen."
-          secondaryLabel="Lokale Courts behalten"
-          primaryLabel="HVV-Courts übernehmen"
-          onSecondary={() => syncGames(false)}
+          message="HVV-Laden ersetzt alle vorhandenen Spiele und Ergebnislinks dieses Turniers."
+          secondaryLabel="Abbrechen"
+          primaryLabel="Neu laden"
+          onSecondary={() => setShowSyncDialog(false)}
           onPrimary={() => syncGames(true)}
           onClose={() => setShowSyncDialog(false)}
         />
