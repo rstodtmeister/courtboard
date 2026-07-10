@@ -310,10 +310,10 @@ function winnerFromSpecialRating(draft: GameDraft): string | null {
   const teamBFailed = rating.includes("verletzung b") || rating.includes("aufgabe b") || rating.includes("angetreten b");
 
   if (teamAFailed && !teamBFailed) {
-    return draft.team_b || "2";
+    return "2";
   }
   if (teamBFailed && !teamAFailed) {
-    return draft.team_a || "1";
+    return "1";
   }
   return "";
 }

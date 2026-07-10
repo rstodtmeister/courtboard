@@ -51,7 +51,7 @@ export async function submitGameToHvv(game: HvvGameUpdate, credentials: HvvCrede
   let changedFields = 0;
   changedFields += replaceFormValue(form.html, formFields, game.court ?? "", ["court", "feld", "platz"]);
   changedFields += replaceFormValue(form.html, formFields, game.referee ?? "", ["schiri", "schieds", "referee"]);
-  changedFields += replaceFormValue(form.html, formFields, game.game_rating ?? "", ["wertungid", "spielwertung", "wertung"]);
+  changedFields += replaceGameRating(form.html, formFields, game.game_rating ?? "");
   changedFields += replaceFormValue(form.html, formFields, game.set1_team_a ?? "", ["s1pa", "satz1teama", "satz1a", "set1teama", "set1a"]);
   changedFields += replaceFormValue(form.html, formFields, game.set1_team_b ?? "", ["s1pb", "satz1teamb", "satz1b", "set1teamb", "set1b"]);
   changedFields += replaceFormValue(form.html, formFields, game.set2_team_a ?? "", ["s2pa", "satz2teama", "satz2a", "set2teama", "set2a"]);
@@ -282,6 +282,38 @@ function replaceFormValue(form: string, formFields: Record<string, string>, valu
   }
   formFields[field.name] = formValue(field.html, value);
   return 1;
+}
+
+function replaceGameRating(form: string, formFields: Record<string, string>, value: string) {
+  if (!value) {
+    return 0;
+  }
+  const field = findField(form, ["wertungid", "spielwertung", "wertung"]);
+  if (!field) {
+    return 0;
+  }
+  formFields[field.name] = gameRatingValue(value) ?? formValue(field.html, value);
+  return 1;
+}
+
+function gameRatingValue(value: string) {
+  const ratings: Record<string, string> = {
+    normal: "0",
+    freilosb: "1",
+    freilosa: "2",
+    verletzunga: "3",
+    verletzungb: "4",
+    verletzungab: "5",
+    aufgabea: "6",
+    aufgabeb: "7",
+    aufgabeab: "8",
+    nichtangetretena: "9",
+    nichtangetretenb: "10",
+    nichtangetretenab: "11",
+    verletzunganichtangetretenb: "12",
+    nichtangetretenaverletzungb: "13",
+  };
+  return ratings[normalizeToken(value)];
 }
 
 function findField(form: string, tokens: string[]) {
