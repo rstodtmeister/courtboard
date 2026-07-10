@@ -162,6 +162,36 @@ async function fetchWithSession(
   cookies: Map<string, string>,
   init: RequestInit = {},
 ) {
+  let currentUrl = url;
+  let currentInit = init;
+  for (let redirectCount = 0; redirectCount < 8; redirectCount++) {
+    const response = await fetchOnce(currentUrl, credentials, cookies, currentInit);
+    if (!isRedirect(response.status)) {
+      if (!response.ok) {
+        throw new Error(`HVV-Abruf fehlgeschlagen (${response.status}).`);
+      }
+      return { response };
+    }
+
+    const location = response.headers.get("location");
+    await response.arrayBuffer();
+    if (!location) {
+      throw new Error("HVV-Redirect ohne Ziel-URL.");
+    }
+
+    currentUrl = new URL(location, currentUrl).toString();
+    currentInit = redirectInit(currentInit, response.status);
+  }
+
+  throw new Error("HVV-Abruf hat zu viele Weiterleitungen erzeugt.");
+}
+
+async function fetchOnce(
+  url: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+  init: RequestInit,
+) {
   const headers = new Headers(init.headers);
   headers.set("User-Agent", "CourtBoard/1.0");
   if (hasCredentials(credentials)) {
@@ -171,12 +201,20 @@ async function fetchWithSession(
     headers.set("Cookie", [...cookies].map(([name, value]) => `${name}=${value}`).join("; "));
   }
 
-  const response = await fetch(url, { ...init, headers, redirect: "follow" });
+  const response = await fetch(url, { ...init, headers, redirect: "manual" });
   storeCookies(response.headers, cookies);
-  if (!response.ok) {
-    throw new Error(`HVV-Abruf fehlgeschlagen (${response.status}).`);
+  return response;
+}
+
+function isRedirect(status: number) {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function redirectInit(init: RequestInit, status: number): RequestInit {
+  if (status === 307 || status === 308) {
+    return init;
   }
-  return { response };
+  return { method: "GET" };
 }
 
 function storeCookies(headers: Headers, cookies: Map<string, string>) {
