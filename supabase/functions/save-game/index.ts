@@ -2,6 +2,8 @@ import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, createUserClient } from "../_shared/supabase.ts";
 import { refreshTournamentGamesFromHvv, type HvvCredentials, submitGameToHvv } from "../_shared/hvv.ts";
 
+type AdminRole = "superadmin" | "admin";
+
 type SaveGameRequest = {
   gameId?: string;
   tournamentId?: string;
@@ -31,7 +33,7 @@ Deno.serve(async (req) => {
   const adminClient = createAdminClient();
   const { data: adminUser, error: adminError } = await adminClient
     .from("admin_users")
-    .select("user_id")
+    .select("user_id,role")
     .eq("user_id", userData.user.id)
     .eq("password_setup_required", false)
     .maybeSingle();
@@ -58,6 +60,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: gameError?.message ?? "Game not found" }, 404);
     }
 
+    const authorizationError = await tournamentAuthorizationError(adminClient, adminUser, userData.user.id, game.tournament_id);
+    if (authorizationError) {
+      return authorizationError;
+    }
+
     try {
       await submitGameToHvv(game, credentials);
       await adminClient.from("games").update({ dirty: false }).eq("id", game.id);
@@ -74,6 +81,11 @@ Deno.serve(async (req) => {
 
   if (!body.tournamentId) {
     return jsonResponse({ error: "tournamentId is required" }, 400);
+  }
+
+  const authorizationError = await tournamentAuthorizationError(adminClient, adminUser, userData.user.id, body.tournamentId);
+  if (authorizationError) {
+    return authorizationError;
   }
 
   const { data: games, error: gamesError } = await adminClient
@@ -111,4 +123,28 @@ Deno.serve(async (req) => {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function tournamentAuthorizationError(
+  adminClient: ReturnType<typeof createAdminClient>,
+  adminUser: { user_id: string; role: AdminRole },
+  userId: string,
+  tournamentId: string,
+) {
+  if (adminUser.role === "superadmin") {
+    return null;
+  }
+
+  const { data: assignment, error } = await adminClient
+    .from("tournament_admins")
+    .select("tournament_id")
+    .eq("tournament_id", tournamentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !assignment) {
+    return jsonResponse({ error: "Not authorized for this tournament" }, 403);
+  }
+
+  return null;
 }

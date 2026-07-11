@@ -4,12 +4,14 @@ import { CourtDisplayApp } from "./CourtDisplayApp";
 import { ScoreEntryApp } from "./ScoreEntryApp";
 import {
   completeAuthRedirect,
+  createTournament,
   createScoreLink as createScoreLinkData,
   deleteAdminUser,
   disableScoreLink,
   getHvvCredentialsStatus,
   getSession,
   getTournament,
+  listTournaments,
   inviteAdminUser,
   listGames,
   listAdminUsers,
@@ -242,6 +244,8 @@ function LoginForm() {
 
 function AdminDashboard({ session }: { session: AppSession }) {
   const [games, setGames] = useState<Game[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scoreLinks, setScoreLinks] = useState<ScoreLink[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -273,10 +277,27 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
 
     try {
+      const tournamentList = await listTournaments();
+      const selectedId = selectedTournamentId && tournamentList.some((item) => item.id === selectedTournamentId)
+        ? selectedTournamentId
+        : tournamentList[0]?.id ?? "";
+      if (selectedId !== selectedTournamentId) {
+        setSelectedTournamentId(selectedId);
+      }
+      setTournaments(tournamentList);
+
+      if (!selectedId) {
+        setGames([]);
+        setTournament(null);
+        setScoreLinks([]);
+        setAdminUsers(isSuperadmin ? await listAdminUsers() : []);
+        return;
+      }
+
       const [gameData, tournamentData, linkData, adminsData] = await Promise.all([
-        listGames(),
-        getTournament(),
-        listScoreLinks(),
+        listGames(selectedId),
+        getTournament(selectedId),
+        listScoreLinks(selectedId),
         isSuperadmin ? listAdminUsers() : Promise.resolve([]),
       ]);
       setGames(gameData);
@@ -296,7 +317,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
         setStatusSyncing(false);
       }
     }
-  }, [isSuperadmin]);
+  }, [isSuperadmin, selectedTournamentId]);
 
   useEffect(() => {
     loadDashboard({ initial: true });
@@ -313,6 +334,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
     try {
       const saved = await saveTournament(nextTournament);
       setTournament(saved);
+      setTournaments((current) => current.map((item) => item.id === saved.id ? saved : item));
       setMessage("Turnier gespeichert.");
       return true;
     } catch (saveError) {
@@ -348,7 +370,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       });
       const url = scoreUrl(data.token, tournament?.token_base_url);
       setLinkText(url);
-      setScoreLinks(await listScoreLinks());
+      setScoreLinks(await listScoreLinks(game.tournament_id));
       setMessage(`Ergebnislink fuer Spiel ${game.number} erzeugt.`);
     } catch (linkError) {
       setError(linkError instanceof Error ? linkError.message : "Link konnte nicht erzeugt werden.");
@@ -365,7 +387,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
         tournamentId,
         court,
       });
-      setScoreLinks(await listScoreLinks());
+      setScoreLinks(await listScoreLinks(tournamentId));
       setMessage(`Ergebnislink fuer Court ${court} erzeugt.`);
     } catch (linkError) {
       setError(linkError instanceof Error ? linkError.message : "Court-Link konnte nicht erzeugt werden.");
@@ -384,8 +406,8 @@ function AdminDashboard({ session }: { session: AppSession }) {
         await unlockScoreGame(lockedGame.id);
       }
       await createScoreLinkData({ tournamentId, court });
-      setScoreLinks(await listScoreLinks());
-      setGames(await listGames());
+      setScoreLinks(await listScoreLinks(tournamentId));
+      setGames(await listGames(tournamentId));
       setMessage(`QR-Code fuer Court ${court} ersetzt.`);
     } catch (linkError) {
       setError(linkError instanceof Error ? linkError.message : "Court-Link konnte nicht ersetzt werden.");
@@ -411,8 +433,8 @@ function AdminDashboard({ session }: { session: AppSession }) {
     setMessage("");
     try {
       await unlockScoreGame(gameId);
-      setGames(await listGames());
-      setScoreLinks(await listScoreLinks());
+      setGames(await listGames(selectedTournamentId));
+      setScoreLinks(await listScoreLinks(selectedTournamentId));
       setMessage("Eingabesperre geloest.");
     } catch (unlockError) {
       setError(unlockError instanceof Error ? unlockError.message : "Eingabesperre konnte nicht geloest werden.");
@@ -430,6 +452,10 @@ function AdminDashboard({ session }: { session: AppSession }) {
 
   async function syncGames(overwriteCourts: boolean) {
     setShowSyncDialog(false);
+    if (!selectedTournamentId) {
+      setError("Bitte zuerst ein Turnier auswaehlen oder anlegen.");
+      return;
+    }
     if (!getHvvCredentialsStatus().active) {
       setPendingSyncOverwriteCourts(overwriteCourts);
       setShowHvvCredentialsDialog(true);
@@ -439,7 +465,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
     setError("");
     setMessage("");
     try {
-      const result = await syncGamesFromHvv({ overwriteCourts });
+      const result = await syncGamesFromHvv({ tournamentId: selectedTournamentId, overwriteCourts });
       await loadDashboard();
       setMessage(`${result.imported} Spiele geladen. ${result.message}`);
     } catch (syncError) {
@@ -540,6 +566,46 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
+  async function addTournament() {
+    if (!isSuperadmin) {
+      return;
+    }
+    const name = window.prompt("Name des neuen Turniers");
+    if (!name?.trim()) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      const created = await createTournament({
+        name: name.trim(),
+        hvv_edit_url: "",
+        hvv_public_url: "",
+        token_base_url: "",
+        courts: [],
+      });
+      setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
+      setSelectedTournamentId(created.id);
+      setMessage(`Turnier ${created.name} angelegt.`);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Turnier konnte nicht angelegt werden.");
+    }
+  }
+
+  async function updateAdminTournaments(admin: AdminUser, tournamentIds: string[]) {
+    setError("");
+    setMessage("");
+    try {
+      await updateAdminUser({ userId: admin.user_id, action: "updateTournaments", tournamentIds });
+      setAdminUsers(await listAdminUsers());
+      setMessage(`Turnierzuweisung fuer ${admin.email || admin.user_id} aktualisiert.`);
+      return true;
+    } catch (adminError) {
+      setError(adminError instanceof Error ? adminError.message : "Turnierzuweisung konnte nicht gespeichert werden.");
+      return false;
+    }
+  }
+
   async function printPdf(selectedGames: Game[], sheetType: PdfSheetType) {
     setError("");
     setMessage("");
@@ -576,9 +642,18 @@ function AdminDashboard({ session }: { session: AppSession }) {
     <section className="panel wide-panel">
       <div className="toolbar">
         <div>
+          {tournament && <strong>{tournament.name}</strong>}
           <p className="toolbar-status">{games.length} Spiele, {dirtyCount} geaendert{lastSyncedAt ? `, Sync ${lastSyncedAt}` : ""}</p>
         </div>
         <div className="actions">
+          {tournaments.length > 0 && (
+            <select className="tournament-select" value={selectedTournamentId} onChange={(event) => setSelectedTournamentId(event.target.value)}>
+              {tournaments.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          )}
+          {isSuperadmin && <button type="button" className="secondary" onClick={addTournament}>Turnier anlegen</button>}
           <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
             {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
           </button>
@@ -637,7 +712,15 @@ function AdminDashboard({ session }: { session: AppSession }) {
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
           {activeTab === "admins" && isSuperadmin && (
-            <AdminUsersPanel admins={adminUsers} currentUserEmail={session.user.email} onInvite={inviteAdmin} onUpdate={updateAdmin} onDelete={deleteAdmin} />
+            <AdminUsersPanel
+              admins={adminUsers}
+              tournaments={tournaments}
+              currentUserEmail={session.user.email}
+              onInvite={inviteAdmin}
+              onUpdate={updateAdmin}
+              onUpdateTournaments={updateAdminTournaments}
+              onDelete={deleteAdmin}
+            />
           )}
         </div>
       )}
@@ -773,15 +856,19 @@ function HvvCredentialsDialog({
 
 function AdminUsersPanel({
   admins,
+  tournaments,
   currentUserEmail,
   onInvite,
   onUpdate,
+  onUpdateTournaments,
   onDelete,
 }: {
   admins: AdminUser[];
+  tournaments: Tournament[];
   currentUserEmail: string;
   onInvite: (email: string, role: AdminRole) => Promise<boolean>;
   onUpdate: (admin: AdminUser, action: "confirm" | "resendInvite" | "updateRole" | "setSuspended", params?: { role?: AdminRole; suspended?: boolean }) => Promise<boolean>;
+  onUpdateTournaments: (admin: AdminUser, tournamentIds: string[]) => Promise<boolean>;
   onDelete: (admin: AdminUser) => Promise<boolean>;
 }) {
   const [email, setEmail] = useState("");
@@ -819,6 +906,17 @@ function AdminUsersPanel({
     setBusyAction("");
   }
 
+  async function toggleTournament(admin: AdminUser, tournamentId: string, selected: boolean) {
+    const currentIds = admin.tournament_ids ?? [];
+    const nextIds = selected
+      ? [...new Set([...currentIds, tournamentId])]
+      : currentIds.filter((id) => id !== tournamentId);
+    const key = `${admin.user_id}:tournaments`;
+    setBusyAction(key);
+    await onUpdateTournaments(admin, nextIds);
+    setBusyAction("");
+  }
+
   return (
     <section className="admin-users-panel">
       <form className="admin-invite-form" onSubmit={submit}>
@@ -846,6 +944,7 @@ function AdminUsersPanel({
               <th>E-Mail</th>
               <th>Rolle</th>
               <th>Status</th>
+              <th>Turniere</th>
               <th>Angelegt</th>
               <th>Letzter Login</th>
               <th>Aktionen</th>
@@ -874,6 +973,25 @@ function AdminUsersPanel({
                     </select>
                   </td>
                   <td><AdminStatus admin={admin} /></td>
+                  <td>
+                    {admin.role === "superadmin" ? (
+                      <span className="badge active">Alle</span>
+                    ) : (
+                      <div className="admin-tournament-list">
+                        {tournaments.map((tournament) => (
+                          <label key={tournament.id}>
+                            <input
+                              type="checkbox"
+                              checked={(admin.tournament_ids ?? []).includes(tournament.id)}
+                              onChange={(event) => toggleTournament(admin, tournament.id, event.target.checked)}
+                              disabled={actionDisabled || busyAction === `${admin.user_id}:tournaments`}
+                            />
+                            {tournament.name}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td>{formatDateTime(admin.created_at)}</td>
                   <td>{admin.last_sign_in_at ? formatDateTime(admin.last_sign_in_at) : "-"}</td>
                   <td className="admin-actions">

@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   const adminClient = createAdminClient();
   const { data: adminUser, error: adminError } = await adminClient
     .from("admin_users")
-    .select("user_id")
+    .select("user_id,role")
     .eq("user_id", userData.user.id)
     .eq("password_setup_required", false)
     .maybeSingle();
@@ -69,6 +69,19 @@ Deno.serve(async (req) => {
   const body = await req.json() as SyncGamesRequest;
   if (!body.tournamentId) {
     return jsonResponse({ error: "tournamentId is required" }, 400);
+  }
+
+  if (adminUser.role !== "superadmin") {
+    const { data: assignment, error: assignmentError } = await adminClient
+      .from("tournament_admins")
+      .select("tournament_id")
+      .eq("tournament_id", body.tournamentId)
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    if (assignmentError || !assignment) {
+      return jsonResponse({ error: "Not authorized for this tournament" }, 403);
+    }
   }
 
   const { data: tournament, error: tournamentError } = await adminClient

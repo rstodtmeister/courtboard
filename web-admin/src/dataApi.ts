@@ -63,7 +63,7 @@ type StoredScoreLink = {
 type LocalStore = {
   session: AppSession | null;
   admins: AdminUser[];
-  tournament: Tournament;
+  tournaments: Tournament[];
   games: Game[];
   links: StoredScoreLink[];
 };
@@ -294,6 +294,7 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
       user_id: createId("local-admin"),
       email: params.email,
       role: params.role,
+      tournament_ids: store.tournaments.map((tournament) => tournament.id),
       password_setup_required: true,
       created_at: new Date().toISOString(),
       email_confirmed_at: null,
@@ -319,9 +320,10 @@ export async function inviteAdminUser(params: { email: string; role: AdminRole }
 
 export async function updateAdminUser(params: {
   userId: string;
-  action: "confirm" | "resendInvite" | "updateRole" | "setSuspended";
+  action: "confirm" | "resendInvite" | "updateRole" | "setSuspended" | "updateTournaments";
   role?: AdminRole;
   suspended?: boolean;
+  tournamentIds?: string[];
 }): Promise<AdminUser> {
   if (dataMode === "local") {
     const store = readStore();
@@ -332,6 +334,7 @@ export async function updateAdminUser(params: {
     const nextAdmin: AdminUser = {
       ...target,
       role: params.action === "updateRole" && params.role ? params.role : target.role,
+      tournament_ids: params.action === "updateTournaments" ? params.tournamentIds ?? [] : target.tournament_ids,
       email_confirmed_at: params.action === "confirm" ? new Date().toISOString() : target.email_confirmed_at,
       banned_until: params.action === "setSuspended" && params.suspended ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString() : null,
     };
@@ -379,13 +382,15 @@ export async function deleteAdminUser(userId: string): Promise<void> {
   }
 }
 
-export async function listGames(): Promise<Game[]> {
+export async function listGames(tournamentId?: string): Promise<Game[]> {
   if (dataMode === "local") {
     const data = await localJson<LocalGamesResponse>("/api/games");
-    return [...data.games].sort((left, right) => left.number.localeCompare(right.number, "de", { numeric: true }));
+    return [...data.games]
+      .filter((game) => !tournamentId || game.tournament_id === tournamentId)
+      .sort((left, right) => left.number.localeCompare(right.number, "de", { numeric: true }));
   }
 
-  const tournament = await getPrimaryTournament();
+  const tournament = tournamentId ? { id: tournamentId } : await getPrimaryTournament();
   const { data, error } = await getSupabase()
     .from("games")
     .select(gameSelect)
@@ -399,8 +404,8 @@ export async function listGames(): Promise<Game[]> {
   return data ?? [];
 }
 
-export async function syncGamesFromHvv(options: { overwriteCourts: boolean }): Promise<SyncGamesResult> {
-  const tournament = await getTournament();
+export async function syncGamesFromHvv(options: { tournamentId: string; overwriteCourts: boolean }): Promise<SyncGamesResult> {
+  const tournament = await getTournament(options.tournamentId);
   const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
 
   if (dataMode === "local") {
@@ -529,12 +534,30 @@ async function updateLocalGame(game: Game) {
   });
 }
 
-export async function getTournament(): Promise<Tournament> {
+export async function listTournaments(): Promise<Tournament[]> {
   if (dataMode === "local") {
-    return readStore().tournament;
+    return readStore().tournaments;
   }
 
-  const data = await getPrimaryTournament();
+  const { data, error } = await getSupabase()
+    .from("tournaments")
+    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function getTournament(tournamentId?: string): Promise<Tournament> {
+  if (dataMode === "local") {
+    const store = readStore();
+    return store.tournaments.find((item) => item.id === tournamentId) ?? store.tournaments[0];
+  }
+
+  const data = tournamentId ? await getTournamentById(tournamentId) : await getPrimaryTournament();
   const { data: games, error: gamesError } = await getSupabase()
     .from("games")
     .select("court")
@@ -564,10 +587,54 @@ async function getPrimaryTournament() {
   return data;
 }
 
+async function getTournamentById(tournamentId: string) {
+  const { data, error } = await getSupabase()
+    .from("tournaments")
+    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .eq("id", tournamentId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+export async function createTournament(params: Pick<Tournament, "name" | "hvv_edit_url" | "hvv_public_url" | "token_base_url" | "courts">): Promise<Tournament> {
+  if (dataMode === "local") {
+    const store = readStore();
+    const tournament: Tournament = { id: createId("local-tournament"), ...params };
+    writeStore({ ...store, tournaments: [...store.tournaments, tournament] });
+    return tournament;
+  }
+
+  const { data, error } = await getSupabase()
+    .from("tournaments")
+    .insert({
+      name: params.name,
+      hvv_edit_url: params.hvv_edit_url,
+      hvv_public_url: params.hvv_public_url,
+      token_base_url: params.token_base_url,
+      courts: params.courts,
+    })
+    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 export async function saveTournament(tournament: Tournament): Promise<Tournament> {
   if (dataMode === "local") {
     const store = readStore();
-    writeStore({ ...store, tournament });
+    writeStore({
+      ...store,
+      tournaments: store.tournaments.map((item) => item.id === tournament.id ? tournament : item),
+    });
     return tournament;
   }
 
@@ -691,13 +758,15 @@ export async function loadScoreEntry(token: string): Promise<ScoreEntryData> {
   return data;
 }
 
-export async function listScoreLinks(): Promise<ScoreLink[]> {
+export async function listScoreLinks(tournamentId?: string): Promise<ScoreLink[]> {
   if (dataMode === "local") {
     const data = await localJson<LocalLinksResponse>("/api/score-links");
-    return data.links.sort((left, right) => right.created_at.localeCompare(left.created_at));
+    return data.links
+      .filter((link) => !tournamentId || link.tournament_id === tournamentId)
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
   }
 
-  const tournament = await getPrimaryTournament();
+  const tournament = tournamentId ? { id: tournamentId } : await getPrimaryTournament();
   const { data, error } = await getSupabase()
     .from("score_entry_links")
     .select("id,tournament_id,game_id,court,token,expires_at,used_at,created_at")
@@ -869,6 +938,14 @@ function writeStore(store: LocalStore) {
 
 function seedStore(): LocalStore {
   const tournamentId = "local-tournament-1";
+  const tournament: Tournament = {
+    id: tournamentId,
+    name: "Lokales Beispielturnier",
+    hvv_edit_url: "",
+    hvv_public_url: "",
+    token_base_url: "",
+    courts: ["1", "2", "3", "4"],
+  };
   return {
     session: { user: { email: "admin@local.test", role: "superadmin" } },
     admins: [
@@ -876,19 +953,13 @@ function seedStore(): LocalStore {
         user_id: "local-superadmin-1",
         email: "admin@local.test",
         role: "superadmin",
+        tournament_ids: [tournamentId],
         password_setup_required: false,
         created_at: new Date().toISOString(),
         email_confirmed_at: new Date().toISOString(),
       },
     ],
-    tournament: {
-      id: tournamentId,
-      name: "Lokales Beispielturnier",
-      hvv_edit_url: "",
-      hvv_public_url: "",
-      token_base_url: "",
-      courts: ["1", "2", "3", "4"],
-    },
+    tournaments: [tournament],
     links: [],
     games: [
       createGame(tournamentId, "1", "09:00", "1", "Team A", "Team B", "Team C"),
@@ -903,10 +974,11 @@ function seedStore(): LocalStore {
 
 function normalizeStore(store: Partial<LocalStore>): LocalStore {
   const seeded = seedStore();
-  const tournament = store.tournament ?? {
-    ...seeded.tournament,
-    id: store.games?.[0]?.tournament_id ?? seeded.tournament.id,
-  };
+  const legacyStore = store as Partial<LocalStore> & { tournament?: Tournament };
+  const tournaments = store.tournaments ?? (legacyStore.tournament ? [legacyStore.tournament] : [{
+    ...seeded.tournaments[0],
+    id: store.games?.[0]?.tournament_id ?? seeded.tournaments[0].id,
+  }]);
 
   return {
     session: store.session
@@ -914,12 +986,10 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
       : seeded.session,
     admins: (store.admins ?? seeded.admins).map((admin) => ({
       ...admin,
+      tournament_ids: admin.tournament_ids ?? tournaments.map((tournament) => tournament.id),
       password_setup_required: admin.password_setup_required ?? false,
     })),
-    tournament: {
-      ...tournament,
-      token_base_url: tournament.token_base_url ?? "",
-    },
+    tournaments: tournaments.map((tournament) => ({ ...tournament, token_base_url: tournament.token_base_url ?? "" })),
     games: (store.games ?? seeded.games).map((game) => ({ ...game, completed: game.completed ?? false })),
     links: (store.links ?? []).map((link) => ({
       ...link,

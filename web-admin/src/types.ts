@@ -83,6 +83,7 @@ export type AdminUser = {
   user_id: string;
   email: string;
   role: AdminRole;
+  tournament_ids: string[];
   password_setup_required: boolean;
   created_at: string;
   email_confirmed_at: string | null;

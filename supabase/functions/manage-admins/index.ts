@@ -6,12 +6,14 @@ type AdminRole = "superadmin" | "admin";
 type InviteAdminRequest = {
   email?: string;
   role?: AdminRole;
+  tournamentIds?: string[];
 };
 
 type AdminPayload = {
   user_id: string;
   email: string;
   role: AdminRole;
+  tournament_ids: string[];
   password_setup_required: boolean;
   created_at: string;
   email_confirmed_at: string | null;
@@ -23,13 +25,14 @@ type DeleteAdminRequest = {
   userId?: string;
 };
 
-type AdminAction = "confirm" | "resendInvite" | "updateRole" | "setSuspended";
+type AdminAction = "confirm" | "resendInvite" | "updateRole" | "setSuspended" | "updateTournaments";
 
 type UpdateAdminRequest = {
   userId?: string;
   action?: AdminAction;
   role?: AdminRole;
   suspended?: boolean;
+  tournamentIds?: string[];
 };
 
 function authRedirectUrl(req: Request) {
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "email is required" }, 400);
   }
 
-  return inviteAdmin(req, adminClient, userData.user.id, email, role);
+  return inviteAdmin(req, adminClient, userData.user.id, email, role, body.tournamentIds ?? []);
 });
 
 async function inviteAdmin(
@@ -128,6 +131,7 @@ async function inviteAdmin(
   invitedBy: string,
   email: string,
   role: AdminRole,
+  tournamentIds: string[],
 ) {
   let inviteEmailSent = true;
   let emailError: string | null = null;
@@ -199,6 +203,13 @@ async function inviteAdmin(
 
   if (upsertError) {
     return jsonResponse({ error: upsertError.message }, 500);
+  }
+
+  if (role === "admin") {
+    const assignmentError = await replaceTournamentAssignments(adminClient, user.id, tournamentIds, invitedBy);
+    if (assignmentError) {
+      return assignmentError;
+    }
   }
 
   const admin = await adminFromUser(adminClient, row, user.email ?? email);
@@ -278,7 +289,26 @@ async function updateAdmin(
       return jsonResponse({ error: error.message }, 500);
     }
     await adminClient.auth.admin.updateUserById(userId, { user_metadata: { role } });
+    if (role === "superadmin") {
+      await adminClient.from("tournament_admins").delete().eq("user_id", userId);
+    }
     return adminPayload(adminClient, row);
+  }
+
+  if (body.action === "updateTournaments") {
+    if (target.row.role === "superadmin") {
+      return jsonResponse({ error: "Superadmins haben Zugriff auf alle Turniere." }, 400);
+    }
+    const assignmentError = await replaceTournamentAssignments(
+      adminClient,
+      userId,
+      Array.isArray(body.tournamentIds) ? body.tournamentIds : [],
+      currentUserId,
+    );
+    if (assignmentError) {
+      return assignmentError;
+    }
+    return adminPayload(adminClient, target.row);
   }
 
   if (body.action === "setSuspended") {
@@ -391,7 +421,8 @@ async function adminPayload(
   row: { user_id: string; role: AdminRole; password_setup_required: boolean; created_at: string },
 ) {
   const { data } = await adminClient.auth.admin.getUserById(row.user_id);
-  return jsonResponse({ admin: adminFromAuthUser(row, data.user) });
+  const tournamentIds = row.role === "superadmin" ? [] : await tournamentIdsForAdmin(adminClient, row.user_id);
+  return jsonResponse({ admin: adminFromAuthUser(row, data.user, "", tournamentIds) });
 }
 
 async function adminFromUser(
@@ -400,7 +431,8 @@ async function adminFromUser(
   fallbackEmail = "",
 ) {
   const { data } = await adminClient.auth.admin.getUserById(row.user_id);
-  return adminFromAuthUser(row, data.user, fallbackEmail);
+  const tournamentIds = row.role === "superadmin" ? [] : await tournamentIdsForAdmin(adminClient, row.user_id);
+  return adminFromAuthUser(row, data.user, fallbackEmail, tournamentIds);
 }
 
 function adminFromAuthUser(
@@ -412,11 +444,13 @@ function adminFromAuthUser(
     last_sign_in_at?: string | null;
   } | null,
   fallbackEmail = "",
+  tournamentIds: string[] = [],
 ): AdminPayload {
   return {
     user_id: row.user_id,
     email: user?.email ?? fallbackEmail,
     role: row.role,
+    tournament_ids: row.role === "superadmin" ? [] : tournamentIds,
     password_setup_required: row.password_setup_required,
     created_at: row.created_at,
     email_confirmed_at: user?.email_confirmed_at ?? null,
@@ -463,4 +497,53 @@ async function listAdmins(adminClient: ReturnType<typeof createAdminClient>) {
   const admins = await Promise.all((rows ?? []).map((row) => adminFromUser(adminClient, row)));
 
   return jsonResponse({ admins });
+}
+
+async function tournamentIdsForAdmin(adminClient: ReturnType<typeof createAdminClient>, userId: string) {
+  const { data, error } = await adminClient
+    .from("tournament_admins")
+    .select("tournament_id")
+    .eq("user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((item) => item.tournament_id as string);
+}
+
+async function replaceTournamentAssignments(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+  tournamentIds: string[],
+  assignedBy: string,
+) {
+  const uniqueIds = [...new Set(tournamentIds.filter(Boolean))];
+  const { error: deleteError } = await adminClient
+    .from("tournament_admins")
+    .delete()
+    .eq("user_id", userId);
+
+  if (deleteError) {
+    return jsonResponse({ error: deleteError.message }, 500);
+  }
+
+  if (uniqueIds.length === 0) {
+    return null;
+  }
+
+  const rows = uniqueIds.map((tournamentId) => ({
+    tournament_id: tournamentId,
+    user_id: userId,
+    assigned_by: assignedBy,
+  }));
+  const { error: insertError } = await adminClient
+    .from("tournament_admins")
+    .insert(rows);
+
+  if (insertError) {
+    return jsonResponse({ error: insertError.message }, 500);
+  }
+
+  return null;
 }

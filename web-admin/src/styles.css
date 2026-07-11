@@ -175,6 +175,17 @@ select {
   margin-bottom: 8px;
 }
 
+.toolbar strong {
+  display: block;
+  margin-bottom: 2px;
+  overflow-wrap: anywhere;
+}
+
+.tournament-select {
+  width: auto;
+  min-width: 220px;
+}
+
 .tournament-progress {
   display: grid;
   gap: 4px;
@@ -422,6 +433,26 @@ select {
 
 .admin-actions button {
   white-space: nowrap;
+}
+
+.admin-tournament-list {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.admin-tournament-list label {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 7px;
+  color: #3b424c;
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.admin-tournament-list input {
+  width: auto;
 }
 
 .danger-button {

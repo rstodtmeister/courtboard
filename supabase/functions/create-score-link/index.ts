@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   const adminClient = createAdminClient();
   const { data: adminUser, error: adminError } = await adminClient
     .from("admin_users")
-    .select("user_id")
+    .select("user_id,role")
     .eq("user_id", userData.user.id)
     .eq("password_setup_required", false)
     .maybeSingle();
@@ -40,6 +40,32 @@ Deno.serve(async (req) => {
   const body = await req.json() as CreateScoreLinkRequest;
   if (!body.tournamentId || (!body.gameId && !body.court)) {
     return jsonResponse({ error: "tournamentId and gameId or court are required" }, 400);
+  }
+
+  if (adminUser.role !== "superadmin") {
+    const { data: assignment, error: assignmentError } = await adminClient
+      .from("tournament_admins")
+      .select("tournament_id")
+      .eq("tournament_id", body.tournamentId)
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    if (assignmentError || !assignment) {
+      return jsonResponse({ error: "Not authorized for this tournament" }, 403);
+    }
+  }
+
+  if (body.gameId) {
+    const { data: game, error: gameError } = await adminClient
+      .from("games")
+      .select("id")
+      .eq("id", body.gameId)
+      .eq("tournament_id", body.tournamentId)
+      .maybeSingle();
+
+    if (gameError || !game) {
+      return jsonResponse({ error: gameError?.message ?? "Game not found in tournament" }, 404);
+    }
   }
 
   const token = randomToken();
