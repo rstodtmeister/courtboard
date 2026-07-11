@@ -386,6 +386,14 @@ select {
   justify-content: center;
 }
 
+.autosave-status {
+  min-width: 92px;
+  align-self: center;
+  color: #656d78;
+  font-size: .88rem;
+  font-weight: 700;
+}
+
 .admin-users-panel {
   display: grid;
   gap: 14px;

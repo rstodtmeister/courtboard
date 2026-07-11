@@ -336,15 +336,19 @@ function AdminDashboard({ session }: { session: AppSession }) {
     return () => window.clearInterval(interval);
   }, [loadDashboard]);
 
-  async function saveTournamentDraft(nextTournament: Tournament) {
-    setError("");
-    setMessage("");
+  async function saveTournamentDraft(nextTournament: Tournament, options: { silent?: boolean; successMessage?: string } = {}) {
+    if (!options.silent) {
+      setError("");
+      setMessage("");
+    }
 
     try {
       const saved = await saveTournament(nextTournament);
       setTournament(saved);
       setTournaments((current) => current.map((item) => item.id === saved.id ? saved : item));
-      setMessage("Courts gespeichert.");
+      if (!options.silent) {
+        setMessage(options.successMessage ?? "Turnierdaten gespeichert.");
+      }
       return true;
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Turnier konnte nicht gespeichert werden.");
@@ -1281,53 +1285,56 @@ function TournamentSettings({
   onDelete,
 }: {
   tournament: Tournament;
-  onSave: (tournament: Tournament) => Promise<boolean>;
+  onSave: (tournament: Tournament, options?: { silent?: boolean; successMessage?: string }) => Promise<boolean>;
   onDelete?: () => Promise<void>;
 }) {
+  const tournamentCourts = tournament.courts.join(", ");
   const [draft, setDraft] = useState(() => ({
     hvv_edit_url: tournament.hvv_edit_url,
-    courts: tournament.courts.join(", "),
+    courts: tournamentCourts,
   }));
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
-    if (dirty) {
-      return;
-    }
     setDraft({
       hvv_edit_url: tournament.hvv_edit_url,
-      courts: tournament.courts.join(", "),
+      courts: tournamentCourts,
     });
-  }, [dirty, tournament]);
+    setSaveState("idle");
+  }, [tournament.id, tournament.hvv_edit_url, tournamentCourts]);
 
   function updateDraft(update: Partial<typeof draft>) {
-    setDirty(true);
     setDraft((current) => ({ ...current, ...update }));
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    const saved = await onSave({
-      ...tournament,
-      name: tournament.name,
-      hvv_edit_url: draft.hvv_edit_url.trim(),
-      hvv_public_url: tournament.hvv_public_url ?? null,
-      token_base_url: null,
-      courts: draft.courts.split(",").map((court) => court.trim()).filter(Boolean),
-    });
-    if (saved) {
-      setDirty(false);
+  useEffect(() => {
+    const nextHvvUrl = draft.hvv_edit_url.trim();
+    const nextCourts = draft.courts.split(",").map((court) => court.trim()).filter(Boolean);
+    if (nextHvvUrl === tournament.hvv_edit_url && draft.courts === tournamentCourts) {
+      return;
     }
-    setSaving(false);
-  }
+
+    setSaveState("saving");
+    const timeout = window.setTimeout(async () => {
+      const saved = await onSave({
+        ...tournament,
+        name: tournament.name,
+        hvv_edit_url: nextHvvUrl,
+        hvv_public_url: tournament.hvv_public_url ?? null,
+        token_base_url: null,
+        courts: nextCourts,
+      }, { silent: true });
+      setSaveState(saved ? "saved" : "idle");
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [draft, onSave, tournament, tournamentCourts]);
 
   return (
-    <form className="config-panel" onSubmit={submit}>
+    <section className="config-panel">
       <div>
         <h3>Turnier</h3>
-        <p>Lokale Konfiguration fuer Import, Courts und spaetere HVV-Anbindung.</p>
+        <p>HVV-Daten werden beim Import gesetzt. Courts und HVV URL werden automatisch gespeichert.</p>
       </div>
       <label>
         Bezeichnung
@@ -1366,10 +1373,12 @@ function TournamentSettings({
         <input value={draft.courts} onChange={(event) => updateDraft({ courts: event.target.value })} />
       </label>
       <div className="config-actions">
+        <span className="autosave-status" aria-live="polite">
+          {saveState === "saving" ? "Speichert..." : saveState === "saved" ? "Gespeichert" : ""}
+        </span>
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
-        <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Courts speichern"}</button>
       </div>
-    </form>
+    </section>
   );
 }
 
