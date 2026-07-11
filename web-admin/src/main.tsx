@@ -369,7 +369,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
         tournamentId: game.tournament_id,
         gameId: game.id,
       });
-      const url = scoreUrl(data.token, tournament?.token_base_url);
+      const url = scoreUrl(data.token);
       setLinkText(url);
       setScoreLinks(await listScoreLinks(game.tournament_id));
       setMessage(`Ergebnislink fuer Spiel ${game.number} erzeugt.`);
@@ -582,7 +582,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
         name: name.trim(),
         hvv_edit_url: "",
         hvv_public_url: "",
-        token_base_url: "",
+        token_base_url: null,
         courts: [],
       });
       setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
@@ -716,7 +716,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 courts={courts}
                 games={games}
                 links={courtLinks}
-                tokenBaseUrl={tournament?.token_base_url}
                 onCreateCourtLink={createCourtLink}
                 onReplaceCourtLink={replaceCourtLink}
                 onUnlockCourt={unlockCourt}
@@ -1115,7 +1114,6 @@ function TournamentSettings({
     name: tournament.name,
     hvv_edit_url: tournament.hvv_edit_url,
     hvv_public_url: tournament.hvv_public_url ?? "",
-    token_base_url: tournament.token_base_url ?? "",
     courts: tournament.courts.join(", "),
   }));
   const [saving, setSaving] = useState(false);
@@ -1129,7 +1127,6 @@ function TournamentSettings({
       name: tournament.name,
       hvv_edit_url: tournament.hvv_edit_url,
       hvv_public_url: tournament.hvv_public_url ?? "",
-      token_base_url: tournament.token_base_url ?? "",
       courts: tournament.courts.join(", "),
     });
   }, [dirty, tournament]);
@@ -1147,7 +1144,7 @@ function TournamentSettings({
       name: draft.name.trim(),
       hvv_edit_url: draft.hvv_edit_url.trim(),
       hvv_public_url: draft.hvv_public_url.trim() || null,
-      token_base_url: draft.token_base_url.trim() || null,
+      token_base_url: null,
       courts: draft.courts.split(",").map((court) => court.trim()).filter(Boolean),
     });
     if (saved) {
@@ -1188,10 +1185,6 @@ function TournamentSettings({
         <input value={draft.hvv_public_url} onChange={(event) => updateDraft({ hvv_public_url: event.target.value })} />
       </label>
       <label>
-        Token Basis-URL
-        <input value={draft.token_base_url} onChange={(event) => updateDraft({ token_base_url: event.target.value })} placeholder="http://192.168.x.x:5173" />
-      </label>
-      <label>
         Courts
         <input value={draft.courts} onChange={(event) => updateDraft({ courts: event.target.value })} />
       </label>
@@ -1213,7 +1206,6 @@ function CourtLinksPanel({
   courts,
   games,
   links,
-  tokenBaseUrl,
   onCreateCourtLink,
   onReplaceCourtLink,
   onUnlockCourt,
@@ -1221,7 +1213,6 @@ function CourtLinksPanel({
   courts: Array<{ court: string; tournamentId: string }>;
   games: Game[];
   links: ScoreLink[];
-  tokenBaseUrl?: string | null;
   onCreateCourtLink: (court: string, tournamentId: string) => Promise<void>;
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
   onUnlockCourt: (court: string) => Promise<void>;
@@ -1239,7 +1230,7 @@ function CourtLinksPanel({
           const link = links.find((item) => item.court === entry.court);
           const currentGame = games.find((game) => game.court === entry.court && !isCompleted(game));
           const lockedGame = games.find((game) => game.court === entry.court && !isCompleted(game) && game.score_locked_by_device);
-          const value = link?.token ? scoreUrl(link.token, tokenBaseUrl) : "";
+          const value = link?.token ? scoreUrl(link.token) : "";
           return (
             <div className="court-link-card" key={entry.court}>
               <div className="court-link-card-head">
