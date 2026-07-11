@@ -264,8 +264,9 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [pendingSyncOverwriteCourts, setPendingSyncOverwriteCourts] = useState<boolean | null>(null);
-  const [pendingHvvAction, setPendingHvvAction] = useState<"sync" | "selectTournament" | null>(null);
+  const [pendingHvvAction, setPendingHvvAction] = useState<"sync" | "selectTournament" | "importTournament" | null>(null);
   const [pendingHvvTournamentSource, setPendingHvvTournamentSource] = useState("");
+  const [hvvTournamentSelectionMode, setHvvTournamentSelectionMode] = useState<"update" | "create">("update");
   const [showHvvCredentialsDialog, setShowHvvCredentialsDialog] = useState(false);
   const [showHvvTournamentDialog, setShowHvvTournamentDialog] = useState(false);
   const [hvvTournamentOptions, setHvvTournamentOptions] = useState<HvvTournamentOption[]>([]);
@@ -488,33 +489,35 @@ function AdminDashboard({ session }: { session: AppSession }) {
     const overwriteCourts = pendingSyncOverwriteCourts;
     setPendingSyncOverwriteCourts(null);
     setShowHvvCredentialsDialog(false);
-    if (pendingHvvAction === "selectTournament") {
+    if (pendingHvvAction === "selectTournament" || pendingHvvAction === "importTournament") {
       const source = pendingHvvTournamentSource;
+      const mode = pendingHvvAction === "importTournament" ? "create" : "update";
       setPendingHvvTournamentSource("");
       setPendingHvvAction(null);
-      await openHvvTournamentSelection(source);
+      await openHvvTournamentSelection(source, mode);
     } else if (overwriteCourts !== null) {
       setPendingHvvAction(null);
       await syncGames(overwriteCourts);
     }
   }
 
-  async function openHvvTournamentSelection(sourceOverride?: string) {
-    if (!tournament) {
+  async function openHvvTournamentSelection(sourceOverride?: string, mode: "update" | "create" = "update") {
+    if (mode === "update" && !tournament) {
       return;
     }
-    const source = sourceOverride?.trim() || tournament.hvv_edit_url.trim();
+    const source = sourceOverride?.trim() || tournament?.hvv_edit_url.trim() || "";
     if (!source) {
       setError("Bitte zuerst die HVV URL eintragen.");
       return;
     }
     if (!getHvvCredentialsStatus().active) {
-      setPendingHvvAction("selectTournament");
+      setPendingHvvAction(mode === "create" ? "importTournament" : "selectTournament");
       setPendingHvvTournamentSource(source);
       setShowHvvCredentialsDialog(true);
       return;
     }
 
+    setHvvTournamentSelectionMode(mode);
     setLoadingHvvTournaments(true);
     setError("");
     setMessage("");
@@ -533,16 +536,12 @@ function AdminDashboard({ session }: { session: AppSession }) {
   }
 
   async function selectHvvTournament(option: HvvTournamentOption) {
-    if (!tournament) {
-      return;
-    }
     setShowHvvTournamentDialog(false);
     setError("");
     setMessage("");
-    const saved = await saveTournamentDraft({
-      ...tournament,
-      name: option.name || tournament.name,
-      hvv_edit_url: option.detail_url || tournament.hvv_edit_url,
+    const nextTournament = {
+      name: option.name,
+      hvv_edit_url: option.detail_url,
       hvv_public_url: option.schedule_url || null,
       hvv_turnier_id: option.hvv_turnier_id || null,
       hvv_veranstaltung_id: option.hvv_veranstaltung_id || null,
@@ -551,7 +550,26 @@ function AdminDashboard({ session }: { session: AppSession }) {
       tournament_date: option.tournament_date || null,
       location: option.location || null,
       token_base_url: null,
-    });
+      courts: tournament?.courts ?? [],
+    };
+
+    if (hvvTournamentSelectionMode === "create" || !tournament) {
+      try {
+        const created = await createTournament(nextTournament);
+        setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
+        setTournament(created);
+        setSelectedTournamentId(created.id);
+        setGames([]);
+        setScoreLinks([]);
+        setActiveTab("settings");
+        setMessage(`HVV-Turnier ${option.name} importiert.`);
+      } catch (createError) {
+        setError(createError instanceof Error ? createError.message : "HVV-Turnier konnte nicht importiert werden.");
+      }
+      return;
+    }
+
+    const saved = await saveTournamentDraft({ ...tournament, ...nextTournament });
     if (saved) {
       setMessage(`HVV-Turnier ${option.name} ausgewaehlt.`);
     }
@@ -639,26 +657,15 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
-  async function addTournament() {
+  async function importHvvTournament() {
     if (!isSuperadmin) {
       return;
     }
-    setError("");
-    setMessage("");
-    try {
-      const created = await createTournament({
-        name: `Neues Turnier ${new Date().toISOString().slice(0, 19).replace("T", " ")}`,
-        hvv_edit_url: "",
-        hvv_public_url: "",
-        token_base_url: null,
-        courts: [],
-      });
-      setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
-      setSelectedTournamentId(created.id);
-      setMessage(`Turnier ${created.name} angelegt.`);
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Turnier konnte nicht angelegt werden.");
+    const source = window.prompt("HVV Portal-URL", "https://www.hvv-beach.de/testportal/");
+    if (!source?.trim()) {
+      return;
     }
+    await openHvvTournamentSelection(source.trim(), "create");
   }
 
   async function removeTournament() {
@@ -748,7 +755,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
               ))}
             </select>
           )}
-          {isSuperadmin && <button type="button" className="secondary" onClick={addTournament}>Turnier anlegen</button>}
+          {isSuperadmin && <button type="button" className="secondary" onClick={importHvvTournament}>HVV Turnier importieren</button>}
           <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
             {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
           </button>
@@ -842,6 +849,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
             setPendingSyncOverwriteCourts(null);
             setPendingHvvAction(null);
             setPendingHvvTournamentSource("");
+            setHvvTournamentSelectionMode("update");
             setShowHvvCredentialsDialog(false);
           }}
         />
@@ -850,6 +858,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
         <HvvTournamentDialog
           tournaments={hvvTournamentOptions}
           selectedTournamentId={tournament?.hvv_turnier_id ?? ""}
+          mode={hvvTournamentSelectionMode}
           onSelect={selectHvvTournament}
           onClose={() => setShowHvvTournamentDialog(false)}
         />
@@ -964,11 +973,13 @@ function HvvCredentialsDialog({
 function HvvTournamentDialog({
   tournaments,
   selectedTournamentId,
+  mode,
   onSelect,
   onClose,
 }: {
   tournaments: HvvTournamentOption[];
   selectedTournamentId: string;
+  mode: "update" | "create";
   onSelect: (tournament: HvvTournamentOption) => Promise<void>;
   onClose: () => void;
 }) {
@@ -983,7 +994,7 @@ function HvvTournamentDialog({
   return (
     <div className="app-dialog-backdrop" role="presentation">
       <section className="app-dialog hvv-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-tournament-title">
-        <h3 id="hvv-tournament-title">HVV Turnier auswaehlen</h3>
+        <h3 id="hvv-tournament-title">{mode === "create" ? "HVV Turnier importieren" : "HVV Turnier auswaehlen"}</h3>
         <div className="table-wrap">
           <table className="admin-table hvv-tournament-table">
             <thead>
@@ -1010,7 +1021,7 @@ function HvvTournamentDialog({
                     <td>{item.hvv_turnier_id}/{item.hvv_veranstaltung_id}</td>
                     <td>
                       <button type="button" onClick={() => selectTournament(item)} disabled={Boolean(busyId)}>
-                        {busyId === item.hvv_turnier_id ? "Speichert..." : selected ? "Aktualisieren" : "Auswaehlen"}
+                        {busyId === item.hvv_turnier_id ? "Speichert..." : mode === "create" ? "Importieren" : selected ? "Aktualisieren" : "Auswaehlen"}
                       </button>
                     </td>
                   </tr>
@@ -1266,7 +1277,6 @@ function TournamentSettings({
   onDelete?: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState(() => ({
-    name: tournament.name,
     hvv_edit_url: tournament.hvv_edit_url,
     courts: tournament.courts.join(", "),
   }));
@@ -1278,7 +1288,6 @@ function TournamentSettings({
       return;
     }
     setDraft({
-      name: tournament.name,
       hvv_edit_url: tournament.hvv_edit_url,
       courts: tournament.courts.join(", "),
     });
@@ -1294,7 +1303,7 @@ function TournamentSettings({
     setSaving(true);
     const saved = await onSave({
       ...tournament,
-      name: draft.name.trim(),
+      name: tournament.name,
       hvv_edit_url: draft.hvv_edit_url.trim(),
       hvv_public_url: tournament.hvv_public_url ?? null,
       token_base_url: null,
@@ -1327,7 +1336,7 @@ function TournamentSettings({
       </div>
       <label>
         Bezeichnung
-        <input value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
+        <input value={tournament.name} readOnly />
       </label>
       <label>
         HVV URL

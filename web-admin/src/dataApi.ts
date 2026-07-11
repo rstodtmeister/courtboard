@@ -634,7 +634,7 @@ async function getTournamentById(tournamentId: string) {
   return data;
 }
 
-export async function createTournament(params: Pick<Tournament, "name" | "hvv_edit_url" | "hvv_public_url" | "token_base_url" | "courts">): Promise<Tournament> {
+export async function createTournament(params: Omit<Tournament, "id">): Promise<Tournament> {
   if (dataMode === "local") {
     const store = readStore();
     const tournament: Tournament = { id: createId("local-tournament"), ...params };
@@ -648,6 +648,12 @@ export async function createTournament(params: Pick<Tournament, "name" | "hvv_ed
       name: params.name,
       hvv_edit_url: params.hvv_edit_url,
       hvv_public_url: params.hvv_public_url,
+      hvv_turnier_id: params.hvv_turnier_id ?? null,
+      hvv_veranstaltung_id: params.hvv_veranstaltung_id ?? null,
+      hvv_type: params.hvv_type ?? null,
+      hvv_gender: params.hvv_gender ?? null,
+      tournament_date: params.tournament_date ?? null,
+      location: params.location ?? null,
       token_base_url: params.token_base_url,
       courts: params.courts,
     })
