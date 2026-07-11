@@ -7,6 +7,7 @@ import {
   createTournament,
   createScoreLink as createScoreLinkData,
   deleteAdminUser,
+  deleteTournament,
   disableScoreLink,
   getHvvCredentialsStatus,
   getSession,
@@ -592,6 +593,32 @@ function AdminDashboard({ session }: { session: AppSession }) {
     }
   }
 
+  async function removeTournament() {
+    if (!isSuperadmin || !tournament) {
+      return;
+    }
+    const remaining = tournaments.filter((item) => item.id !== tournament.id);
+    if (!window.confirm(`Turnier "${tournament.name}" wirklich loeschen? Alle Spiele, Ergebnislinks und Zuweisungen dieses Turniers werden entfernt.`)) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      await deleteTournament(tournament.id);
+      setTournaments(remaining);
+      setSelectedTournamentId(remaining[0]?.id ?? "");
+      setTournament(remaining[0] ?? null);
+      setGames([]);
+      setScoreLinks([]);
+      setMessage(`Turnier ${tournament.name} geloescht.`);
+      if (remaining.length === 0) {
+        setActiveTab("settings");
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Turnier konnte nicht geloescht werden.");
+    }
+  }
+
   async function updateAdminTournaments(admin: AdminUser, tournamentIds: string[]) {
     setError("");
     setMessage("");
@@ -708,6 +735,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 onOpenCourtDisplay={() => window.open(displayUrl(), "_blank")}
                 onSignOut={signOut}
                 onSave={saveTournamentDraft}
+                onDelete={isSuperadmin ? removeTournament : undefined}
               />
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
@@ -1072,6 +1100,7 @@ function TournamentSettings({
   onOpenCourtDisplay,
   onSignOut,
   onSave,
+  onDelete,
 }: {
   tournament: Tournament;
   syncing: boolean;
@@ -1080,6 +1109,7 @@ function TournamentSettings({
   onOpenCourtDisplay: () => void;
   onSignOut: () => Promise<void>;
   onSave: (tournament: Tournament) => Promise<boolean>;
+  onDelete?: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState(() => ({
     name: tournament.name,
@@ -1172,6 +1202,7 @@ function TournamentSettings({
         </button>
         <button type="button" className="secondary" onClick={onOpenCourtDisplay}>Court Anzeige</button>
         <button type="button" className="secondary" onClick={onSignOut}>Abmelden</button>
+        {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
         <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Turnier speichern"}</button>
       </div>
     </form>

@@ -658,6 +658,32 @@ export async function saveTournament(tournament: Tournament): Promise<Tournament
   return data;
 }
 
+export async function deleteTournament(tournamentId: string): Promise<void> {
+  if (dataMode === "local") {
+    const store = readStore();
+    writeStore({
+      ...store,
+      tournaments: store.tournaments.filter((tournament) => tournament.id !== tournamentId),
+      games: store.games.filter((game) => game.tournament_id !== tournamentId),
+      links: store.links.filter((link) => link.tournament_id !== tournamentId),
+      admins: store.admins.map((admin) => ({
+        ...admin,
+        tournament_ids: admin.tournament_ids.filter((id) => id !== tournamentId),
+      })),
+    });
+    return;
+  }
+
+  const { error } = await getSupabase()
+    .from("tournaments")
+    .delete()
+    .eq("id", tournamentId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function saveGame(game: Game, draft: GameDraft): Promise<Game> {
   if (dataMode === "local") {
     const store = readStore();
