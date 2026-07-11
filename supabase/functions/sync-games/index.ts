@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
   const { data: tournament, error: tournamentError } = await adminClient
     .from("tournaments")
-    .select("id,hvv_edit_url,hvv_public_url")
+    .select("id,name,hvv_edit_url,hvv_public_url")
     .eq("id", body.tournamentId)
     .single();
 
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const page = await loadHvvPage(source, body.hvvCredentials ?? {});
+    const page = await loadHvvPage(source, body.hvvCredentials ?? {}, tournament.name);
     const importedGames = parseBeachGames(page.html, page.url, tournament.id);
 
     const { error: linksDeleteError } = await adminClient
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function loadHvvPage(source: string, credentials: HvvCredentials) {
+async function loadHvvPage(source: string, credentials: HvvCredentials, tournamentName: string) {
   const cookies = new Map<string, string>();
   const first = await fetchWithSession(source, credentials, cookies);
   let html = await first.response.text();
@@ -165,7 +165,85 @@ async function loadHvvPage(source: string, credentials: HvvCredentials) {
     throw new Error("Anmeldung fehlgeschlagen oder Loginformular erneut angezeigt.");
   }
 
+  if (isTournamentOverview(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentOverview(html, url, tournamentName, credentials, cookies);
+    html = schedulePage.html;
+    url = schedulePage.url;
+  }
+
   return { html, url, title: textContent(matchFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i)) };
+}
+
+async function resolveSchedulePageFromTournamentOverview(
+  html: string,
+  overviewUrl: string,
+  tournamentName: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  if (!tournamentName.trim()) {
+    throw new Error("Zum Laden aus der HVV-Turnieruebersicht muss das CourtBoard-Turnier einen Namen haben.");
+  }
+
+  const rows = tournamentOverviewRows(html);
+  for (const row of rows) {
+    const eventUrl = eventUrlFromTournamentRow(row, overviewUrl);
+    if (!eventUrl) {
+      continue;
+    }
+
+    const eventPage = await fetchWithSession(eventUrl, credentials, cookies);
+    const eventHtml = await eventPage.response.text();
+    const eventPageUrl = eventPage.response.url || eventUrl;
+    const eventName = labelTextById(eventHtml, "veranstaltung_bezeichnung") ||
+      labelTextById(eventHtml, "turnier_veranstaltung_bezeichnung") ||
+      textContent(matchFirst(eventHtml, /<div[^>]*font-size:14px[\s\S]*?<\/div>/i));
+
+    if (normalizeToken(eventName) !== normalizeToken(tournamentName)) {
+      continue;
+    }
+
+    const eventId = eventIdFromUrl(eventPageUrl) || eventIdFromUrl(eventUrl);
+    if (!eventId) {
+      throw new Error(`HVV-Veranstaltung fuer "${tournamentName}" gefunden, aber ohne Veranstaltung-ID.`);
+    }
+
+    const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, eventPageUrl).toString();
+    const schedulePage = await fetchWithSession(scheduleUrl, credentials, cookies);
+    return {
+      html: await schedulePage.response.text(),
+      url: schedulePage.response.url || scheduleUrl,
+    };
+  }
+
+  throw new Error(`In der HVV-Turnieruebersicht wurde kein Turnier mit der Veranstaltungsbezeichnung "${tournamentName}" gefunden.`);
+}
+
+function isTournamentOverview(html: string, url: string) {
+  return /id=["']turnierliste["']/i.test(html) || /beach_beach_turniere!browse/i.test(url);
+}
+
+function tournamentOverviewRows(html: string) {
+  return [...html.matchAll(/<tr\b[^>]*class=["'](?:oddrow|evenrow)["'][^>]*>[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
+}
+
+function eventUrlFromTournamentRow(row: string, baseUrl: string) {
+  const link = matchFirst(row, /<a\b[^>]*href=["'][^"']*beach_beach_veranstaltung!browse[^"']*veranstaltungid=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/i);
+  const href = attr(link, "href").trim();
+  return href ? new URL(href, baseUrl).toString() : "";
+}
+
+function eventIdFromUrl(url: string) {
+  try {
+    return new URL(url).searchParams.get("veranstaltungid") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function labelTextById(html: string, id: string) {
+  const escaped = escapeRegex(id);
+  return textContent(matchFirst(html, new RegExp(`<label\\b[^>]*id=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/label>`, "i")));
 }
 
 async function fetchWithSession(
@@ -476,6 +554,15 @@ function decodeEntities(value: string) {
     }
     return named[code] ?? `&${code};`;
   });
+}
+
+function normalizeToken(value: string) {
+  return value.toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss")
+    .replaceAll(/[^a-z0-9]+/g, "");
 }
 
 function matchFirst(value: string, pattern: RegExp) {

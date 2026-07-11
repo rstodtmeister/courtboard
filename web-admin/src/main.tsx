@@ -1178,7 +1178,11 @@ function TournamentSettings({
       </label>
       <label>
         HVV Edit-URL
-        <input value={draft.hvv_edit_url} onChange={(event) => updateDraft({ hvv_edit_url: event.target.value })} />
+        <input
+          value={draft.hvv_edit_url}
+          onChange={(event) => updateDraft({ hvv_edit_url: event.target.value })}
+          placeholder="https://www.hvv-beach.de/testportal/beach_beach_turniere!browse.action"
+        />
       </label>
       <label>
         HVV Public-URL

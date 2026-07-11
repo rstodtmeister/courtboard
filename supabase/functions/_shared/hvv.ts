@@ -93,7 +93,7 @@ export async function refreshTournamentGamesFromHvv(
 ) {
   const { data: tournament, error } = await adminClient
     .from("tournaments")
-    .select("hvv_edit_url,hvv_public_url")
+    .select("name,hvv_edit_url,hvv_public_url")
     .eq("id", tournamentId)
     .single();
 
@@ -106,7 +106,7 @@ export async function refreshTournamentGamesFromHvv(
     return 0;
   }
 
-  const page = await loadSchedulePage(source, credentials);
+  const page = await loadSchedulePage(source, credentials, tournament.name ?? "");
   const games = parseScheduleGames(page.html, page.url);
   let updated = 0;
   for (const game of games) {
@@ -131,7 +131,7 @@ export async function refreshTournamentGamesFromHvv(
   return updated;
 }
 
-async function loadSchedulePage(source: string, credentials: HvvCredentials) {
+async function loadSchedulePage(source: string, credentials: HvvCredentials, tournamentName: string) {
   const cookies = new Map<string, string>();
   let response = await fetchWithSession(source, credentials, cookies);
   let html = await response.text();
@@ -155,7 +155,57 @@ async function loadSchedulePage(source: string, credentials: HvvCredentials) {
     throw new Error("Anmeldung fehlgeschlagen oder Loginformular erneut angezeigt.");
   }
 
+  if (isTournamentOverview(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentOverview(html, url, tournamentName, credentials, cookies);
+    html = schedulePage.html;
+    url = schedulePage.url;
+  }
+
   return { html, url };
+}
+
+async function resolveSchedulePageFromTournamentOverview(
+  html: string,
+  overviewUrl: string,
+  tournamentName: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  if (!tournamentName.trim()) {
+    throw new Error("Zum Laden aus der HVV-Turnieruebersicht muss das CourtBoard-Turnier einen Namen haben.");
+  }
+
+  for (const row of tournamentOverviewRows(html)) {
+    const eventUrl = eventUrlFromTournamentRow(row, overviewUrl);
+    if (!eventUrl) {
+      continue;
+    }
+
+    const eventResponse = await fetchWithSession(eventUrl, credentials, cookies);
+    const eventHtml = await eventResponse.text();
+    const eventPageUrl = eventResponse.url || eventUrl;
+    const eventName = labelTextById(eventHtml, "veranstaltung_bezeichnung") ||
+      labelTextById(eventHtml, "turnier_veranstaltung_bezeichnung") ||
+      textContent(matchFirst(eventHtml, /<div[^>]*font-size:14px[\s\S]*?<\/div>/i));
+
+    if (normalizeToken(eventName) !== normalizeToken(tournamentName)) {
+      continue;
+    }
+
+    const eventId = eventIdFromUrl(eventPageUrl) || eventIdFromUrl(eventUrl);
+    if (!eventId) {
+      throw new Error(`HVV-Veranstaltung fuer "${tournamentName}" gefunden, aber ohne Veranstaltung-ID.`);
+    }
+
+    const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, eventPageUrl).toString();
+    const scheduleResponse = await fetchWithSession(scheduleUrl, credentials, cookies);
+    return {
+      html: await scheduleResponse.text(),
+      url: scheduleResponse.url || scheduleUrl,
+    };
+  }
+
+  throw new Error(`In der HVV-Turnieruebersicht wurde kein Turnier mit der Veranstaltungsbezeichnung "${tournamentName}" gefunden.`);
 }
 
 async function loadEditPage(game: HvvGameUpdate, credentials: HvvCredentials, cookies: Map<string, string>) {
@@ -551,6 +601,33 @@ function textByDataContent(row: string, dataContent: string) {
   const escaped = escapeRegex(dataContent);
   const pattern = new RegExp(`<t[dh]\\b[^>]*data-content=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/t[dh]>`, "i");
   return textContent(matchFirst(row, pattern));
+}
+
+function isTournamentOverview(html: string, url: string) {
+  return /id=["']turnierliste["']/i.test(html) || /beach_beach_turniere!browse/i.test(url);
+}
+
+function tournamentOverviewRows(html: string) {
+  return [...html.matchAll(/<tr\b[^>]*class=["'](?:oddrow|evenrow)["'][^>]*>[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
+}
+
+function eventUrlFromTournamentRow(row: string, baseUrl: string) {
+  const link = matchFirst(row, /<a\b[^>]*href=["'][^"']*beach_beach_veranstaltung!browse[^"']*veranstaltungid=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/i);
+  const href = attr(link, "href").trim();
+  return href ? new URL(href, baseUrl).toString() : "";
+}
+
+function eventIdFromUrl(url: string) {
+  try {
+    return new URL(url).searchParams.get("veranstaltungid") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function labelTextById(html: string, id: string) {
+  const escaped = escapeRegex(id);
+  return textContent(matchFirst(html, new RegExp(`<label\\b[^>]*id=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/label>`, "i")));
 }
 
 function attr(html: string, name: string) {
