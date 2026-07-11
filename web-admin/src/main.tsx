@@ -832,8 +832,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
             tournament ? (
               <TournamentSettings
                 tournament={tournament}
-                onOpenCourtDisplay={() => window.open(displayUrl(), "_blank")}
-                onSignOut={signOut}
                 onSave={saveTournamentDraft}
                 onDelete={isSuperadmin ? removeTournament : undefined}
               />
@@ -1279,14 +1277,10 @@ function isAdminSuspended(admin: AdminUser) {
 
 function TournamentSettings({
   tournament,
-  onOpenCourtDisplay,
-  onSignOut,
   onSave,
   onDelete,
 }: {
   tournament: Tournament;
-  onOpenCourtDisplay: () => void;
-  onSignOut: () => Promise<void>;
   onSave: (tournament: Tournament) => Promise<boolean>;
   onDelete?: () => Promise<void>;
 }) {
@@ -1327,19 +1321,6 @@ function TournamentSettings({
       setDirty(false);
     }
     setSaving(false);
-  }
-
-  function addCourt() {
-    setDirty(true);
-    setDraft((current) => {
-      const courts = current.courts.split(",").map((court) => court.trim()).filter(Boolean);
-      const courtNumbers = courts.map(courtNumber).filter((court) => court > 0);
-      const nextCourt = courtNumbers.length > 0 ? Math.max(...courtNumbers) + 1 : 1;
-      return {
-        ...current,
-        courts: [...courts, String(nextCourt)].join(", "),
-      };
-    });
   }
 
   return (
@@ -1385,9 +1366,6 @@ function TournamentSettings({
         <input value={draft.courts} onChange={(event) => updateDraft({ courts: event.target.value })} />
       </label>
       <div className="config-actions">
-        <button type="button" className="secondary" onClick={addCourt}>Court hinzufuegen</button>
-        <button type="button" className="secondary" onClick={onOpenCourtDisplay}>Court Anzeige</button>
-        <button type="button" className="secondary" onClick={onSignOut}>Abmelden</button>
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
         <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Turnier speichern"}</button>
       </div>
