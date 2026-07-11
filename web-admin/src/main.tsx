@@ -995,7 +995,7 @@ function HvvTournamentDialog({
     <div className="app-dialog-backdrop" role="presentation">
       <section className="app-dialog hvv-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-tournament-title">
         <h3 id="hvv-tournament-title">{mode === "create" ? "HVV Turnier importieren" : "HVV Turnier auswaehlen"}</h3>
-        <div className="table-wrap">
+        <div className="table-wrap hvv-tournament-table-wrap">
           <table className="admin-table hvv-tournament-table">
             <thead>
               <tr>

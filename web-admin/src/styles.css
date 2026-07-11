@@ -417,10 +417,72 @@ select {
 
 .hvv-tournament-dialog {
   width: min(1120px, calc(100vw - 28px));
+  max-height: calc(100vh - 48px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.hvv-tournament-table-wrap {
+  max-height: min(68vh, 680px);
+  overflow: auto;
 }
 
 .hvv-tournament-table {
   min-width: 920px;
+  table-layout: fixed;
+}
+
+.hvv-tournament-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f7fa;
+}
+
+.hvv-tournament-table th,
+.hvv-tournament-table td {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.hvv-tournament-table th:first-child,
+.hvv-tournament-table td:first-child {
+  width: 28%;
+}
+
+.hvv-tournament-table th:nth-child(2),
+.hvv-tournament-table td:nth-child(2) {
+  width: 100px;
+}
+
+.hvv-tournament-table th:nth-child(3),
+.hvv-tournament-table td:nth-child(3) {
+  width: 18%;
+}
+
+.hvv-tournament-table th:nth-child(4),
+.hvv-tournament-table td:nth-child(4) {
+  width: 18%;
+}
+
+.hvv-tournament-table th:nth-child(5),
+.hvv-tournament-table td:nth-child(5) {
+  width: 110px;
+}
+
+.hvv-tournament-table th:nth-child(6),
+.hvv-tournament-table td:nth-child(6) {
+  width: 120px;
+}
+
+.hvv-tournament-table th:nth-child(7),
+.hvv-tournament-table td:nth-child(7) {
+  width: 120px;
+}
+
+.hvv-tournament-table td {
+  overflow-wrap: anywhere;
+  font-size: .9rem;
+  line-height: 1.25;
 }
 
 .admin-role-select {
