@@ -38,6 +38,16 @@ type ImportedGame = {
   completed: boolean;
 };
 
+type HvvTournamentMetadata = {
+  name: string;
+  hvv_turnier_id: string;
+  hvv_veranstaltung_id: string;
+  hvv_type: string;
+  hvv_gender: string;
+  tournament_date: string;
+  location: string;
+};
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) {
@@ -86,7 +96,7 @@ Deno.serve(async (req) => {
 
   const { data: tournament, error: tournamentError } = await adminClient
     .from("tournaments")
-    .select("id,name,hvv_edit_url,hvv_public_url")
+    .select("id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id")
     .eq("id", body.tournamentId)
     .single();
 
@@ -100,8 +110,34 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const page = await loadHvvPage(source, body.hvvCredentials ?? {}, tournament.name);
+    const page = await loadHvvPage(source, body.hvvCredentials ?? {}, {
+      name: tournament.name,
+      hvvTurnierId: tournament.hvv_turnier_id ?? "",
+      hvvVeranstaltungId: tournament.hvv_veranstaltung_id ?? "",
+    });
     const importedGames = parseBeachGames(page.html, page.url, tournament.id);
+
+    if (page.metadata) {
+      const { error: updateTournamentError } = await adminClient
+        .from("tournaments")
+        .update({
+          name: page.metadata.name || tournament.name,
+          hvv_turnier_id: page.metadata.hvv_turnier_id || null,
+          hvv_veranstaltung_id: page.metadata.hvv_veranstaltung_id || null,
+          hvv_type: page.metadata.hvv_type || null,
+          hvv_gender: page.metadata.hvv_gender || null,
+          tournament_date: page.metadata.tournament_date || null,
+          location: page.metadata.location || null,
+          hvv_public_url: page.metadata.hvv_veranstaltung_id
+            ? new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${page.metadata.hvv_veranstaltung_id}`, page.url).toString()
+            : tournament.hvv_public_url,
+        })
+        .eq("id", tournament.id);
+
+      if (updateTournamentError) {
+        return jsonResponse({ error: updateTournamentError.message }, 500);
+      }
+    }
 
     const { error: linksDeleteError } = await adminClient
       .from("score_entry_links")
@@ -141,7 +177,11 @@ Deno.serve(async (req) => {
   }
 });
 
-async function loadHvvPage(source: string, credentials: HvvCredentials, tournamentName: string) {
+async function loadHvvPage(
+  source: string,
+  credentials: HvvCredentials,
+  tournamentHint: { name: string; hvvTurnierId: string; hvvVeranstaltungId: string },
+) {
   const cookies = new Map<string, string>();
   const first = await fetchWithSession(source, credentials, cookies);
   let html = await first.response.text();
@@ -165,47 +205,60 @@ async function loadHvvPage(source: string, credentials: HvvCredentials, tourname
     throw new Error("Anmeldung fehlgeschlagen oder Loginformular erneut angezeigt.");
   }
 
+  let metadata: HvvTournamentMetadata | null = null;
   if (isTournamentOverview(html, url)) {
-    const schedulePage = await resolveSchedulePageFromTournamentOverview(html, url, tournamentName, credentials, cookies);
+    const schedulePage = await resolveSchedulePageFromTournamentOverview(html, url, tournamentHint, credentials, cookies);
+    metadata = schedulePage.metadata;
+    html = schedulePage.html;
+    url = schedulePage.url;
+  } else if (isTournamentDetail(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentDetail(html, url, credentials, cookies);
+    metadata = schedulePage.metadata;
     html = schedulePage.html;
     url = schedulePage.url;
   }
 
-  return { html, url, title: textContent(matchFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i)) };
+  return { html, url, title: textContent(matchFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i)), metadata };
 }
 
 async function resolveSchedulePageFromTournamentOverview(
   html: string,
   overviewUrl: string,
-  tournamentName: string,
+  tournamentHint: { name: string; hvvTurnierId: string; hvvVeranstaltungId: string },
   credentials: HvvCredentials,
   cookies: Map<string, string>,
 ) {
-  if (!tournamentName.trim()) {
-    throw new Error("Zum Laden aus der HVV-Turnieruebersicht muss das CourtBoard-Turnier einen Namen haben.");
+  if (!tournamentHint.name.trim() && !tournamentHint.hvvTurnierId && !tournamentHint.hvvVeranstaltungId) {
+    throw new Error("Zum Laden aus der HVV-Turnieruebersicht muss das Turnier einmal ueber eine HVV-Turnierdetail-URL geladen oder eindeutig benannt sein.");
   }
 
   const rows = tournamentOverviewRows(html);
   for (const row of rows) {
+    const rowTurnierId = attr(matchFirst(row, /<input\b[^>]*name=["']ausg["'][^>]*>/i), "value");
     const eventUrl = eventUrlFromTournamentRow(row, overviewUrl);
     if (!eventUrl) {
+      continue;
+    }
+    const rowEventId = eventIdFromUrl(eventUrl);
+    if (tournamentHint.hvvTurnierId && rowTurnierId !== tournamentHint.hvvTurnierId) {
+      continue;
+    }
+    if (tournamentHint.hvvVeranstaltungId && rowEventId !== tournamentHint.hvvVeranstaltungId) {
       continue;
     }
 
     const eventPage = await fetchWithSession(eventUrl, credentials, cookies);
     const eventHtml = await eventPage.response.text();
     const eventPageUrl = eventPage.response.url || eventUrl;
-    const eventName = labelTextById(eventHtml, "veranstaltung_bezeichnung") ||
-      labelTextById(eventHtml, "turnier_veranstaltung_bezeichnung") ||
-      textContent(matchFirst(eventHtml, /<div[^>]*font-size:14px[\s\S]*?<\/div>/i));
+    const metadata = metadataFromEventPage(eventHtml, eventPageUrl, row, rowTurnierId);
 
-    if (normalizeToken(eventName) !== normalizeToken(tournamentName)) {
+    if (!tournamentHint.hvvTurnierId && !tournamentHint.hvvVeranstaltungId && normalizeToken(metadata.name) !== normalizeToken(tournamentHint.name)) {
       continue;
     }
 
-    const eventId = eventIdFromUrl(eventPageUrl) || eventIdFromUrl(eventUrl);
+    const eventId = metadata.hvv_veranstaltung_id;
     if (!eventId) {
-      throw new Error(`HVV-Veranstaltung fuer "${tournamentName}" gefunden, aber ohne Veranstaltung-ID.`);
+      throw new Error(`HVV-Veranstaltung fuer "${tournamentHint.name}" gefunden, aber ohne Veranstaltung-ID.`);
     }
 
     const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, eventPageUrl).toString();
@@ -213,14 +266,39 @@ async function resolveSchedulePageFromTournamentOverview(
     return {
       html: await schedulePage.response.text(),
       url: schedulePage.response.url || scheduleUrl,
+      metadata,
     };
   }
 
-  throw new Error(`In der HVV-Turnieruebersicht wurde kein Turnier mit der Veranstaltungsbezeichnung "${tournamentName}" gefunden.`);
+  throw new Error(`In der HVV-Turnieruebersicht wurde kein passendes Turnier gefunden.`);
+}
+
+async function resolveSchedulePageFromTournamentDetail(
+  html: string,
+  detailUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const metadata = metadataFromTournamentDetail(html, detailUrl);
+  if (!metadata.hvv_veranstaltung_id) {
+    throw new Error("Auf der HVV-Turnierdetailseite wurde keine Veranstaltung-ID gefunden.");
+  }
+
+  const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${metadata.hvv_veranstaltung_id}`, detailUrl).toString();
+  const schedulePage = await fetchWithSession(scheduleUrl, credentials, cookies);
+  return {
+    html: await schedulePage.response.text(),
+    url: schedulePage.response.url || scheduleUrl,
+    metadata,
+  };
 }
 
 function isTournamentOverview(html: string, url: string) {
   return /id=["']turnierliste["']/i.test(html) || /beach_beach_turniere!browse/i.test(url);
+}
+
+function isTournamentDetail(html: string, url: string) {
+  return /turnier_turnierid/i.test(html) || /beach_beach_turnier!browse/i.test(url);
 }
 
 function tournamentOverviewRows(html: string) {
@@ -244,6 +322,92 @@ function eventIdFromUrl(url: string) {
 function labelTextById(html: string, id: string) {
   const escaped = escapeRegex(id);
   return textContent(matchFirst(html, new RegExp(`<label\\b[^>]*id=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/label>`, "i")));
+}
+
+function metadataFromTournamentDetail(html: string, pageUrl: string): HvvTournamentMetadata {
+  const eventId = eventIdFromUrl(pageUrl) || attr(matchFirst(html, /<input\b[^>]*name=["']veranstaltungid["'][^>]*>/i), "value");
+  const turnierId = new URL(pageUrl).searchParams.get("turnierid") ||
+    labelTextById(html, "turnier_turnierid") ||
+    fieldValueByFor(html, "turnier_turnierid");
+  const name = labelTextById(html, "turnier_veranstaltung_bezeichnung") ||
+    fieldValueByFor(html, "turnier_veranstaltung_bezeichnung") ||
+    labelTextById(html, "veranstaltung_bezeichnung") ||
+    fieldValueByFor(html, "veranstaltung_bezeichnung");
+
+  return {
+    name,
+    hvv_turnier_id: turnierId,
+    hvv_veranstaltung_id: eventId,
+    hvv_type: fieldValueByFor(html, "turnier_typ_path") || fieldValueByFor(html, "turnier_subtyp"),
+    hvv_gender: genderFromHtml(fieldCellByFor(html, "turnier_geschlecht")),
+    tournament_date: fieldValueByFor(html, "turnier_hfvon") || firstDateFromText(textContent(matchFirst(html, /<div id=["']path["'][\s\S]*?<\/div>/i))),
+    location: labelTextById(html, "turnier_veranstaltung_ort") ||
+      fieldValueByFor(html, "turnier_veranstaltung_ort") ||
+      labelTextById(html, "veranstaltung_ort") ||
+      fieldValueByFor(html, "veranstaltung_ort"),
+  };
+}
+
+function metadataFromEventPage(html: string, pageUrl: string, overviewRow: string, rowTurnierId: string): HvvTournamentMetadata {
+  const tournamentRow = tournamentRowFromEventPage(html, rowTurnierId);
+  const eventName = labelTextById(html, "veranstaltung_bezeichnung") ||
+    fieldValueByFor(html, "veranstaltung_bezeichnung") ||
+    labelTextById(html, "turnier_veranstaltung_bezeichnung") ||
+    fieldValueByFor(html, "turnier_veranstaltung_bezeichnung") ||
+    textContent(matchFirst(html, /<div[^>]*font-size:14px[\s\S]*?<\/div>/i));
+
+  return {
+    name: eventName,
+    hvv_turnier_id: rowTurnierId,
+    hvv_veranstaltung_id: eventIdFromUrl(pageUrl),
+    hvv_type: textByColumn(tournamentRow, 1) || textByColumn(overviewRow, 2),
+    hvv_gender: genderFromHtml(cellByColumn(tournamentRow, 3) || cellByColumn(overviewRow, 4)),
+    tournament_date: textByColumn(tournamentRow, 0) || textByColumn(overviewRow, 3),
+    location: fieldValueByFor(html, "veranstaltung_ort") || textByColumn(overviewRow, 5),
+  };
+}
+
+function tournamentRowFromEventPage(html: string, turnierId: string) {
+  if (!turnierId) {
+    return "";
+  }
+  for (const rowMatch of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)) {
+    const row = rowMatch[0];
+    if (new RegExp(`turnierid["']?\\s*[^>]*value=["']?${escapeRegex(turnierId)}\\b|turnierid=${escapeRegex(turnierId)}\\b`, "i").test(row)) {
+      return row;
+    }
+  }
+  return "";
+}
+
+function fieldValueByFor(html: string, forId: string) {
+  return textContent(fieldCellByFor(html, forId));
+}
+
+function fieldCellByFor(html: string, forId: string) {
+  const escaped = escapeRegex(forId);
+  const row = matchFirst(html, new RegExp(`<tr\\b[^>]*>[\\s\\S]*?<label\\b[^>]*for=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/label>[\\s\\S]*?<\\/tr>`, "i"));
+  const cells = [...row.matchAll(/<td\b[^>]*>[\s\S]*?<\/td>/gi)].map((match) => match[0]);
+  return cells.length > 1 ? cells[1] : "";
+}
+
+function genderFromHtml(html: string) {
+  const img = matchFirst(html, /<img\b[^>]*>/i);
+  const normalized = normalizeToken(`${textContent(html)} ${attr(img, "src")} ${attr(img, "alt")} ${attr(img, "title")}`);
+  if (normalized.includes("mixed")) {
+    return "Mixed";
+  }
+  if (normalized.includes("female") || normalized.includes("weiblich") || normalized.includes("damen")) {
+    return "weiblich";
+  }
+  if (normalized.includes("male") || normalized.includes("maennlich") || normalized.includes("herren")) {
+    return "maennlich";
+  }
+  return textContent(html);
+}
+
+function firstDateFromText(value: string) {
+  return value.match(/\b\d{2}\.\d{2}\.\d{4}\b/)?.[0] ?? "";
 }
 
 async function fetchWithSession(

@@ -159,6 +159,10 @@ async function loadSchedulePage(source: string, credentials: HvvCredentials, tou
     const schedulePage = await resolveSchedulePageFromTournamentOverview(html, url, tournamentName, credentials, cookies);
     html = schedulePage.html;
     url = schedulePage.url;
+  } else if (isTournamentDetail(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentDetail(html, url, credentials, cookies);
+    html = schedulePage.html;
+    url = schedulePage.url;
   }
 
   return { html, url };
@@ -206,6 +210,25 @@ async function resolveSchedulePageFromTournamentOverview(
   }
 
   throw new Error(`In der HVV-Turnieruebersicht wurde kein Turnier mit der Veranstaltungsbezeichnung "${tournamentName}" gefunden.`);
+}
+
+async function resolveSchedulePageFromTournamentDetail(
+  html: string,
+  detailUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const eventId = eventIdFromUrl(detailUrl) || attr(matchFirst(html, /<input\b[^>]*name=["']veranstaltungid["'][^>]*>/i), "value");
+  if (!eventId) {
+    throw new Error("Auf der HVV-Turnierdetailseite wurde keine Veranstaltung-ID gefunden.");
+  }
+
+  const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, detailUrl).toString();
+  const scheduleResponse = await fetchWithSession(scheduleUrl, credentials, cookies);
+  return {
+    html: await scheduleResponse.text(),
+    url: scheduleResponse.url || scheduleUrl,
+  };
 }
 
 async function loadEditPage(game: HvvGameUpdate, credentials: HvvCredentials, cookies: Map<string, string>) {
@@ -605,6 +628,10 @@ function textByDataContent(row: string, dataContent: string) {
 
 function isTournamentOverview(html: string, url: string) {
   return /id=["']turnierliste["']/i.test(html) || /beach_beach_turniere!browse/i.test(url);
+}
+
+function isTournamentDetail(html: string, url: string) {
+  return /turnier_turnierid/i.test(html) || /beach_beach_turnier!browse/i.test(url);
 }
 
 function tournamentOverviewRows(html: string) {

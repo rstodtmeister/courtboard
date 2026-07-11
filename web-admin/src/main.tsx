@@ -571,15 +571,11 @@ function AdminDashboard({ session }: { session: AppSession }) {
     if (!isSuperadmin) {
       return;
     }
-    const name = window.prompt("Name des neuen Turniers");
-    if (!name?.trim()) {
-      return;
-    }
     setError("");
     setMessage("");
     try {
       const created = await createTournament({
-        name: name.trim(),
+        name: `Neues Turnier ${new Date().toISOString().slice(0, 19).replace("T", " ")}`,
         hvv_edit_url: "",
         hvv_public_url: "",
         token_base_url: null,
@@ -1173,7 +1169,7 @@ function TournamentSettings({
         <p>Lokale Konfiguration fuer Import, Courts und spaetere HVV-Anbindung.</p>
       </div>
       <label>
-        Name
+        Bezeichnung
         <input value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
       </label>
       <label>
@@ -1187,6 +1183,22 @@ function TournamentSettings({
       <label>
         HVV Public-URL
         <input value={draft.hvv_public_url} onChange={(event) => updateDraft({ hvv_public_url: event.target.value })} />
+      </label>
+      <label>
+        Ort
+        <input value={tournament.location ?? ""} readOnly />
+      </label>
+      <label>
+        Datum
+        <input value={tournament.tournament_date ?? ""} readOnly />
+      </label>
+      <label>
+        Typ
+        <input value={tournament.hvv_type ?? ""} readOnly />
+      </label>
+      <label>
+        Geschlecht
+        <input value={tournament.hvv_gender ?? ""} readOnly />
       </label>
       <label>
         Courts

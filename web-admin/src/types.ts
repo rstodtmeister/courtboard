@@ -34,6 +34,12 @@ export type Tournament = {
   name: string;
   hvv_edit_url: string;
   hvv_public_url: string | null;
+  hvv_turnier_id?: string | null;
+  hvv_veranstaltung_id?: string | null;
+  hvv_type?: string | null;
+  hvv_gender?: string | null;
+  tournament_date?: string | null;
+  location?: string | null;
   token_base_url: string | null;
   courts: string[];
 };

@@ -3,6 +3,8 @@ import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData,
 
 const gameSelect =
   "id,tournament_id,number,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
+const tournamentSelect =
+  "id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -541,7 +543,7 @@ export async function listTournaments(): Promise<Tournament[]> {
 
   const { data, error } = await getSupabase()
     .from("tournaments")
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .select(tournamentSelect)
     .order("name", { ascending: true });
 
   if (error) {
@@ -575,7 +577,7 @@ export async function getTournament(tournamentId?: string): Promise<Tournament> 
 async function getPrimaryTournament() {
   const { data, error } = await getSupabase()
     .from("tournaments")
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .select(tournamentSelect)
     .order("created_at", { ascending: true })
     .limit(1)
     .single();
@@ -590,7 +592,7 @@ async function getPrimaryTournament() {
 async function getTournamentById(tournamentId: string) {
   const { data, error } = await getSupabase()
     .from("tournaments")
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .select(tournamentSelect)
     .eq("id", tournamentId)
     .single();
 
@@ -618,7 +620,7 @@ export async function createTournament(params: Pick<Tournament, "name" | "hvv_ed
       token_base_url: params.token_base_url,
       courts: params.courts,
     })
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .select(tournamentSelect)
     .single();
 
   if (error) {
@@ -644,11 +646,17 @@ export async function saveTournament(tournament: Tournament): Promise<Tournament
       name: tournament.name,
       hvv_edit_url: tournament.hvv_edit_url,
       hvv_public_url: tournament.hvv_public_url,
+      hvv_turnier_id: tournament.hvv_turnier_id ?? null,
+      hvv_veranstaltung_id: tournament.hvv_veranstaltung_id ?? null,
+      hvv_type: tournament.hvv_type ?? null,
+      hvv_gender: tournament.hvv_gender ?? null,
+      tournament_date: tournament.tournament_date ?? null,
+      location: tournament.location ?? null,
       token_base_url: tournament.token_base_url,
       courts: tournament.courts,
     })
     .eq("id", tournament.id)
-    .select("id,name,hvv_edit_url,hvv_public_url,token_base_url,courts")
+    .select(tournamentSelect)
     .single();
 
   if (error) {
@@ -969,6 +977,12 @@ function seedStore(): LocalStore {
     name: "Lokales Beispielturnier",
     hvv_edit_url: "",
     hvv_public_url: "",
+    hvv_turnier_id: null,
+    hvv_veranstaltung_id: null,
+    hvv_type: null,
+    hvv_gender: null,
+    tournament_date: null,
+    location: null,
     token_base_url: "",
     courts: ["1", "2", "3", "4"],
   };
@@ -1015,7 +1029,16 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
       tournament_ids: admin.tournament_ids ?? tournaments.map((tournament) => tournament.id),
       password_setup_required: admin.password_setup_required ?? false,
     })),
-    tournaments: tournaments.map((tournament) => ({ ...tournament, token_base_url: tournament.token_base_url ?? "" })),
+    tournaments: tournaments.map((tournament) => ({
+      ...tournament,
+      hvv_turnier_id: tournament.hvv_turnier_id ?? null,
+      hvv_veranstaltung_id: tournament.hvv_veranstaltung_id ?? null,
+      hvv_type: tournament.hvv_type ?? null,
+      hvv_gender: tournament.hvv_gender ?? null,
+      tournament_date: tournament.tournament_date ?? null,
+      location: tournament.location ?? null,
+      token_base_url: tournament.token_base_url ?? "",
+    })),
     games: (store.games ?? seeded.games).map((game) => ({ ...game, completed: game.completed ?? false })),
     links: (store.links ?? []).map((link) => ({
       ...link,
