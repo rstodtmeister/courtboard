@@ -1109,7 +1109,6 @@ function TournamentSettings({
   const [draft, setDraft] = useState(() => ({
     name: tournament.name,
     hvv_edit_url: tournament.hvv_edit_url,
-    hvv_public_url: tournament.hvv_public_url ?? "",
     courts: tournament.courts.join(", "),
   }));
   const [saving, setSaving] = useState(false);
@@ -1122,7 +1121,6 @@ function TournamentSettings({
     setDraft({
       name: tournament.name,
       hvv_edit_url: tournament.hvv_edit_url,
-      hvv_public_url: tournament.hvv_public_url ?? "",
       courts: tournament.courts.join(", "),
     });
   }, [dirty, tournament]);
@@ -1139,7 +1137,7 @@ function TournamentSettings({
       ...tournament,
       name: draft.name.trim(),
       hvv_edit_url: draft.hvv_edit_url.trim(),
-      hvv_public_url: draft.hvv_public_url.trim() || null,
+      hvv_public_url: tournament.hvv_public_url ?? null,
       token_base_url: null,
       courts: draft.courts.split(",").map((court) => court.trim()).filter(Boolean),
     });
@@ -1173,16 +1171,16 @@ function TournamentSettings({
         <input value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
       </label>
       <label>
-        HVV Edit-URL
+        HVV URL
         <input
           value={draft.hvv_edit_url}
           onChange={(event) => updateDraft({ hvv_edit_url: event.target.value })}
-          placeholder="https://www.hvv-beach.de/testportal/beach_beach_turniere!browse.action"
+          placeholder="https://www.hvv-beach.de/testportal/"
         />
       </label>
       <label>
-        HVV Public-URL
-        <input value={draft.hvv_public_url} onChange={(event) => updateDraft({ hvv_public_url: event.target.value })} />
+        HVV Spiele-URL
+        <input value={tournament.hvv_public_url ?? ""} readOnly />
       </label>
       <label>
         Ort

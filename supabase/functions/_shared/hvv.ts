@@ -133,9 +133,10 @@ export async function refreshTournamentGamesFromHvv(
 
 async function loadSchedulePage(source: string, credentials: HvvCredentials, tournamentName: string) {
   const cookies = new Map<string, string>();
-  let response = await fetchWithSession(source, credentials, cookies);
+  const initialUrl = hvvInitialUrl(source);
+  let response = await fetchWithSession(initialUrl, credentials, cookies);
   let html = await response.text();
-  let url = response.url || source;
+  let url = response.url || initialUrl;
 
   if (hasHvvCredentials(credentials) && isLoginPage(html)) {
     const login = loginRequest(html, url, credentials);
@@ -146,9 +147,9 @@ async function loadSchedulePage(source: string, credentials: HvvCredentials, tou
     });
     await loginResponse.arrayBuffer();
 
-    response = await fetchWithSession(source, credentials, cookies);
+    response = await fetchWithSession(initialUrl, credentials, cookies);
     html = await response.text();
-    url = response.url || source;
+    url = response.url || initialUrl;
   }
 
   if (isLoginPage(html)) {
@@ -166,6 +167,20 @@ async function loadSchedulePage(source: string, credentials: HvvCredentials, tou
   }
 
   return { html, url };
+}
+
+function hvvInitialUrl(source: string) {
+  const url = new URL(source);
+  if (/beach_beach_[^/]*!(?:browse|input|execute)(?:\.action)?/i.test(url.pathname)) {
+    return url.toString();
+  }
+
+  if (!url.pathname.endsWith("/")) {
+    url.pathname = `${url.pathname}/`;
+  }
+  url.search = "";
+  url.hash = "";
+  return new URL("beach_beach_turniere!browse.action", url).toString();
 }
 
 async function resolveSchedulePageFromTournamentOverview(
