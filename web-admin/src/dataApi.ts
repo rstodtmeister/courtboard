@@ -28,6 +28,18 @@ export type PushHvvResult = {
   results: Array<{ gameId: string; number: string; ok: boolean; error?: string }>;
 };
 
+export type HvvTournamentOption = {
+  name: string;
+  hvv_turnier_id: string;
+  hvv_veranstaltung_id: string;
+  hvv_type: string;
+  hvv_gender: string;
+  tournament_date: string;
+  location: string;
+  detail_url: string;
+  schedule_url: string;
+};
+
 type ImportedGame = Omit<Game, "id" | "tournament_id" | "printed" | "dirty" | "completed"> & {
   edit_url?: string | null;
   edit_method?: string | null;
@@ -462,6 +474,25 @@ export async function syncGamesFromHvv(options: { tournamentId: string; overwrit
   }
 
   return data;
+}
+
+export async function listHvvTournaments(source: string): Promise<HvvTournamentOption[]> {
+  if (dataMode === "local") {
+    throw new Error("HVV-Turnierauswahl ist im lokalen Browsermodus nicht verfuegbar.");
+  }
+
+  const { data, error } = await getSupabase().functions.invoke<{ tournaments: HvvTournamentOption[] }>("list-hvv-tournaments", {
+    body: {
+      source,
+      hvvCredentials: requireHvvCredentials(),
+    },
+  });
+
+  if (error || !data) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "HVV-Turniere konnten nicht geladen werden."));
+  }
+
+  return data.tournaments;
 }
 
 export async function pushDirtyGamesToHvv(tournamentId: string): Promise<PushHvvResult> {

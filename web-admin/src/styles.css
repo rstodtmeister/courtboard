@@ -415,6 +415,14 @@ select {
   min-width: 1080px;
 }
 
+.hvv-tournament-dialog {
+  width: min(1120px, calc(100vw - 28px));
+}
+
+.hvv-tournament-table {
+  min-width: 920px;
+}
+
 .admin-role-select {
   min-width: 132px;
 }

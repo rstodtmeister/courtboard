@@ -15,6 +15,7 @@ import {
   listTournaments,
   inviteAdminUser,
   listGames,
+  listHvvTournaments,
   listAdminUsers,
   listScoreLinks,
   loadScoreEntry,
@@ -52,6 +53,7 @@ import {
   withScoreAutomation,
 } from "./scoreLogic";
 import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, Tournament } from "./types";
+import type { HvvTournamentOption } from "./dataApi";
 import type {
   AdminTab,
   LiveSnapshot,
@@ -262,7 +264,12 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [pendingSyncOverwriteCourts, setPendingSyncOverwriteCourts] = useState<boolean | null>(null);
+  const [pendingHvvAction, setPendingHvvAction] = useState<"sync" | "selectTournament" | null>(null);
+  const [pendingHvvTournamentSource, setPendingHvvTournamentSource] = useState("");
   const [showHvvCredentialsDialog, setShowHvvCredentialsDialog] = useState(false);
+  const [showHvvTournamentDialog, setShowHvvTournamentDialog] = useState(false);
+  const [hvvTournamentOptions, setHvvTournamentOptions] = useState<HvvTournamentOption[]>([]);
+  const [loadingHvvTournaments, setLoadingHvvTournaments] = useState(false);
   const isSuperadmin = session.user.role === "superadmin";
 
   const loadDashboard = useCallback(async (options: { silent?: boolean; initial?: boolean } = {}) => {
@@ -458,6 +465,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       return;
     }
     if (!getHvvCredentialsStatus().active) {
+      setPendingHvvAction("sync");
       setPendingSyncOverwriteCourts(overwriteCourts);
       setShowHvvCredentialsDialog(true);
       return;
@@ -480,8 +488,72 @@ function AdminDashboard({ session }: { session: AppSession }) {
     const overwriteCourts = pendingSyncOverwriteCourts;
     setPendingSyncOverwriteCourts(null);
     setShowHvvCredentialsDialog(false);
-    if (overwriteCourts !== null) {
+    if (pendingHvvAction === "selectTournament") {
+      const source = pendingHvvTournamentSource;
+      setPendingHvvTournamentSource("");
+      setPendingHvvAction(null);
+      await openHvvTournamentSelection(source);
+    } else if (overwriteCourts !== null) {
+      setPendingHvvAction(null);
       await syncGames(overwriteCourts);
+    }
+  }
+
+  async function openHvvTournamentSelection(sourceOverride?: string) {
+    if (!tournament) {
+      return;
+    }
+    const source = sourceOverride?.trim() || tournament.hvv_edit_url.trim();
+    if (!source) {
+      setError("Bitte zuerst die HVV URL eintragen.");
+      return;
+    }
+    if (!getHvvCredentialsStatus().active) {
+      setPendingHvvAction("selectTournament");
+      setPendingHvvTournamentSource(source);
+      setShowHvvCredentialsDialog(true);
+      return;
+    }
+
+    setLoadingHvvTournaments(true);
+    setError("");
+    setMessage("");
+    try {
+      const options = await listHvvTournaments(source);
+      setHvvTournamentOptions(options);
+      setShowHvvTournamentDialog(true);
+      if (options.length === 0) {
+        setError("In der HVV-Uebersicht wurden keine Turniere gefunden.");
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "HVV-Turniere konnten nicht geladen werden.");
+    } finally {
+      setLoadingHvvTournaments(false);
+    }
+  }
+
+  async function selectHvvTournament(option: HvvTournamentOption) {
+    if (!tournament) {
+      return;
+    }
+    setShowHvvTournamentDialog(false);
+    setError("");
+    setMessage("");
+    const saved = await saveTournamentDraft({
+      ...tournament,
+      name: option.name || tournament.name,
+      hvv_edit_url: option.detail_url || tournament.hvv_edit_url,
+      hvv_public_url: option.schedule_url || null,
+      hvv_turnier_id: option.hvv_turnier_id || null,
+      hvv_veranstaltung_id: option.hvv_veranstaltung_id || null,
+      hvv_type: option.hvv_type || null,
+      hvv_gender: option.hvv_gender || null,
+      tournament_date: option.tournament_date || null,
+      location: option.location || null,
+      token_base_url: null,
+    });
+    if (saved) {
+      setMessage(`HVV-Turnier ${option.name} ausgewaehlt.`);
     }
   }
 
@@ -728,6 +800,8 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 loading={loading}
                 onSyncGames={() => setShowSyncDialog(true)}
                 onOpenCourtDisplay={() => window.open(displayUrl(), "_blank")}
+                onSelectHvvTournament={openHvvTournamentSelection}
+                loadingHvvTournaments={loadingHvvTournaments}
                 onSignOut={signOut}
                 onSave={saveTournamentDraft}
                 onDelete={isSuperadmin ? removeTournament : undefined}
@@ -766,8 +840,18 @@ function AdminDashboard({ session }: { session: AppSession }) {
           }}
           onClose={() => {
             setPendingSyncOverwriteCourts(null);
+            setPendingHvvAction(null);
+            setPendingHvvTournamentSource("");
             setShowHvvCredentialsDialog(false);
           }}
+        />
+      )}
+      {showHvvTournamentDialog && (
+        <HvvTournamentDialog
+          tournaments={hvvTournamentOptions}
+          selectedTournamentId={tournament?.hvv_turnier_id ?? ""}
+          onSelect={selectHvvTournament}
+          onClose={() => setShowHvvTournamentDialog(false)}
         />
       )}
     </section>
@@ -872,6 +956,77 @@ function HvvCredentialsDialog({
             <button type="submit">Fortfahren</button>
           </div>
         </form>
+      </section>
+    </div>
+  );
+}
+
+function HvvTournamentDialog({
+  tournaments,
+  selectedTournamentId,
+  onSelect,
+  onClose,
+}: {
+  tournaments: HvvTournamentOption[];
+  selectedTournamentId: string;
+  onSelect: (tournament: HvvTournamentOption) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [busyId, setBusyId] = useState("");
+
+  async function selectTournament(tournament: HvvTournamentOption) {
+    setBusyId(tournament.hvv_turnier_id);
+    await onSelect(tournament);
+    setBusyId("");
+  }
+
+  return (
+    <div className="app-dialog-backdrop" role="presentation">
+      <section className="app-dialog hvv-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-tournament-title">
+        <h3 id="hvv-tournament-title">HVV Turnier auswaehlen</h3>
+        <div className="table-wrap">
+          <table className="admin-table hvv-tournament-table">
+            <thead>
+              <tr>
+                <th>Bezeichnung</th>
+                <th>Datum</th>
+                <th>Ort</th>
+                <th>Typ</th>
+                <th>Geschlecht</th>
+                <th>IDs</th>
+                <th>Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tournaments.map((item) => {
+                const selected = item.hvv_turnier_id === selectedTournamentId;
+                return (
+                  <tr key={`${item.hvv_veranstaltung_id}:${item.hvv_turnier_id}`}>
+                    <td>{item.name}</td>
+                    <td>{item.tournament_date || "-"}</td>
+                    <td>{item.location || "-"}</td>
+                    <td>{item.hvv_type || "-"}</td>
+                    <td>{item.hvv_gender || "-"}</td>
+                    <td>{item.hvv_turnier_id}/{item.hvv_veranstaltung_id}</td>
+                    <td>
+                      <button type="button" onClick={() => selectTournament(item)} disabled={Boolean(busyId)}>
+                        {busyId === item.hvv_turnier_id ? "Speichert..." : selected ? "Aktualisieren" : "Auswaehlen"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {tournaments.length === 0 && (
+                <tr>
+                  <td colSpan={7}>Keine HVV-Turniere gefunden.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="app-dialog-actions">
+          <button type="button" className="secondary" onClick={onClose}>Schliessen</button>
+        </div>
       </section>
     </div>
   );
@@ -1093,6 +1248,8 @@ function TournamentSettings({
   loading,
   onSyncGames,
   onOpenCourtDisplay,
+  onSelectHvvTournament,
+  loadingHvvTournaments,
   onSignOut,
   onSave,
   onDelete,
@@ -1102,6 +1259,8 @@ function TournamentSettings({
   loading: boolean;
   onSyncGames: () => void;
   onOpenCourtDisplay: () => void;
+  onSelectHvvTournament: (source: string) => void;
+  loadingHvvTournaments: boolean;
   onSignOut: () => Promise<void>;
   onSave: (tournament: Tournament) => Promise<boolean>;
   onDelete?: () => Promise<void>;
@@ -1204,6 +1363,9 @@ function TournamentSettings({
       </label>
       <div className="config-actions">
         <button type="button" className="secondary" onClick={addCourt}>Court hinzufuegen</button>
+        <button type="button" className="secondary" onClick={() => onSelectHvvTournament(draft.hvv_edit_url)} disabled={loadingHvvTournaments || !draft.hvv_edit_url.trim()}>
+          {loadingHvvTournaments ? "Laedt..." : "HVV Turnier auswaehlen"}
+        </button>
         <button type="button" className="secondary" onClick={onSyncGames} disabled={loading || syncing}>
           {syncing ? "Laedt..." : "HVV laden"}
         </button>

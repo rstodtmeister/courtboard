@@ -1,0 +1,388 @@
+import { handleCors, jsonResponse } from "../_shared/cors.ts";
+import { createAdminClient, createUserClient } from "../_shared/supabase.ts";
+
+type HvvCredentials = {
+  username?: string;
+  password?: string;
+};
+
+type ListHvvTournamentsRequest = {
+  source?: string;
+  hvvCredentials?: HvvCredentials;
+};
+
+type HvvTournamentOption = {
+  name: string;
+  hvv_turnier_id: string;
+  hvv_veranstaltung_id: string;
+  hvv_type: string;
+  hvv_gender: string;
+  tournament_date: string;
+  location: string;
+  detail_url: string;
+  schedule_url: string;
+};
+
+Deno.serve(async (req) => {
+  const cors = handleCors(req);
+  if (cors) {
+    return cors;
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  const userClient = createUserClient(req);
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  if (userError || !userData.user) {
+    return jsonResponse({ error: "Not authenticated" }, 401);
+  }
+
+  const adminClient = createAdminClient();
+  const { data: adminUser, error: adminError } = await adminClient
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", userData.user.id)
+    .eq("password_setup_required", false)
+    .maybeSingle();
+
+  if (adminError || !adminUser) {
+    return jsonResponse({ error: "Not authorized" }, 403);
+  }
+
+  const body = await req.json() as ListHvvTournamentsRequest;
+  const source = body.source?.trim();
+  if (!source) {
+    return jsonResponse({ error: "source is required" }, 400);
+  }
+
+  try {
+    const page = await loadHvvPage(hvvInitialUrl(source), body.hvvCredentials ?? {});
+    const options = await parseTournamentOptions(page.html, page.url, body.hvvCredentials ?? {}, page.cookies);
+    return jsonResponse({ tournaments: options });
+  } catch (error) {
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+async function loadHvvPage(source: string, credentials: HvvCredentials) {
+  const cookies = new Map<string, string>();
+  const first = await fetchWithSession(source, credentials, cookies);
+  let html = await first.response.text();
+  let url = first.response.url || source;
+
+  if (hasCredentials(credentials) && isLoginPage(html)) {
+    const login = loginRequest(html, url, credentials);
+    const loginResponse = await fetchWithSession(login.url, credentials, cookies, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: login.body,
+    });
+    await loginResponse.response.arrayBuffer();
+
+    const second = await fetchWithSession(source, credentials, cookies);
+    html = await second.response.text();
+    url = second.response.url || source;
+  }
+
+  if (isLoginPage(html)) {
+    throw new Error("Anmeldung fehlgeschlagen oder Loginformular erneut angezeigt.");
+  }
+
+  return { html, url, cookies };
+}
+
+async function parseTournamentOptions(
+  html: string,
+  overviewUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const rows = tournamentOverviewRows(html);
+  const options: HvvTournamentOption[] = [];
+
+  for (const row of rows) {
+    const turnierId = attr(matchFirst(row, /<input\b[^>]*name=["']ausg["'][^>]*>/i), "value");
+    const eventUrl = eventUrlFromTournamentRow(row, overviewUrl);
+    const eventId = eventIdFromUrl(eventUrl);
+    const detailUrl = detailUrlFromTournamentRow(row, overviewUrl);
+    if (!turnierId || !eventId) {
+      continue;
+    }
+
+    const eventName = await loadEventName(eventUrl, credentials, cookies);
+    options.push({
+      name: eventName || `${textByColumn(row, 3)} ${textByColumn(row, 5)} ${textByColumn(row, 2)}`.trim(),
+      hvv_turnier_id: turnierId,
+      hvv_veranstaltung_id: eventId,
+      hvv_type: textByColumn(row, 2),
+      hvv_gender: genderFromHtml(cellByColumn(row, 4)),
+      tournament_date: textByColumn(row, 3),
+      location: textByColumn(row, 5),
+      detail_url: detailUrl || new URL(`beach_beach_turnier!browse?turnierid=${turnierId}`, overviewUrl).toString(),
+      schedule_url: new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, overviewUrl).toString(),
+    });
+  }
+
+  return options;
+}
+
+async function loadEventName(eventUrl: string, credentials: HvvCredentials, cookies: Map<string, string>) {
+  if (!eventUrl) {
+    return "";
+  }
+  const response = await fetchWithSession(eventUrl, credentials, cookies);
+  const html = await response.response.text();
+  return labelTextById(html, "veranstaltung_bezeichnung") ||
+    labelTextById(html, "turnier_veranstaltung_bezeichnung") ||
+    textContent(matchFirst(html, /<div[^>]*font-size:14px[\s\S]*?<\/div>/i));
+}
+
+function hvvInitialUrl(source: string) {
+  const url = new URL(source);
+  if (/beach_beach_[^/]*!(?:browse|input|execute)(?:\.action)?/i.test(url.pathname)) {
+    return url.toString();
+  }
+
+  if (!url.pathname.endsWith("/")) {
+    url.pathname = `${url.pathname}/`;
+  }
+  url.search = "";
+  url.hash = "";
+  return new URL("beach_beach_turniere!browse.action", url).toString();
+}
+
+async function fetchWithSession(
+  url: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+  init: RequestInit = {},
+) {
+  let currentUrl = url;
+  let currentInit = init;
+  for (let redirectCount = 0; redirectCount < 8; redirectCount++) {
+    const response = await fetchOnce(currentUrl, credentials, cookies, currentInit);
+    if (!isRedirect(response.status)) {
+      if (!response.ok) {
+        throw new Error(`HVV-Abruf fehlgeschlagen (${response.status}).`);
+      }
+      return { response };
+    }
+
+    const location = response.headers.get("location");
+    await response.arrayBuffer();
+    if (!location) {
+      throw new Error("HVV-Redirect ohne Ziel-URL.");
+    }
+
+    currentUrl = new URL(location, currentUrl).toString();
+    currentInit = redirectInit(currentInit, response.status);
+  }
+
+  throw new Error("HVV-Abruf hat zu viele Weiterleitungen erzeugt.");
+}
+
+async function fetchOnce(
+  url: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+  init: RequestInit,
+) {
+  const headers = new Headers(init.headers);
+  headers.set("User-Agent", "CourtBoard/1.0");
+  if (hasCredentials(credentials)) {
+    headers.set("Authorization", `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`);
+  }
+  if (cookies.size > 0) {
+    headers.set("Cookie", [...cookies].map(([name, value]) => `${name}=${value}`).join("; "));
+  }
+
+  const response = await fetch(url, { ...init, headers, redirect: "manual" });
+  storeCookies(response.headers, cookies);
+  return response;
+}
+
+function storeCookies(headers: Headers, cookies: Map<string, string>) {
+  const getSetCookie = (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie;
+  const values = getSetCookie ? getSetCookie.call(headers) : splitSetCookie(headers.get("set-cookie") ?? "");
+  for (const value of values) {
+    const pair = value.split(";", 1)[0] ?? "";
+    const separator = pair.indexOf("=");
+    if (separator > 0) {
+      cookies.set(pair.slice(0, separator), pair.slice(separator + 1));
+    }
+  }
+}
+
+function splitSetCookie(value: string) {
+  return value ? value.split(/,(?=\s*[^;,=\s]+=[^;,]+)/) : [];
+}
+
+function isRedirect(status: number) {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function redirectInit(init: RequestInit, status: number): RequestInit {
+  return status === 307 || status === 308 ? init : { method: "GET" };
+}
+
+function isLoginPage(html: string) {
+  return /<form[^>]*(id|name)=["']core_login["'][^>]*>/i.test(html);
+}
+
+function loginRequest(html: string, pageUrl: string, credentials: HvvCredentials) {
+  const form = matchFirst(html, /<form[^>]*(?:id|name)=["']core_login["'][^>]*>[\s\S]*?<\/form>/i);
+  if (!form) {
+    throw new Error("Loginformular wurde nicht gefunden.");
+  }
+
+  const action = attr(form, "action");
+  if (!action) {
+    throw new Error("Loginformular hat keine gueltige Ziel-URL.");
+  }
+
+  const params = new URLSearchParams();
+  let submitAdded = false;
+  for (const inputMatch of form.matchAll(/<input\b[^>]*>/gi)) {
+    const input = inputMatch[0];
+    const name = attr(input, "name");
+    if (!name) {
+      continue;
+    }
+    const type = attr(input, "type").toLowerCase();
+    if (name === "username") {
+      params.set(name, credentials.username ?? "");
+    } else if (name === "password") {
+      params.set(name, credentials.password ?? "");
+    } else if (type === "submit") {
+      if (!submitAdded) {
+        params.set(name, attr(input, "value"));
+        submitAdded = true;
+      }
+    } else {
+      params.set(name, attr(input, "value"));
+    }
+  }
+
+  return { url: new URL(action, pageUrl).toString(), body: params.toString() };
+}
+
+function tournamentOverviewRows(html: string) {
+  return [...html.matchAll(/<tr\b[^>]*class=["'](?:oddrow|evenrow)["'][^>]*>[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
+}
+
+function eventUrlFromTournamentRow(row: string, baseUrl: string) {
+  const link = matchFirst(row, /<a\b[^>]*href=["'][^"']*beach_beach_veranstaltung!browse[^"']*veranstaltungid=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/i);
+  const href = attr(link, "href").trim();
+  return href ? new URL(href, baseUrl).toString() : "";
+}
+
+function detailUrlFromTournamentRow(row: string, baseUrl: string) {
+  const link = matchFirst(row, /<a\b[^>]*href=["'][^"']*beach_beach_turnier!browse[^"']*turnierid=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/i);
+  const href = attr(link, "href").trim();
+  return href ? new URL(href, baseUrl).toString() : "";
+}
+
+function eventIdFromUrl(url: string) {
+  try {
+    return new URL(url).searchParams.get("veranstaltungid") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function labelTextById(html: string, id: string) {
+  const escaped = escapeRegex(id);
+  return textContent(matchFirst(html, new RegExp(`<label\\b[^>]*id=["']${escaped}["'][^>]*>[\\s\\S]*?<\\/label>`, "i")));
+}
+
+function textByColumn(row: string, index: number) {
+  const cells = [...row.matchAll(/<td\b[^>]*>[\s\S]*?<\/td>/gi)].map((match) => match[0]);
+  return index >= 0 && index < cells.length ? textContent(cells[index]) : "";
+}
+
+function cellByColumn(row: string, index: number) {
+  const cells = [...row.matchAll(/<td\b[^>]*>[\s\S]*?<\/td>/gi)].map((match) => match[0]);
+  return index >= 0 && index < cells.length ? cells[index] : "";
+}
+
+function genderFromHtml(html: string) {
+  const img = matchFirst(html, /<img\b[^>]*>/i);
+  const normalized = normalizeToken(`${textContent(html)} ${attr(img, "src")} ${attr(img, "alt")} ${attr(img, "title")}`);
+  if (normalized.includes("mixed")) {
+    return "Mixed";
+  }
+  if (normalized.includes("female") || normalized.includes("weiblich") || normalized.includes("damen")) {
+    return "weiblich";
+  }
+  if (normalized.includes("male") || normalized.includes("maennlich") || normalized.includes("herren")) {
+    return "maennlich";
+  }
+  return textContent(html);
+}
+
+function attr(html: string, name: string) {
+  const escaped = escapeRegex(name);
+  const match = html.match(new RegExp(`\\b${escaped}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return decodeEntities(match?.[2] ?? match?.[3] ?? match?.[4] ?? "");
+}
+
+function textContent(html: string | undefined) {
+  return clean(decodeEntities((html ?? "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")));
+}
+
+function clean(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function decodeEntities(value: string) {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: '"',
+    auml: "ä",
+    Auml: "Ä",
+    ouml: "ö",
+    Ouml: "Ö",
+    uuml: "ü",
+    Uuml: "Ü",
+    szlig: "ß",
+  };
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-zA-Z]+);/g, (_entity, code: string) => {
+    if (code.startsWith("#x")) {
+      return String.fromCodePoint(Number.parseInt(code.slice(2), 16));
+    }
+    if (code.startsWith("#")) {
+      return String.fromCodePoint(Number.parseInt(code.slice(1), 10));
+    }
+    return named[code] ?? `&${code};`;
+  });
+}
+
+function normalizeToken(value: string) {
+  return value.toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss")
+    .replaceAll(/[^a-z0-9]+/g, "");
+}
+
+function matchFirst(value: string, pattern: RegExp) {
+  return value.match(pattern)?.[0] ?? "";
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasCredentials(credentials: HvvCredentials) {
+  return Boolean(credentials.username && credentials.password);
+}
