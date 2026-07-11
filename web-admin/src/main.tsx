@@ -475,14 +475,26 @@ function AdminDashboard({ session }: { session: AppSession }) {
     setError("");
     setMessage("");
     try {
-      const result = await syncGamesFromHvv({ tournamentId: selectedTournamentId, overwriteCourts });
-      await loadDashboard();
-      setMessage(`${result.imported} Spiele geladen. ${result.message}`);
+      await loadGamesFromHvv(selectedTournamentId, overwriteCourts);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Spiele konnten nicht geladen werden.");
     } finally {
       setSyncing(false);
     }
+  }
+
+  async function loadGamesFromHvv(tournamentId: string, overwriteCourts: boolean) {
+    const result = await syncGamesFromHvv({ tournamentId, overwriteCourts });
+    const [gameData, tournamentData, linkData] = await Promise.all([
+      listGames(tournamentId),
+      getTournament(tournamentId),
+      listScoreLinks(tournamentId),
+    ]);
+    setGames(gameData);
+    setTournament(tournamentData);
+    setScoreLinks(linkData);
+    setLastSyncedAt(formatSyncTime(new Date()));
+    setMessage(`${result.imported} Spiele geladen. ${result.message}`);
   }
 
   async function continuePendingSync() {
@@ -554,24 +566,41 @@ function AdminDashboard({ session }: { session: AppSession }) {
     };
 
     if (hvvTournamentSelectionMode === "create" || !tournament) {
+      let created: Tournament;
       try {
-        const created = await createTournament(nextTournament);
+        created = await createTournament(nextTournament);
         setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
         setTournament(created);
         setSelectedTournamentId(created.id);
         setGames([]);
         setScoreLinks([]);
         setActiveTab("settings");
-        setMessage(`HVV-Turnier ${option.name} importiert.`);
       } catch (createError) {
         setError(createError instanceof Error ? createError.message : "HVV-Turnier konnte nicht importiert werden.");
+        return;
+      }
+
+      try {
+        setSyncing(true);
+        await loadGamesFromHvv(created.id, true);
+      } catch (syncError) {
+        setError(syncError instanceof Error ? syncError.message : "HVV-Turnier importiert, aber Spiele konnten nicht geladen werden.");
+      } finally {
+        setSyncing(false);
       }
       return;
     }
 
     const saved = await saveTournamentDraft({ ...tournament, ...nextTournament });
     if (saved) {
-      setMessage(`HVV-Turnier ${option.name} ausgewaehlt.`);
+      try {
+        setSyncing(true);
+        await loadGamesFromHvv(tournament.id, true);
+      } catch (syncError) {
+        setError(syncError instanceof Error ? syncError.message : "Spiele konnten nicht geladen werden.");
+      } finally {
+        setSyncing(false);
+      }
     }
   }
 
@@ -803,12 +832,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
             tournament ? (
               <TournamentSettings
                 tournament={tournament}
-                syncing={syncing}
-                loading={loading}
-                onSyncGames={() => setShowSyncDialog(true)}
                 onOpenCourtDisplay={() => window.open(displayUrl(), "_blank")}
-                onSelectHvvTournament={openHvvTournamentSelection}
-                loadingHvvTournaments={loadingHvvTournaments}
                 onSignOut={signOut}
                 onSave={saveTournamentDraft}
                 onDelete={isSuperadmin ? removeTournament : undefined}
@@ -1255,23 +1279,13 @@ function isAdminSuspended(admin: AdminUser) {
 
 function TournamentSettings({
   tournament,
-  syncing,
-  loading,
-  onSyncGames,
   onOpenCourtDisplay,
-  onSelectHvvTournament,
-  loadingHvvTournaments,
   onSignOut,
   onSave,
   onDelete,
 }: {
   tournament: Tournament;
-  syncing: boolean;
-  loading: boolean;
-  onSyncGames: () => void;
   onOpenCourtDisplay: () => void;
-  onSelectHvvTournament: (source: string) => void;
-  loadingHvvTournaments: boolean;
   onSignOut: () => Promise<void>;
   onSave: (tournament: Tournament) => Promise<boolean>;
   onDelete?: () => Promise<void>;
@@ -1372,12 +1386,6 @@ function TournamentSettings({
       </label>
       <div className="config-actions">
         <button type="button" className="secondary" onClick={addCourt}>Court hinzufuegen</button>
-        <button type="button" className="secondary" onClick={() => onSelectHvvTournament(draft.hvv_edit_url)} disabled={loadingHvvTournaments || !draft.hvv_edit_url.trim()}>
-          {loadingHvvTournaments ? "Laedt..." : "HVV Turnier auswaehlen"}
-        </button>
-        <button type="button" className="secondary" onClick={onSyncGames} disabled={loading || syncing}>
-          {syncing ? "Laedt..." : "HVV laden"}
-        </button>
         <button type="button" className="secondary" onClick={onOpenCourtDisplay}>Court Anzeige</button>
         <button type="button" className="secondary" onClick={onSignOut}>Abmelden</button>
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
