@@ -344,7 +344,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       const saved = await saveTournament(nextTournament);
       setTournament(saved);
       setTournaments((current) => current.map((item) => item.id === saved.id ? saved : item));
-      setMessage("Turnier gespeichert.");
+      setMessage("Courts gespeichert.");
       return true;
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Turnier konnte nicht gespeichert werden.");
@@ -1367,7 +1367,7 @@ function TournamentSettings({
       </label>
       <div className="config-actions">
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
-        <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Turnier speichern"}</button>
+        <button type="submit" disabled={saving}>{saving ? "Speichert..." : "Courts speichern"}</button>
       </div>
     </form>
   );
