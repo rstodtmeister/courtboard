@@ -232,7 +232,7 @@ function isLoginPage(html: string) {
 }
 
 function loginRequest(html: string, pageUrl: string, credentials: HvvCredentials) {
-  const form = matchFirst(html, /<form[^>]*(?:id|name)=["']core_login["'][^>]*>[\s\S]*?<\/form>/i);
+  const form = loginForm(html);
   if (!form) {
     throw new Error("Loginformular wurde nicht gefunden.");
   }
@@ -266,6 +266,14 @@ function loginRequest(html: string, pageUrl: string, credentials: HvvCredentials
   }
 
   return { url: new URL(action, pageUrl).toString(), body: params.toString() };
+}
+
+function loginForm(html: string) {
+  const forms = [...html.matchAll(/<form\b[^>]*(?:id|name)=["']core_login["'][^>]*>[\s\S]*?<\/form>/gi)]
+    .map((match) => match[0]);
+  return forms.find((form) => /name=["']global\.button\.login["']/i.test(form)) ||
+    forms.find((form) => /name=["']password["']/i.test(form)) ||
+    "";
 }
 
 function tournamentOverviewRows(html: string) {

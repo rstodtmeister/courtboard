@@ -213,7 +213,7 @@ public class WebPageScraper {
     }
 
     private void submitLoginForm(Document document, String username, String password, Map<String, String> cookies) throws IOException {
-        Element form = document.selectFirst("form#core_login, form[name=core_login]");
+        Element form = loginForm(document);
         if (form == null) {
             throw new IOException("Loginformular wurde nicht gefunden.");
         }
@@ -248,6 +248,14 @@ public class WebPageScraper {
 
         org.jsoup.Connection.Response loginResponse = loginConnection.execute();
         cookies.putAll(loginResponse.cookies());
+    }
+
+    private Element loginForm(Document document) {
+        Element form = document.selectFirst("form#core_login:has(input[name=\"global.button.login\"]), form[name=core_login]:has(input[name=\"global.button.login\"])");
+        if (form != null) {
+            return form;
+        }
+        return document.selectFirst("form#core_login:has(input[name=password]), form[name=core_login]:has(input[name=password])");
     }
 
     private boolean hasCredentials(String username, String password) {
