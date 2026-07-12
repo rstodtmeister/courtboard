@@ -778,9 +778,15 @@ function AdminDashboard({ session }: { session: AppSession }) {
   return (
     <section className="panel wide-panel">
       <div className="toolbar">
-        <div>
+        <div className="tournament-summary">
           {tournament && <strong>{tournament.name}</strong>}
-          <p className="toolbar-status">{games.length} Spiele, {dirtyCount} geaendert{lastSyncedAt ? `, Sync ${lastSyncedAt}` : ""}</p>
+          <p className="toolbar-status">
+            {tournament?.location && <span>{tournament.location}</span>}
+            {tournament?.tournament_date && <span>{tournament.tournament_date}</span>}
+            <span>{games.length} Spiele</span>
+            {dirtyCount > 0 && <span>{dirtyCount} geaendert</span>}
+            {lastSyncedAt && <span>Sync {lastSyncedAt}</span>}
+          </p>
         </div>
         <div className="actions">
           {tournaments.length > 0 && (
@@ -790,7 +796,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
               ))}
             </select>
           )}
-          {isSuperadmin && <button type="button" className="secondary" onClick={importHvvTournament}>HVV Turnier importieren</button>}
           <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
             {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
           </button>
@@ -840,6 +845,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 tournament={tournament}
                 onSave={saveTournamentDraft}
                 onDelete={isSuperadmin ? removeTournament : undefined}
+                onImport={isSuperadmin ? importHvvTournament : undefined}
               />
             ) : <div className="empty">Turnierdaten fehlen.</div>
           )}
@@ -1285,10 +1291,12 @@ function TournamentSettings({
   tournament,
   onSave,
   onDelete,
+  onImport,
 }: {
   tournament: Tournament;
   onSave: (tournament: Tournament, options?: { silent?: boolean; successMessage?: string }) => Promise<boolean>;
   onDelete?: () => Promise<void>;
+  onImport?: () => void;
 }) {
   const tournamentCourts = tournament.courts.join(", ");
   const [draft, setDraft] = useState(() => ({
@@ -1378,6 +1386,7 @@ function TournamentSettings({
         <span className="autosave-status" aria-live="polite">
           {saveState === "saving" ? "Speichert..." : saveState === "saved" ? "Gespeichert" : ""}
         </span>
+        {onImport && <button type="button" className="secondary" onClick={onImport}>HVV Turnier importieren</button>}
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
       </div>
     </section>
