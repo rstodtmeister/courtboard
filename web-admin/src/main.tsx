@@ -777,43 +777,45 @@ function AdminDashboard({ session }: { session: AppSession }) {
 
   return (
     <section className="panel wide-panel">
-      <div className="toolbar">
-        <div className="tournament-summary">
-          {tournament && <strong>{tournament.name}</strong>}
-          <p className="toolbar-status">
-            {tournament?.location && <span>{tournament.location}</span>}
-            {tournament?.tournament_date && <span>{tournament.tournament_date}</span>}
-            <span>{games.length} Spiele</span>
-            {dirtyCount > 0 && <span>{dirtyCount} geaendert</span>}
-            {lastSyncedAt && <span>Sync {lastSyncedAt}</span>}
-          </p>
+      <div className="admin-sticky-header">
+        <div className="toolbar">
+          <div className="tournament-summary">
+            {tournament && <strong>{tournament.name}</strong>}
+            <p className="toolbar-status">
+              {tournament?.location && <span>{tournament.location}</span>}
+              {tournament?.tournament_date && <span>{tournament.tournament_date}</span>}
+              <span>{games.length} Spiele</span>
+              {dirtyCount > 0 && <span>{dirtyCount} geaendert</span>}
+              {lastSyncedAt && <span>Sync {lastSyncedAt}</span>}
+            </p>
+          </div>
+          <div className="actions">
+            {tournaments.length > 0 && (
+              <select className="tournament-select" value={selectedTournamentId} onChange={(event) => setSelectedTournamentId(event.target.value)}>
+                {tournaments.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            )}
+            <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
+              {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
+            </button>
+            <button type="button" className="secondary sync-button" onClick={() => loadDashboard()} disabled={loading || statusSyncing}>
+              {statusSyncing ? "Sync..." : "Sync"}
+            </button>
+          </div>
         </div>
-        <div className="actions">
-          {tournaments.length > 0 && (
-            <select className="tournament-select" value={selectedTournamentId} onChange={(event) => setSelectedTournamentId(event.target.value)}>
-              {tournaments.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-          )}
-          <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
-            {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
-          </button>
-          <button type="button" className="secondary sync-button" onClick={() => loadDashboard()} disabled={loading || statusSyncing}>
-            {statusSyncing ? "Sync..." : "Sync"}
-          </button>
-        </div>
-      </div>
-      <TournamentProgress completed={completedGamesCount} total={games.length} />
+        <TournamentProgress completed={completedGamesCount} total={games.length} />
 
-      <AdminTabs
-        activeTab={activeTab}
-        gamesCount={games.length}
-        courtsCount={courts.length}
-        adminCount={adminUsers.length}
-        isSuperadmin={isSuperadmin}
-        onChange={setActiveTab}
-      />
+        <AdminTabs
+          activeTab={activeTab}
+          gamesCount={games.length}
+          courtsCount={courts.length}
+          adminCount={adminUsers.length}
+          isSuperadmin={isSuperadmin}
+          onChange={setActiveTab}
+        />
+      </div>
 
       {error && <div className="error">{error}</div>}
       {message && <div className="success">{message}</div>}
