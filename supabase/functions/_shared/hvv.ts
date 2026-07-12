@@ -101,7 +101,7 @@ export async function refreshTournamentGamesFromHvv(
     throw new Error(error?.message ?? "Tournament not found");
   }
 
-  const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
+  const source = hvvSourceUrl(tournament.hvv_edit_url, tournament.hvv_public_url);
   if (!source) {
     return 0;
   }
@@ -164,9 +164,21 @@ async function loadSchedulePage(source: string, credentials: HvvCredentials, tou
     const schedulePage = await resolveSchedulePageFromTournamentDetail(html, url, credentials, cookies);
     html = schedulePage.html;
     url = schedulePage.url;
+  } else if (isTournamentEvent(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentEvent(html, url, credentials, cookies);
+    html = schedulePage.html;
+    url = schedulePage.url;
   }
 
   return { html, url };
+}
+
+function hvvSourceUrl(editUrl: string | null, publicUrl: string | null) {
+  const publicSource = publicUrl?.trim() ?? "";
+  if (publicSource && /beach_beach_veranstaltung_spiele!browse/i.test(publicSource)) {
+    return publicSource;
+  }
+  return editUrl || publicSource;
 }
 
 function hvvInitialUrl(source: string) {
@@ -239,6 +251,25 @@ async function resolveSchedulePageFromTournamentDetail(
   }
 
   const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, detailUrl).toString();
+  const scheduleResponse = await fetchWithSession(scheduleUrl, credentials, cookies);
+  return {
+    html: await scheduleResponse.text(),
+    url: scheduleResponse.url || scheduleUrl,
+  };
+}
+
+async function resolveSchedulePageFromTournamentEvent(
+  html: string,
+  eventUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const eventId = eventIdFromUrl(eventUrl) || attr(matchFirst(html, /<input\b[^>]*name=["']veranstaltungid["'][^>]*>/i), "value");
+  if (!eventId) {
+    throw new Error("Auf der HVV-Veranstaltungsseite wurde keine Veranstaltung-ID gefunden.");
+  }
+
+  const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${eventId}`, eventUrl).toString();
   const scheduleResponse = await fetchWithSession(scheduleUrl, credentials, cookies);
   return {
     html: await scheduleResponse.text(),
@@ -647,6 +678,11 @@ function isTournamentOverview(html: string, url: string) {
 
 function isTournamentDetail(html: string, url: string) {
   return /turnier_turnierid/i.test(html) || /beach_beach_turnier!browse/i.test(url);
+}
+
+function isTournamentEvent(html: string, url: string) {
+  return !/beach_beach_veranstaltung_spiele!browse/i.test(url) &&
+    (/veranstaltung_bezeichnung/i.test(html) || /beach_beach_veranstaltung!browse/i.test(url));
 }
 
 function tournamentOverviewRows(html: string) {

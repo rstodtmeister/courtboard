@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: tournamentError?.message ?? "Tournament not found" }, 404);
   }
 
-  const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
+  const source = hvvSourceUrl(tournament.hvv_edit_url, tournament.hvv_public_url);
   if (!source) {
     return jsonResponse({ error: "Keine HVV-URL fuer dieses Turnier eingetragen." }, 400);
   }
@@ -217,9 +217,22 @@ async function loadHvvPage(
     metadata = schedulePage.metadata;
     html = schedulePage.html;
     url = schedulePage.url;
+  } else if (isTournamentEvent(html, url)) {
+    const schedulePage = await resolveSchedulePageFromTournamentEvent(html, url, credentials, cookies);
+    metadata = schedulePage.metadata;
+    html = schedulePage.html;
+    url = schedulePage.url;
   }
 
   return { html, url, title: textContent(matchFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i)), metadata };
+}
+
+function hvvSourceUrl(editUrl: string | null, publicUrl: string | null) {
+  const publicSource = publicUrl?.trim() ?? "";
+  if (publicSource && /beach_beach_veranstaltung_spiele!browse/i.test(publicSource)) {
+    return publicSource;
+  }
+  return editUrl || publicSource;
 }
 
 function hvvInitialUrl(source: string) {
@@ -308,12 +321,37 @@ async function resolveSchedulePageFromTournamentDetail(
   };
 }
 
+async function resolveSchedulePageFromTournamentEvent(
+  html: string,
+  eventUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const metadata = metadataFromEventPage(html, eventUrl, "", "");
+  if (!metadata.hvv_veranstaltung_id) {
+    throw new Error("Auf der HVV-Veranstaltungsseite wurde keine Veranstaltung-ID gefunden.");
+  }
+
+  const scheduleUrl = new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${metadata.hvv_veranstaltung_id}`, eventUrl).toString();
+  const schedulePage = await fetchWithSession(scheduleUrl, credentials, cookies);
+  return {
+    html: await schedulePage.response.text(),
+    url: schedulePage.response.url || scheduleUrl,
+    metadata,
+  };
+}
+
 function isTournamentOverview(html: string, url: string) {
   return /id=["']turnierliste["']/i.test(html) || /beach_beach_turniere!browse/i.test(url);
 }
 
 function isTournamentDetail(html: string, url: string) {
   return /turnier_turnierid/i.test(html) || /beach_beach_turnier!browse/i.test(url);
+}
+
+function isTournamentEvent(html: string, url: string) {
+  return !/beach_beach_veranstaltung_spiele!browse/i.test(url) &&
+    (/veranstaltung_bezeichnung/i.test(html) || /beach_beach_veranstaltung!browse/i.test(url));
 }
 
 function tournamentOverviewRows(html: string) {
