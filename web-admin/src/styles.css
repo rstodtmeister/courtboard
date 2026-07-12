@@ -3632,13 +3632,12 @@ tbody tr:nth-child(even) {
   }
 
   .toolbar {
-    align-items: center;
-    flex-direction: row;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .tournament-summary {
-    flex: 1 1 auto;
-    min-width: 150px;
+    min-width: 0;
   }
 
   .toolbar h2 {
@@ -3651,10 +3650,9 @@ tbody tr:nth-child(even) {
 
   .toolbar .actions {
     display: flex;
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 6px;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .toolbar .toolbar-status {
@@ -3666,24 +3664,23 @@ tbody tr:nth-child(even) {
   }
 
   .tournament-select {
-    width: 44px;
-    min-width: 44px;
-    max-width: 44px;
-    padding-right: 6px;
-    padding-left: 6px;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
 
   .toolbar .actions button:not(.sync-button) {
-    max-width: 96px;
-    padding: 6px 8px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: 1 1 170px;
+    max-width: none;
+    padding: 8px 10px;
+    white-space: normal;
   }
 
   .sync-button {
+    flex: 0 0 auto;
     min-width: 52px;
-    padding: 6px 8px;
+    padding: 8px 10px;
   }
 
   .actions button,
