@@ -496,6 +496,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
     ]);
     setGames(gameData);
     setTournament(tournamentData);
+    setTournaments((current) => current.map((item) => item.id === tournamentData.id ? tournamentData : item));
     setScoreLinks(linkData);
     setLastSyncedAt(formatSyncTime(new Date()));
     setMessage(`${result.imported} Spiele geladen. ${result.message}`);
@@ -587,6 +588,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       try {
         setSyncing(true);
         await loadGamesFromHvv(created.id, true);
+        setActiveTab("games");
       } catch (syncError) {
         setError(syncError instanceof Error ? syncError.message : "HVV-Turnier importiert, aber Spiele konnten nicht geladen werden.");
       } finally {
