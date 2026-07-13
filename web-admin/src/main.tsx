@@ -843,8 +843,11 @@ function AdminDashboard({ session }: { session: AppSession }) {
           )}
           {activeTab === "settings" && (
             tournament ? (
-              <TournamentSettings
-                tournament={tournament}
+              <TournamentPanel
+                tournaments={tournaments}
+                selectedTournament={tournament}
+                selectedTournamentId={selectedTournamentId}
+                onSelectTournament={setSelectedTournamentId}
                 onSave={saveTournamentDraft}
                 onDelete={isSuperadmin ? removeTournament : undefined}
                 onImport={isSuperadmin ? importHvvTournament : undefined}
@@ -1289,16 +1292,86 @@ function isAdminSuspended(admin: AdminUser) {
   return Number.isNaN(bannedUntil) || bannedUntil > Date.now();
 }
 
-function TournamentSettings({
-  tournament,
+function TournamentPanel({
+  tournaments,
+  selectedTournament,
+  selectedTournamentId,
+  onSelectTournament,
   onSave,
   onDelete,
   onImport,
 }: {
-  tournament: Tournament;
+  tournaments: Tournament[];
+  selectedTournament: Tournament;
+  selectedTournamentId: string;
+  onSelectTournament: (tournamentId: string) => void;
   onSave: (tournament: Tournament, options?: { silent?: boolean; successMessage?: string }) => Promise<boolean>;
   onDelete?: () => Promise<void>;
   onImport?: () => void;
+}) {
+  const [expandedTournamentId, setExpandedTournamentId] = useState<string | null>(null);
+
+  function showDetails(tournamentId: string) {
+    if (expandedTournamentId === tournamentId) {
+      setExpandedTournamentId(null);
+      return;
+    }
+
+    onSelectTournament(tournamentId);
+    setExpandedTournamentId(tournamentId);
+  }
+
+  return (
+    <section className="tournament-panel">
+      <div className="tournament-panel-head">
+        <div>
+          <h3>Turniere</h3>
+          <p>Eine kompakte Uebersicht aller importierten Turniere.</p>
+        </div>
+        {onImport && <button type="button" onClick={onImport}>HVV Turnier importieren</button>}
+      </div>
+
+      <div className="tournament-list" role="list">
+        {tournaments.map((item) => {
+          const isSelected = item.id === selectedTournamentId;
+          return (
+            <article className={isSelected ? "tournament-list-row selected" : "tournament-list-row"} key={item.id} role="listitem">
+              <div className="tournament-list-main">
+                <strong>{item.name}</strong>
+                <span>
+                  {[item.location, item.tournament_date, item.hvv_type, item.hvv_gender].filter(Boolean).join(" · ") || "Keine HVV-Details"}
+                </span>
+              </div>
+              <div className="tournament-list-meta">
+                <span>{item.courts.length} Courts</span>
+                <button type="button" className="secondary" onClick={() => showDetails(item.id)}>
+                  {expandedTournamentId === item.id ? "Erweitert ausblenden" : "Erweitert anzeigen"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {expandedTournamentId === selectedTournament.id && (
+        <TournamentSettings
+          tournament={selectedTournament}
+          onSave={onSave}
+          onDelete={onDelete}
+        />
+      )}
+    </section>
+  );
+}
+
+function TournamentSettings({
+  tournament,
+  onSave,
+  onDelete,
+}: {
+  tournament: Tournament;
+  onSave: (tournament: Tournament, options?: { silent?: boolean; successMessage?: string }) => Promise<boolean>;
+  onDelete?: () => Promise<void>;
 }) {
   const tournamentCourts = tournament.courts.join(", ");
   const [draft, setDraft] = useState(() => ({
@@ -1388,7 +1461,6 @@ function TournamentSettings({
         <span className="autosave-status" aria-live="polite">
           {saveState === "saving" ? "Speichert..." : saveState === "saved" ? "Gespeichert" : ""}
         </span>
-        {onImport && <button type="button" className="secondary" onClick={onImport}>HVV Turnier importieren</button>}
         {onDelete && <button type="button" className="secondary danger-button" onClick={onDelete}>Turnier loeschen</button>}
       </div>
     </section>

@@ -317,6 +317,71 @@ select {
   gap: 16px;
 }
 
+.tournament-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.tournament-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tournament-panel-head h3 {
+  margin: 0;
+}
+
+.tournament-panel-head p {
+  margin: 5px 0 0;
+  color: #656d78;
+}
+
+.tournament-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tournament-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.tournament-list-row.selected {
+  border-color: #8fb1e8;
+  background: #f4f8ff;
+}
+
+.tournament-list-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tournament-list-main strong {
+  overflow-wrap: anywhere;
+}
+
+.tournament-list-main span,
+.tournament-list-meta span {
+  color: #656d78;
+  font-size: .9rem;
+}
+
+.tournament-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
 .court-links {
   display: flex;
   align-items: center;
@@ -3734,6 +3799,19 @@ tbody tr:nth-child(even) {
 
   .config-panel {
     grid-template-columns: 1fr;
+  }
+
+  .tournament-panel-head,
+  .tournament-list-row,
+  .tournament-list-meta {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .tournament-list-meta {
+    gap: 8px;
+    white-space: normal;
   }
 
   .admin-tabs {
