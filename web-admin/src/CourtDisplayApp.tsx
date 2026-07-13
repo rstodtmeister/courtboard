@@ -50,9 +50,9 @@ export function CourtDisplayApp({ court }: { court: string }) {
         <DisplayOpenGames games={openGames} />
         <DisplayResults games={completedGames} />
         <div className="display-side-box display-url-box">
-          <div>
+          <div className="display-qr-inline">
             <h2>Spielplan</h2>
-            <div>{tournament?.hvv_public_url || "Keine HVV Spielplan URL eingetragen"}</div>
+            {tournament?.hvv_public_url ? <QrCode value={tournament.hvv_public_url} compact /> : <div>Keine HVV Spielplan URL eingetragen</div>}
           </div>
           <div className="display-qr-inline">
             <h2>Diese Anzeige</h2>
