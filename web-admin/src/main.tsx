@@ -850,7 +850,12 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 onDelete={isSuperadmin ? removeTournament : undefined}
                 onImport={isSuperadmin ? importHvvTournament : undefined}
               />
-            ) : <div className="empty">Turnierdaten fehlen.</div>
+            ) : (
+              <div className="empty tournament-empty-state">
+                <span>Keine Turniere vorhanden.</span>
+                {isSuperadmin && <button type="button" onClick={importHvvTournament}>HVV Turnier importieren</button>}
+              </div>
+            )
           )}
           {activeTab === "admins" && isSuperadmin && (
             <AdminUsersPanel

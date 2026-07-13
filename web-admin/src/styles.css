@@ -687,6 +687,13 @@ tbody tr:nth-child(even) {
   color: #3b424c;
 }
 
+.tournament-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .error {
   background: #fff1f1;
   color: #9a1c1c;
