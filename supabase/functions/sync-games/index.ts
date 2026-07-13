@@ -16,6 +16,7 @@ type SyncGamesRequest = {
 type ImportedGame = {
   tournament_id: string;
   number: string;
+  round: string;
   game_date: string;
   court: string;
   team_a: string;
@@ -601,6 +602,7 @@ function parseBeachGames(html: string, baseUrl: string, tournamentId: string): I
     const row = rowMatch[0];
     const date = textByColumn(row, 1);
     const court = textByDataContent(row, "court") || textByColumn(row, 3);
+    const round = textByDataContent(row, "runde") || textByDataContent(row, "round") || textByColumn(row, 5);
     const number = textByColumn(row, 6);
     const teamA = textByDataContent(row, "teamA") || textByColumn(row, 7);
     const teamB = textByDataContent(row, "teamB") || textByColumn(row, 8);
@@ -618,6 +620,7 @@ function parseBeachGames(html: string, baseUrl: string, tournamentId: string): I
     games.push({
       tournament_id: tournamentId,
       number,
+      round,
       game_date: date,
       court,
       team_a: teamA,

@@ -2,6 +2,7 @@ package org.example;
 
 public class GameRow {
     private final String number;
+    private final String round;
     private final String date;
     private final String court;
     private final String teamA;
@@ -29,11 +30,12 @@ public class GameRow {
     }
 
     public GameRow(String number, String date, String court, String teamA, String teamB, String referee, String result, int winnerTeam) {
-        this(number, date, court, teamA, teamB, referee, result, winnerTeam, "", "GET", "", "", "", "", "", "", "", "");
+        this(number, "", date, court, teamA, teamB, referee, result, winnerTeam, "", "GET", "", "", "", "", "", "", "", "");
     }
 
     public GameRow(
             String number,
+            String round,
             String date,
             String court,
             String teamA,
@@ -52,6 +54,7 @@ public class GameRow {
             String set3TeamA,
             String set3TeamB) {
         this.number = valueOrEmpty(number);
+        this.round = valueOrEmpty(round);
         this.date = valueOrEmpty(date);
         this.court = valueOrEmpty(court);
         this.teamA = valueOrEmpty(teamA);
@@ -73,6 +76,10 @@ public class GameRow {
 
     public String number() {
         return number;
+    }
+
+    public String round() {
+        return round;
     }
 
     public String date() {
@@ -149,6 +156,7 @@ public class GameRow {
 
     public String toParagraph() {
         return "Nr: " + number
+                + " | Runde: " + round
                 + " | Datum: " + date
                 + " | Court: " + court
                 + " | Team A: " + teamA
@@ -170,6 +178,7 @@ public class GameRow {
 
     public static GameRow fromParagraph(String paragraph) {
         String number = "";
+        String round = "";
         String date = "";
         String court = "";
         String teamA = "";
@@ -198,6 +207,8 @@ public class GameRow {
             String value = field[1].trim();
             if ("Nr".equals(label)) {
                 number = value;
+            } else if ("Runde".equals(label)) {
+                round = value;
             } else if ("Datum".equals(label) || "Tag".equals(label)) {
                 date = value;
             } else if ("Court".equals(label)) {
@@ -235,7 +246,7 @@ public class GameRow {
             }
         }
 
-        return new GameRow(number, date, court, teamA, teamB, referee, result, winnerTeam,
+        return new GameRow(number, round, date, court, teamA, teamB, referee, result, winnerTeam,
                 editUrl, editMethod, editData, gameRating, set1TeamA, set1TeamB, set2TeamA, set2TeamB, set3TeamA, set3TeamB);
     }
 

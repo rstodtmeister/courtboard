@@ -100,6 +100,7 @@ public class LocalApiServer {
         for (GameRow row : rows) {
             result.add(new GameRow(
                     row.number(),
+                    row.round(),
                     row.date(),
                     row.court(),
                     row.teamA(),
@@ -582,6 +583,7 @@ public class LocalApiServer {
                 .append("\"id\":").append(jsonString(game.id)).append(',')
                 .append("\"tournament_id\":").append(jsonString(game.tournamentId)).append(',')
                 .append("\"number\":").append(jsonString(game.number)).append(',')
+                .append("\"round\":").append(jsonString(game.round)).append(',')
                 .append("\"game_date\":").append(jsonString(game.date)).append(',')
                 .append("\"court\":").append(jsonString(game.court)).append(',')
                 .append("\"team_a\":").append(jsonString(game.teamA)).append(',')
@@ -654,6 +656,7 @@ public class LocalApiServer {
     private void appendGame(StringBuilder builder, GameRow game) {
         builder.append('{')
                 .append("\"number\":").append(jsonString(game.number())).append(',')
+                .append("\"round\":").append(jsonString(game.round())).append(',')
                 .append("\"game_date\":").append(jsonString(game.date())).append(',')
                 .append("\"court\":").append(jsonString(game.court())).append(',')
                 .append("\"team_a\":").append(jsonString(game.teamA())).append(',')
@@ -876,6 +879,7 @@ public class LocalApiServer {
         private final String id;
         private final String tournamentId = "local-tournament-1";
         private final String number;
+        private final String round;
         private final String date;
         private String court;
         private final String teamA;
@@ -911,6 +915,7 @@ public class LocalApiServer {
         private GameState(GameRow row, List<String> teamAPlayers, List<String> teamBPlayers) {
             this.id = "local-game-" + row.number();
             this.number = row.number();
+            this.round = row.round();
             this.date = row.date();
             this.court = row.court();
             this.teamA = row.teamA();

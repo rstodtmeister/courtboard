@@ -1159,6 +1159,7 @@ public class ApplicationWindow extends JFrame {
     private GameRow updatedGameRow(GameRow original, DefaultTableModel tableModel, int rowIndex) {
         return new GameRow(
                 original.number(),
+                original.round(),
                 original.date(),
                 tableValue(tableModel, rowIndex, COLUMN_COURT),
                 original.teamA(),

@@ -2,6 +2,7 @@ export type Game = {
   id: string;
   tournament_id: string;
   number: string;
+  round?: string | null;
   game_date: string | null;
   court: string | null;
   team_a: string | null;

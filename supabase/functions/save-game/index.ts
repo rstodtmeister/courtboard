@@ -12,7 +12,7 @@ type SaveGameRequest = {
 };
 
 const hvvGameSelect =
-  "id,tournament_id,number,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b";
+  "id,tournament_id,number,round,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b";
 
 Deno.serve(async (req) => {
   const cors = handleCors(req);

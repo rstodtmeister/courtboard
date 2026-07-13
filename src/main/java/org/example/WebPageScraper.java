@@ -277,6 +277,7 @@ public class WebPageScraper {
         for (Element row : rows) {
             String date = textByColumn(row, 1);
             String court = textByDataContent(row, "court", 3);
+            String round = textByAnyDataContent(row, List.of("runde", "round"), 5);
             String gameNumber = textByColumn(row, 6);
             String teamA = textByDataContent(row, "teamA", 7);
             String teamB = textByDataContent(row, "teamB", 8);
@@ -290,7 +291,7 @@ public class WebPageScraper {
                 continue;
             }
 
-            section.addParagraph(new GameRow(gameNumber, date, court, teamA, teamB, referee, result, winnerTeam,
+            section.addParagraph(new GameRow(gameNumber, round, date, court, teamA, teamB, referee, result, winnerTeam,
                     editRequest.url(), editRequest.method(), editRequest.data(), "",
                     setScores[0], setScores[1], setScores[2], setScores[3], setScores[4], setScores[5]).toParagraph());
         }

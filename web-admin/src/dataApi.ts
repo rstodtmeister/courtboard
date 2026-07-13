@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse, Tournament } from "./types";
 
 const gameSelect =
-  "id,tournament_id,number,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
+  "id,tournament_id,number,round,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 const tournamentSelect =
   "id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts";
 
@@ -520,6 +520,7 @@ function importedGame(tournamentId: string, game: ImportedGame): Game {
     id: createId("game"),
     tournament_id: tournamentId,
     number: game.number,
+    round: game.round ?? "",
     game_date: game.game_date ?? "",
     court: game.court ?? "",
     team_a: game.team_a ?? "",

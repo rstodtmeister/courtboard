@@ -22,7 +22,7 @@ type SubmitScoreRequest = {
 };
 
 const gameSelect =
-  "id,tournament_id,number,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
+  "id,tournament_id,number,round,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 
 Deno.serve(async (req) => {
   const cors = handleCors(req);
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       dirty: true,
     })
     .eq("id", game.id)
-    .select("id,tournament_id,number,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b")
+    .select("id,tournament_id,number,round,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b")
     .single();
 
   if (updateError) {

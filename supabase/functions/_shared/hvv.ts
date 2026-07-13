@@ -20,6 +20,7 @@ export type HvvGameUpdate = {
 
 type HvvScheduleGame = {
   number: string;
+  round: string;
   game_date: string;
   team_a: string;
   team_b: string;
@@ -113,6 +114,7 @@ export async function refreshTournamentGamesFromHvv(
     const { error: updateError } = await adminClient
       .from("games")
       .update({
+        round: game.round,
         game_date: game.game_date,
         team_a: game.team_a,
         team_b: game.team_b,
@@ -611,6 +613,7 @@ function parseScheduleGames(html: string, baseUrl: string): HvvScheduleGame[] {
     const edit = editRequest(row, baseUrl);
     games.push({
       number,
+      round: textByDataContent(row, "runde") || textByDataContent(row, "round") || textByColumn(row, 5),
       game_date: textByColumn(row, 1),
       team_a: teamA,
       team_b: teamB,
