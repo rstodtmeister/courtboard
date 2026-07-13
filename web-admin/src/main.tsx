@@ -1854,7 +1854,6 @@ function GameEditorRow({
       </td>
       <td className="number-cell">
         <strong>{game.number}</strong>
-        {game.game_date && <span>{game.game_date}</span>}
       </td>
       <td>
         <select className="quick-select court-select" value={game.court ?? ""} onChange={(event) => updateAssignment("court", event.target.value)} aria-label={`Court fuer Spiel ${game.number}`}>
