@@ -253,7 +253,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [scoreLinks, setScoreLinks] = useState<ScoreLink[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusSyncing, setStatusSyncing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pushingHvv, setPushingHvv] = useState(false);
   const [printing, setPrinting] = useState<PdfSheetType | "">("");
@@ -277,8 +276,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
     const silent = options.silent ?? false;
     if (options.initial) {
       setLoading(true);
-    } else if (!silent) {
-      setStatusSyncing(true);
     }
     if (!silent) {
       setError("");
@@ -321,9 +318,6 @@ function AdminDashboard({ session }: { session: AppSession }) {
     } finally {
       if (options.initial) {
         setLoading(false);
-      }
-      if (!silent) {
-        setStatusSyncing(false);
       }
     }
   }, [isSuperadmin, selectedTournamentId]);
@@ -797,11 +791,15 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 ))}
               </select>
             )}
-            <button type="button" className="secondary" onClick={pushDirtyGames} disabled={loading || pushingHvv || dirtyCount === 0}>
-              {pushingHvv ? "Sendet..." : "Änderungen an HVV senden"}
-            </button>
-            <button type="button" className="secondary sync-button" onClick={() => loadDashboard()} disabled={loading || statusSyncing}>
-              {statusSyncing ? "Sync..." : "Sync"}
+            <button
+              type="button"
+              className="secondary"
+              onClick={pushDirtyGames}
+              disabled={loading || pushingHvv || dirtyCount === 0}
+              title="Änderungen an HVV senden"
+              aria-label="Änderungen an HVV senden"
+            >
+              {pushingHvv ? "Sendet..." : "HVV ↻"}
             </button>
           </div>
         </div>
