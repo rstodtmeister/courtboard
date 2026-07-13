@@ -1487,6 +1487,7 @@ function CourtLinksPanel({
           <h3>Court-QR-Codes</h3>
           <p>Ein fester QR-Code pro Court. Das erste Geraet sperrt die Eingabe fuer das aktuelle Spiel.</p>
         </div>
+        <a className="secondary-link" href={displayUrl()} target="_blank" rel="noreferrer">Courts anzeigen</a>
       </div>
       <div className="court-link-grid">
         {courts.map((entry) => {
