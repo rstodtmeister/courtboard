@@ -1640,7 +1640,7 @@ function GamesEditor({
                   onChange={(event) => toggleAll(event.target.checked)}
                 />
               </th>
-              <th>Nr. / Runde</th>
+              <th>Nr.</th>
               <th>Court</th>
               <th>Teams</th>
               <th>Schiedsrichter</th>
@@ -1726,7 +1726,7 @@ function MobileGameCard({
   return (
     <article className={mobileGameCardClass(game, saveState)}>
       <div className="mobile-game-assignment">
-        <strong className="mobile-game-number">{[game.number || "-", game.round].filter(Boolean).join(" · ")}</strong>
+        <strong className="mobile-game-number">{game.number || "-"}</strong>
         <span className="mobile-assignment-label">Court</span>
         <div className="mobile-court-buttons" role="group" aria-label={`Court fuer Spiel ${game.number}`}>
           <button type="button" className={!game.court ? "active" : ""} onClick={() => updateAssignment("court", "")} disabled={saveState === "saving"}>-</button>
@@ -1787,7 +1787,7 @@ function CompletedMobileGameCard({ game, games, onEdit }: { game: Game; games: G
   return (
     <article className="mobile-game-card completed result-card">
       <div className="mobile-result-head">
-        <strong className="mobile-game-number">{[game.number || "-", game.round].filter(Boolean).join(" · ")}</strong>
+        <strong className="mobile-game-number">{game.number || "-"}</strong>
         <span>Court {courtLabel(game.court)}</span>
         <span>fertig</span>
       </div>
@@ -1854,7 +1854,6 @@ function GameEditorRow({
       </td>
       <td className="number-cell">
         <strong>{game.number}</strong>
-        {game.round && <span>{game.round}</span>}
         {game.game_date && <span>{game.game_date}</span>}
       </td>
       <td>
