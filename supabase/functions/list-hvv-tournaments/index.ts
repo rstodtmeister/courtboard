@@ -126,7 +126,9 @@ async function parseTournamentOptions(
   }
 
   const today = todayInTimeZone("Europe/Berlin");
-  return options.filter((option) => !isExpiredTournament(option, today));
+  return options
+    .filter((option) => !isExpiredTournament(option, today))
+    .sort(compareTournamentOptionsByDate);
 }
 
 async function loadEventName(eventUrl: string, credentials: HvvCredentials, cookies: Map<string, string>) {
@@ -317,6 +319,31 @@ function isExpiredTournament(option: HvvTournamentOption, today: CalendarDate) {
     dateKey(date) > dateKey(latest) ? date : latest
   );
   return dateKey(latestDate) < dateKey(today);
+}
+
+function compareTournamentOptionsByDate(left: HvvTournamentOption, right: HvvTournamentOption) {
+  const leftDate = earliestTournamentDate(left.tournament_date);
+  const rightDate = earliestTournamentDate(right.tournament_date);
+  if (leftDate && rightDate) {
+    return dateKey(leftDate) - dateKey(rightDate) || left.name.localeCompare(right.name, "de");
+  }
+  if (leftDate) {
+    return -1;
+  }
+  if (rightDate) {
+    return 1;
+  }
+  return left.name.localeCompare(right.name, "de");
+}
+
+function earliestTournamentDate(value: string) {
+  const tournamentDates = parseTournamentDates(value);
+  if (tournamentDates.length === 0) {
+    return null;
+  }
+  return tournamentDates.reduce((earliest, date) =>
+    dateKey(date) < dateKey(earliest) ? date : earliest
+  );
 }
 
 function parseTournamentDates(value: string) {

@@ -534,7 +534,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
     setMessage("");
     try {
       const options = await listHvvTournaments(source);
-      setHvvTournamentOptions(options);
+      setHvvTournamentOptions(sortHvvTournamentsByDate(options));
       setShowHvvTournamentDialog(true);
       if (options.length === 0) {
         setError("In der HVV-Uebersicht wurden keine Turniere gefunden.");
@@ -1083,6 +1083,43 @@ function HvvTournamentDialog({
       </section>
     </div>
   );
+}
+
+function sortHvvTournamentsByDate(options: HvvTournamentOption[]) {
+  return [...options].sort((left, right) => {
+    const leftDate = firstTournamentDateKey(left.tournament_date);
+    const rightDate = firstTournamentDateKey(right.tournament_date);
+    if (leftDate && rightDate) {
+      return leftDate - rightDate || left.name.localeCompare(right.name, "de");
+    }
+    if (leftDate) {
+      return -1;
+    }
+    if (rightDate) {
+      return 1;
+    }
+    return left.name.localeCompare(right.name, "de");
+  });
+}
+
+function firstTournamentDateKey(value: string) {
+  const match = value.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/);
+  if (!match) {
+    return null;
+  }
+  const day = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const yearPart = Number.parseInt(match[3], 10);
+  const year = match[3].length === 2 ? 2000 + yearPart : yearPart;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return year * 10000 + month * 100 + day;
 }
 
 function AdminUsersPanel({
