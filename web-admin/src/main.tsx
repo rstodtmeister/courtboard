@@ -1103,14 +1103,38 @@ function sortHvvTournamentsByDate(options: HvvTournamentOption[]) {
 }
 
 function firstTournamentDateKey(value: string) {
-  const match = value.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/);
-  if (!match) {
-    return null;
+  const currentYear = new Date().getFullYear();
+  const isoMatch = value.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (isoMatch) {
+    return validDateKey(Number.parseInt(isoMatch[1], 10), Number.parseInt(isoMatch[2], 10), Number.parseInt(isoMatch[3], 10));
   }
-  const day = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const yearPart = Number.parseInt(match[3], 10);
-  const year = match[3].length === 2 ? 2000 + yearPart : yearPart;
+
+  const matches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2}|\d{4}))?/g)];
+  const keys = matches
+    .map((match, index) => {
+      const yearText = match[3] ?? nextExplicitTournamentYear(matches, index) ?? String(currentYear);
+      const yearPart = Number.parseInt(yearText, 10);
+      const year = yearText.length === 2 ? 2000 + yearPart : yearPart;
+      return validDateKey(year, Number.parseInt(match[2], 10), Number.parseInt(match[1], 10));
+    })
+    .filter((key): key is number => key !== null);
+  if (keys.length > 0) {
+    return Math.min(...keys);
+  }
+
+  return null;
+}
+
+function nextExplicitTournamentYear(matches: RegExpMatchArray[], startIndex: number) {
+  for (let index = startIndex + 1; index < matches.length; index++) {
+    if (matches[index][3]) {
+      return matches[index][3];
+    }
+  }
+  return "";
+}
+
+function validDateKey(year: number, month: number, day: number) {
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (
     parsed.getUTCFullYear() !== year ||

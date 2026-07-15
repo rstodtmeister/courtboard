@@ -310,7 +310,7 @@ type CalendarDate = {
 };
 
 function isExpiredTournament(option: HvvTournamentOption, today: CalendarDate) {
-  const tournamentDates = parseTournamentDates(option.tournament_date);
+  const tournamentDates = parseTournamentDates(option.tournament_date, today.year);
   if (tournamentDates.length === 0) {
     return false;
   }
@@ -337,7 +337,7 @@ function compareTournamentOptionsByDate(left: HvvTournamentOption, right: HvvTou
 }
 
 function earliestTournamentDate(value: string) {
-  const tournamentDates = parseTournamentDates(value);
+  const tournamentDates = parseTournamentDates(value, todayInTimeZone("Europe/Berlin").year);
   if (tournamentDates.length === 0) {
     return null;
   }
@@ -346,18 +346,38 @@ function earliestTournamentDate(value: string) {
   );
 }
 
-function parseTournamentDates(value: string) {
+function parseTournamentDates(value: string, fallbackYear: number) {
   const dates: CalendarDate[] = [];
-  for (const match of value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/g)) {
+  for (const match of value.matchAll(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g)) {
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const day = Number.parseInt(match[3], 10);
+    if (isValidCalendarDate({ year, month, day })) {
+      dates.push({ year, month, day });
+    }
+  }
+  const germanMatches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2}|\d{4}))?/g)];
+  for (let index = 0; index < germanMatches.length; index++) {
+    const match = germanMatches[index];
     const day = Number.parseInt(match[1], 10);
     const month = Number.parseInt(match[2], 10);
-    const yearPart = Number.parseInt(match[3], 10);
-    const year = match[3].length === 2 ? 2000 + yearPart : yearPart;
+    const yearText = match[3] ?? nextExplicitYear(germanMatches, index) ?? String(fallbackYear);
+    const yearPart = Number.parseInt(yearText, 10);
+    const year = yearText.length === 2 ? 2000 + yearPart : yearPart;
     if (isValidCalendarDate({ year, month, day })) {
       dates.push({ year, month, day });
     }
   }
   return dates;
+}
+
+function nextExplicitYear(matches: RegExpMatchArray[], startIndex: number) {
+  for (let index = startIndex + 1; index < matches.length; index++) {
+    if (matches[index][3]) {
+      return matches[index][3];
+    }
+  }
+  return "";
 }
 
 function isValidCalendarDate(date: CalendarDate) {
