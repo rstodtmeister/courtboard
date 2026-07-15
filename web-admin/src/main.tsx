@@ -1109,7 +1109,7 @@ function firstTournamentDateKey(value: string) {
     return validDateKey(Number.parseInt(isoMatch[1], 10), Number.parseInt(isoMatch[2], 10), Number.parseInt(isoMatch[3], 10));
   }
 
-  const matches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2}|\d{4}))?/g)];
+  const matches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{4}|\d{2}))?(?!\d)/g)];
   const keys = matches
     .map((match, index) => {
       const yearText = match[3] ?? nextExplicitTournamentYear(matches, index) ?? String(currentYear);

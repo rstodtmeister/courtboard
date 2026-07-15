@@ -356,7 +356,7 @@ function parseTournamentDates(value: string, fallbackYear: number) {
       dates.push({ year, month, day });
     }
   }
-  const germanMatches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2}|\d{4}))?/g)];
+  const germanMatches = [...value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{4}|\d{2}))?(?!\d)/g)];
   for (let index = 0; index < germanMatches.length; index++) {
     const match = germanMatches[index];
     const day = Number.parseInt(match[1], 10);
