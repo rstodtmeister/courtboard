@@ -125,7 +125,8 @@ async function parseTournamentOptions(
     });
   }
 
-  return options;
+  const today = todayInTimeZone("Europe/Berlin");
+  return options.filter((option) => !isExpiredTournament(option, today));
 }
 
 async function loadEventName(eventUrl: string, credentials: HvvCredentials, cookies: Map<string, string>) {
@@ -298,6 +299,66 @@ function eventIdFromUrl(url: string) {
   } catch {
     return "";
   }
+}
+
+type CalendarDate = {
+  year: number;
+  month: number;
+  day: number;
+};
+
+function isExpiredTournament(option: HvvTournamentOption, today: CalendarDate) {
+  const tournamentDates = parseTournamentDates(option.tournament_date);
+  if (tournamentDates.length === 0) {
+    return false;
+  }
+
+  const latestDate = tournamentDates.reduce((latest, date) =>
+    dateKey(date) > dateKey(latest) ? date : latest
+  );
+  return dateKey(latestDate) < dateKey(today);
+}
+
+function parseTournamentDates(value: string) {
+  const dates: CalendarDate[] = [];
+  for (const match of value.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/g)) {
+    const day = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const yearPart = Number.parseInt(match[3], 10);
+    const year = match[3].length === 2 ? 2000 + yearPart : yearPart;
+    if (isValidCalendarDate({ year, month, day })) {
+      dates.push({ year, month, day });
+    }
+  }
+  return dates;
+}
+
+function isValidCalendarDate(date: CalendarDate) {
+  if (date.month < 1 || date.month > 12 || date.day < 1 || date.day > 31) {
+    return false;
+  }
+  const parsed = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  return parsed.getUTCFullYear() === date.year &&
+    parsed.getUTCMonth() === date.month - 1 &&
+    parsed.getUTCDate() === date.day;
+}
+
+function todayInTimeZone(timeZone: string): CalendarDate {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    day: Number(parts.find((part) => part.type === "day")?.value),
+  };
+}
+
+function dateKey(date: CalendarDate) {
+  return date.year * 10000 + date.month * 100 + date.day;
 }
 
 function labelTextById(html: string, id: string) {
