@@ -71,6 +71,7 @@ function App() {
   const token = params.get("token") ?? "";
   const view = params.get("view") ?? "";
   const court = params.get("court") ?? "";
+  const tournamentId = params.get("tournamentId") ?? "";
 
   if (auth === "confirmed") {
     return <AuthConfirmedApp />;
@@ -81,11 +82,11 @@ function App() {
   }
 
   if (view === "courts") {
-    return <CourtDisplayApp court={court} />;
+    return <CourtDisplayApp court={court} tournamentId={tournamentId} />;
   }
 
   if (view === "groups") {
-    return <CourtDisplayApp court="" mode="groups" />;
+    return <CourtDisplayApp court="" tournamentId={tournamentId} mode="groups" />;
   }
 
   return <AdminApp />;
@@ -835,6 +836,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
                 courts={courts}
                 games={games}
                 links={courtLinks}
+                tournamentId={selectedTournamentId}
                 onCreateCourtLink={createCourtLink}
                 onReplaceCourtLink={replaceCourtLink}
                 onUnlockCourt={unlockCourt}
@@ -1539,6 +1541,7 @@ function CourtLinksPanel({
   courts,
   games,
   links,
+  tournamentId,
   onCreateCourtLink,
   onReplaceCourtLink,
   onUnlockCourt,
@@ -1546,6 +1549,7 @@ function CourtLinksPanel({
   courts: Array<{ court: string; tournamentId: string }>;
   games: Game[];
   links: ScoreLink[];
+  tournamentId: string;
   onCreateCourtLink: (court: string, tournamentId: string) => Promise<void>;
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
   onUnlockCourt: (court: string) => Promise<void>;
@@ -1557,13 +1561,13 @@ function CourtLinksPanel({
           <h3>Court-QR-Codes</h3>
           <p>Ein fester QR-Code pro Court. Das erste Geraet sperrt die Eingabe fuer das aktuelle Spiel.</p>
         </div>
-        <a className="secondary-link" href={displayUrl()} target="_blank" rel="noreferrer">Courts anzeigen</a>
+        <a className="secondary-link" href={displayUrl(tournamentId)} target="_blank" rel="noreferrer">Courts anzeigen</a>
       </div>
       <div className="court-link-grid">
         {courts.map((entry) => {
           const link = links.find((item) => item.court === entry.court);
-          const currentGame = games.find((game) => game.court === entry.court && !isCompleted(game));
-          const lockedGame = games.find((game) => game.court === entry.court && !isCompleted(game) && game.score_locked_by_device);
+          const currentGame = games.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game));
+          const lockedGame = games.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game) && game.score_locked_by_device);
           const value = link?.token ? scoreUrl(link.token) : "";
           return (
             <div className="court-link-card" key={entry.court}>
@@ -2273,20 +2277,26 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function displayUrl() {
+function displayUrl(tournamentId?: string) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "courts");
+  if (tournamentId) {
+    url.searchParams.set("tournamentId", tournamentId);
+  }
   return url.toString();
 }
 
-function singleCourtUrl(court: number) {
+function singleCourtUrl(court: number, tournamentId?: string) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "courts");
   url.searchParams.set("court", String(court));
+  if (tournamentId) {
+    url.searchParams.set("tournamentId", tournamentId);
+  }
   return url.toString();
 }
 

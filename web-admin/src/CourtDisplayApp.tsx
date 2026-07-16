@@ -16,13 +16,13 @@ type GroupStanding = {
   pointsLost: number;
 };
 
-export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mode?: "courts" | "groups" }) {
+export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { court: string; tournamentId?: string; mode?: "courts" | "groups" }) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function loadDisplay() {
-    const [gameData, tournamentData] = await Promise.all([listGames(), getTournament()]);
+    const [gameData, tournamentData] = await Promise.all([listGames(tournamentId), getTournament(tournamentId)]);
     setGames(gameData);
     setTournament(tournamentData);
     setLoading(false);
@@ -32,7 +32,7 @@ export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mod
     loadDisplay();
     const interval = window.setInterval(loadDisplay, 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [tournamentId]);
 
   if (loading) {
     return <main className="court-display-loading">Anzeige wird geladen...</main>;
@@ -45,11 +45,11 @@ export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mod
   const completedGames = sortedGames.filter(isCompleted);
 
   if (mode === "groups") {
-    return <GroupDisplay games={sortedGames} />;
+    return <GroupDisplay games={sortedGames} tournamentId={tournament?.id ?? tournamentId} />;
   }
 
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
-    return <SingleCourtDisplay court={selectedCourt} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} />;
+    return <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} />;
   }
 
   const currentUrl = window.location.href;
@@ -58,12 +58,12 @@ export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mod
     <main className="court-display-page">
       <section className="court-board" aria-label="Court Anzeige">
         {courts.map((court) => (
-          <CourtPanel key={court} court={court} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} />
+          <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} />
         ))}
       </section>
       <aside className="display-side-panel">
         <DisplayOpenGames games={openGames} />
-        <DisplayResults games={completedGames} />
+        <DisplayResults games={completedGames} tournamentId={tournament?.id ?? tournamentId} />
         <div className="display-side-box display-url-box">
           <div className="display-qr-inline">
             <h2>Spielplan</h2>
@@ -79,7 +79,7 @@ export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mod
   );
 }
 
-function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) {
+function SingleCourtDisplay({ court, tournamentId, games }: { court: number; tournamentId?: string; games: Game[] }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
@@ -87,7 +87,7 @@ function SingleCourtDisplay({ court, games }: { court: number; games: Game[] }) 
   const started = scoreState ? hasStartedScore(scoreState) : false;
   return (
     <main className="single-court-page">
-      <a className="single-court-back" href={displayUrl()}>Alle Courts</a>
+      <a className="single-court-back" href={displayUrl(tournamentId)}>Alle Courts</a>
       <header className="single-court-meta">
         <h1>Court {court}</h1>
         {currentGame && <div>{[`Spiel ${currentGame.number}`.trim(), status].filter(Boolean).join(" · ")}</div>}
@@ -229,8 +229,8 @@ function SingleCourtSetHistory({ game }: { game: Game }) {
   );
 }
 
-function CourtPanel({ court, games }: { court: number; games: Game[] }) {
-  const courtUrl = singleCourtUrl(court);
+function CourtPanel({ court, tournamentId, games }: { court: number; tournamentId?: string; games: Game[] }) {
+  const courtUrl = singleCourtUrl(court, tournamentId);
   return (
     <a className="display-court-section" href={courtUrl} aria-label={`Court ${court} Einzelansicht oeffnen`} title="Einzelansicht oeffnen">
       <div className="display-court-heading">
@@ -383,12 +383,12 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
   );
 }
 
-function DisplayResults({ games }: { games: Game[] }) {
+function DisplayResults({ games, tournamentId }: { games: Game[]; tournamentId?: string }) {
   return (
     <section className="display-side-box">
       <div className="display-side-title">
         <h2>Ergebnisse</h2>
-        <a href={groupDisplayUrl()}>Gruppen</a>
+        <a href={groupDisplayUrl(tournamentId)}>Gruppen</a>
       </div>
       {games.length === 0 ? (
         <div className="display-side-list"><div className="display-side-item">Noch keine Ergebnisse</div></div>
@@ -407,11 +407,11 @@ function DisplayResults({ games }: { games: Game[] }) {
   );
 }
 
-function GroupDisplay({ games }: { games: Game[] }) {
+function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: string }) {
   const grouped = groupStandings(games);
   return (
     <main className="group-display-page">
-      <a className="single-court-back" href={displayUrl()}>Courts anzeigen</a>
+      <a className="single-court-back" href={displayUrl(tournamentId)}>Courts anzeigen</a>
       <header className="group-display-header">
         <h1>Gruppen</h1>
         <span>{grouped.length === 0 ? "Keine Gruppenergebnisse" : `${grouped.length} Gruppen`}</span>
@@ -472,28 +472,37 @@ function ResultTeam({ game, team }: { game: Game; team: "a" | "b" }) {
 }
 
 
-function displayUrl() {
+function displayUrl(tournamentId?: string) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "courts");
+  if (tournamentId) {
+    url.searchParams.set("tournamentId", tournamentId);
+  }
   return url.toString();
 }
 
-function singleCourtUrl(court: number) {
+function singleCourtUrl(court: number, tournamentId?: string) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "courts");
   url.searchParams.set("court", String(court));
+  if (tournamentId) {
+    url.searchParams.set("tournamentId", tournamentId);
+  }
   return url.toString();
 }
 
-function groupDisplayUrl() {
+function groupDisplayUrl(tournamentId?: string) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "groups");
+  if (tournamentId) {
+    url.searchParams.set("tournamentId", tournamentId);
+  }
   return url.toString();
 }
 
