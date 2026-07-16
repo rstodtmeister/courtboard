@@ -3512,11 +3512,13 @@ tbody tr:nth-child(even) {
 }
 
 .group-display-page {
+  height: 100vh;
   min-height: 100vh;
   display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: clamp(12px, 2vmin, 24px);
-  padding: clamp(12px, 2vmin, 24px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: clamp(8px, 1.2vmin, 16px);
+  padding: clamp(10px, 1.4vmin, 18px);
+  overflow: hidden;
   background: #f4f5f7;
   color: #111827;
   font-family: Arial, Helvetica, sans-serif;
@@ -3526,66 +3528,70 @@ tbody tr:nth-child(even) {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 16px;
-  border-bottom: 4px solid #111827;
-  padding-bottom: clamp(8px, 1.2vmin, 14px);
+  gap: 12px;
+  border-bottom: 3px solid #111827;
+  padding-bottom: clamp(6px, .9vmin, 10px);
 }
 
 .group-display-header h1 {
   margin: 0;
-  font-size: clamp(32px, 6vmin, 72px);
+  font-size: clamp(28px, 4.2vmin, 52px);
   line-height: .95;
   font-weight: 900;
 }
 
 .group-display-header span {
   color: #4b5563;
-  font-size: clamp(15px, 2.2vmin, 24px);
+  font-size: clamp(13px, 1.6vmin, 20px);
   line-height: 1;
   font-weight: 900;
 }
 
 .group-table-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
-  gap: clamp(12px, 2vmin, 24px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 1.2vmin, 16px);
   align-content: start;
+  overflow: auto;
 }
 
 .group-table-card {
   min-width: 0;
-  border: 4px solid #111827;
+  border: 3px solid #111827;
   background: #ffffff;
   overflow: hidden;
 }
 
 .group-table-card h2 {
   margin: 0;
-  padding: clamp(10px, 1.5vmin, 16px);
+  padding: clamp(7px, 1vmin, 11px);
   background: #111827;
   color: #ffffff;
-  font-size: clamp(24px, 3.4vmin, 40px);
+  font-size: clamp(18px, 2.2vmin, 28px);
   line-height: 1;
   font-weight: 900;
 }
 
 .group-table-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .group-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: clamp(13px, 1.45vmin, 17px);
-  line-height: 1.15;
+  table-layout: fixed;
+  font-size: clamp(11px, 1.05vmin, 15px);
+  line-height: 1.1;
 }
 
 .group-table th,
 .group-table td {
   border-top: 1px solid #d1d5db;
-  padding: .55em .65em;
+  padding: .38em .42em;
   text-align: right;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .group-table th {
@@ -3596,8 +3602,9 @@ tbody tr:nth-child(even) {
 
 .group-table th:nth-child(2),
 .group-table td:nth-child(2) {
-  min-width: 220px;
-  max-width: 44vw;
+  width: 32%;
+  min-width: 0;
+  max-width: none;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4603,9 +4610,11 @@ tbody tr:nth-child(even) {
   }
 
   .group-display-page {
+    height: auto;
     min-height: 100dvh;
     gap: 10px;
     padding: 10px;
+    overflow: auto;
   }
 
   .group-display-header {
