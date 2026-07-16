@@ -63,7 +63,7 @@ export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { cour
       </section>
       <aside className="display-side-panel">
         <DisplayOpenGames games={openGames} />
-        <DisplayResults games={completedGames} tournamentId={tournament?.id ?? tournamentId} />
+        <DisplayResults games={completedGames} />
         <div className="display-side-box display-url-box">
           <DisplayGroupsSummary games={sortedGames} />
           <div className="display-qr-stack">
@@ -384,12 +384,11 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
   );
 }
 
-function DisplayResults({ games, tournamentId }: { games: Game[]; tournamentId?: string }) {
+function DisplayResults({ games }: { games: Game[] }) {
   return (
     <section className="display-side-box">
       <div className="display-side-title">
         <h2>Ergebnisse</h2>
-        <a href={groupDisplayUrl(tournamentId)}>Gruppen</a>
       </div>
       {games.length === 0 ? (
         <div className="display-side-list"><div className="display-side-item">Noch keine Ergebnisse</div></div>
