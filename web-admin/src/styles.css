@@ -3497,7 +3497,11 @@ tbody tr:nth-child(even) {
   overflow: hidden;
 }
 
-.display-group-card h3 {
+.display-group-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.4em 3.4em 4.2em;
+  align-items: center;
+  gap: .2em;
   margin: 0;
   padding: .25em .42em;
   background: #111827;
@@ -3507,54 +3511,48 @@ tbody tr:nth-child(even) {
   font-weight: 900;
 }
 
-.display-group-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+.display-group-heading h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.display-group-heading span {
+  text-align: center;
+}
+
+.display-group-rows {
+  display: grid;
   font-size: clamp(8px, .92vmin, 11px);
   line-height: 1.05;
 }
 
-.display-group-table th,
-.display-group-table td {
+.display-group-row {
+  display: grid;
+  grid-template-columns: 1.8em minmax(0, 1fr) 3.4em 3.4em 4.2em;
+  align-items: start;
+  gap: .2em;
   border-top: 1px solid #d1d5db;
-  padding: .2em .25em;
-  text-align: right;
-  white-space: normal;
-  overflow: visible;
+  padding: .22em .42em;
+}
+
+.display-group-row > span {
+  min-width: 0;
+  text-align: center;
   overflow-wrap: anywhere;
+  font-weight: 900;
 }
 
-.display-group-table th {
-  background: #eef2f7;
+.display-group-rank {
   color: #374151;
-  font-weight: 900;
 }
 
-.display-group-table th:first-child,
-.display-group-table td:first-child {
-  width: 1.8em;
-  text-align: center;
-  font-weight: 900;
-}
-
-.display-group-table th:nth-child(2),
-.display-group-table td:nth-child(2) {
-  width: auto;
-  text-align: left;
-  font-weight: 800;
-}
-
-.display-group-table th:nth-child(3),
-.display-group-table th:nth-child(4),
-.display-group-table th:nth-child(5),
-.display-group-table td:nth-child(3),
-.display-group-table td:nth-child(4),
-.display-group-table td:nth-child(5) {
-  width: 3.5em;
-  text-align: center;
-  white-space: nowrap;
-  font-weight: 900;
+.display-group-team {
+  text-align: left !important;
+  font-weight: 800 !important;
 }
 
 .display-groups-empty,

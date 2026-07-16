@@ -469,29 +469,23 @@ function DisplayGroupsSummary({ games }: { games: Game[] }) {
         <div className="display-groups-list">
           {grouped.map(({ group, standings }) => (
             <article className="display-group-card" key={group}>
-              <h3>Gruppe {group}</h3>
-              <table className="display-group-table">
-                <thead>
-                  <tr>
-                    <th className="sr-only">Rang</th>
-                    <th className="sr-only">Team</th>
-                    <th>P</th>
-                    <th>S</th>
-                    <th>B</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((row, index) => (
-                    <tr key={row.team}>
-                      <td>{index + 1}</td>
-                      <td>{row.team}</td>
-                      <td>{rankingPoints(row)}</td>
-                      <td>{row.setsWon}:{row.setsLost}</td>
-                      <td>{row.pointsWon}:{row.pointsLost}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="display-group-heading">
+                <h3>Gruppe {group}</h3>
+                <span>P</span>
+                <span>S</span>
+                <span>B</span>
+              </div>
+              <div className="display-group-rows">
+                {standings.map((row, index) => (
+                  <div className="display-group-row" key={row.team}>
+                    <span className="display-group-rank">{index + 1}</span>
+                    <span className="display-group-team">{row.team}</span>
+                    <span>{rankingPoints(row)}</span>
+                    <span>{row.setsWon}:{row.setsLost}</span>
+                    <span>{row.pointsWon}:{row.pointsLost}</span>
+                  </div>
+                ))}
+              </div>
             </article>
           ))}
         </div>
