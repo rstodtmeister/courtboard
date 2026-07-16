@@ -3491,6 +3491,9 @@ tbody tr:nth-child(even) {
 }
 
 .display-group-card {
+  --display-group-rank-width: clamp(18px, 1.8vmin, 24px);
+  --display-group-metric-width: clamp(34px, 3.3vmin, 48px);
+  --display-group-ball-width: clamp(42px, 4vmin, 60px);
   min-width: 0;
   border: 2px solid #111827;
   background: #ffffff;
@@ -3499,7 +3502,7 @@ tbody tr:nth-child(even) {
 
 .display-group-heading {
   display: grid;
-  grid-template-columns: 1.8em minmax(0, 1fr) 3.4em 3.4em 4.2em;
+  grid-template-columns: var(--display-group-rank-width) minmax(0, 1fr) var(--display-group-metric-width) var(--display-group-metric-width) var(--display-group-ball-width);
   align-items: center;
   gap: .2em;
   margin: 0;
@@ -3533,7 +3536,7 @@ tbody tr:nth-child(even) {
 
 .display-group-row {
   display: grid;
-  grid-template-columns: 1.8em minmax(0, 1fr) 3.4em 3.4em 4.2em;
+  grid-template-columns: var(--display-group-rank-width) minmax(0, 1fr) var(--display-group-metric-width) var(--display-group-metric-width) var(--display-group-ball-width);
   align-items: start;
   gap: .2em;
   border-top: 1px solid #d1d5db;
