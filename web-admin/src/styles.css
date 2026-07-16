@@ -4601,6 +4601,148 @@ tbody tr:nth-child(even) {
   .display-open-cell {
     max-width: none;
   }
+
+  .group-display-page {
+    min-height: 100dvh;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .group-display-header {
+    align-items: flex-start;
+    gap: 8px;
+    border-bottom-width: 3px;
+  }
+
+  .group-display-header h1 {
+    font-size: 2.1rem;
+  }
+
+  .group-display-header span {
+    padding-top: 4px;
+    font-size: .95rem;
+  }
+
+  .group-table-grid {
+    display: block;
+  }
+
+  .group-table-card {
+    border-width: 3px;
+  }
+
+  .group-table-card + .group-table-card {
+    margin-top: 10px;
+  }
+
+  .group-table-card h2 {
+    padding: 9px 10px;
+    font-size: 1.4rem;
+  }
+
+  .group-table-wrap {
+    overflow-x: visible;
+  }
+
+  .group-table,
+  .group-table tbody,
+  .group-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .group-table thead {
+    display: none;
+  }
+
+  .group-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .9rem;
+  }
+
+  .group-table tbody {
+    padding: 8px;
+  }
+
+  .group-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    padding: 8px;
+  }
+
+  .group-table tbody tr + tr {
+    margin-top: 8px;
+  }
+
+  .group-table tbody tr:nth-child(even) {
+    background: #ffffff;
+  }
+
+  .group-table td {
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    min-width: 0;
+    border: 0;
+    background: #f3f4f6;
+    padding: 6px;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .group-table td::before {
+    content: attr(data-label);
+    color: #6b7280;
+    font-size: .64rem;
+    line-height: 1;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .group-table td:first-child {
+    grid-row: 1;
+    grid-column: 1;
+    background: #111827;
+    color: #ffffff;
+    font-size: 1.15rem;
+  }
+
+  .group-table td:first-child::before {
+    color: #d1d5db;
+  }
+
+  .group-table td:nth-child(2) {
+    grid-row: 1;
+    grid-column: 2 / -1;
+    display: block;
+    min-width: 0;
+    max-width: none;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    padding: 7px 8px;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 900;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .group-table td:nth-child(2)::before {
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .group-display-empty {
+    min-height: 180px;
+    border-width: 3px;
+    font-size: 1.2rem;
+  }
 }
 
 @media (orientation: landscape) and (max-height: 520px) and (max-width: 980px) {

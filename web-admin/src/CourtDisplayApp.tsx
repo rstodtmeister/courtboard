@@ -442,16 +442,16 @@ function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: s
                   <tbody>
                     {standings.map((row, index) => (
                       <tr key={row.team}>
-                        <td>{index + 1}</td>
-                        <td>{row.team}</td>
-                        <td>{row.played}</td>
-                        <td>{rankingPoints(row)}</td>
-                        <td>{row.wins}</td>
-                        <td>{row.losses}</td>
-                        <td>{row.setsWon}:{row.setsLost}</td>
-                        <td>{formatRatio(setRatio(row))}</td>
-                        <td>{row.pointsWon}:{row.pointsLost}</td>
-                        <td>{formatRatio(ballRatio(row))}</td>
+                        <td data-label="Rang">{index + 1}</td>
+                        <td data-label="Team">{row.team}</td>
+                        <td data-label="Sp">{row.played}</td>
+                        <td data-label="Pkt">{rankingPoints(row)}</td>
+                        <td data-label="S">{row.wins}</td>
+                        <td data-label="N">{row.losses}</td>
+                        <td data-label="Sätze">{row.setsWon}:{row.setsLost}</td>
+                        <td data-label="SV">{formatRatio(setRatio(row))}</td>
+                        <td data-label="Bälle">{row.pointsWon}:{row.pointsLost}</td>
+                        <td data-label="BV">{formatRatio(ballRatio(row))}</td>
                       </tr>
                     ))}
                   </tbody>
