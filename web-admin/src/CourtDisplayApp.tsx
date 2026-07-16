@@ -429,14 +429,9 @@ function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: s
                     <tr>
                       <th>Rang</th>
                       <th>Team</th>
-                      <th>Sp</th>
                       <th>Pkt</th>
-                      <th>S</th>
-                      <th>N</th>
                       <th>Sätze</th>
-                      <th>SV</th>
                       <th>Bälle</th>
-                      <th>BV</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -444,14 +439,9 @@ function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: s
                       <tr key={row.team}>
                         <td data-label="Rang">{index + 1}</td>
                         <td data-label="Team">{row.team}</td>
-                        <td data-label="Sp">{row.played}</td>
                         <td data-label="Pkt">{rankingPoints(row)}</td>
-                        <td data-label="S">{row.wins}</td>
-                        <td data-label="N">{row.losses}</td>
                         <td data-label="Sätze">{row.setsWon}:{row.setsLost}</td>
-                        <td data-label="SV">{formatRatio(setRatio(row))}</td>
                         <td data-label="Bälle">{row.pointsWon}:{row.pointsLost}</td>
-                        <td data-label="BV">{formatRatio(ballRatio(row))}</td>
                       </tr>
                     ))}
                   </tbody>
