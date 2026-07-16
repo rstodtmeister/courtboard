@@ -84,6 +84,10 @@ function App() {
     return <CourtDisplayApp court={court} />;
   }
 
+  if (view === "groups") {
+    return <CourtDisplayApp court="" mode="groups" />;
+  }
+
   return <AdminApp />;
 }
 

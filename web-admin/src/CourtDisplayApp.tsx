@@ -5,7 +5,18 @@ import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
 
-export function CourtDisplayApp({ court }: { court: string }) {
+type GroupStanding = {
+  team: string;
+  played: number;
+  wins: number;
+  losses: number;
+  setsWon: number;
+  setsLost: number;
+  pointsWon: number;
+  pointsLost: number;
+};
+
+export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mode?: "courts" | "groups" }) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +43,10 @@ export function CourtDisplayApp({ court }: { court: string }) {
   const sortedGames = sortGames(games);
   const openGames = sortedGames.filter((game) => !isCompleted(game));
   const completedGames = sortedGames.filter(isCompleted);
+
+  if (mode === "groups") {
+    return <GroupDisplay games={completedGames} />;
+  }
 
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
     return <SingleCourtDisplay court={selectedCourt} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} />;
@@ -371,7 +386,10 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
 function DisplayResults({ games }: { games: Game[] }) {
   return (
     <section className="display-side-box">
-      <h2>Ergebnisse</h2>
+      <div className="display-side-title">
+        <h2>Ergebnisse</h2>
+        <a href={groupDisplayUrl()}>Gruppen</a>
+      </div>
       {games.length === 0 ? (
         <div className="display-side-list"><div className="display-side-item">Noch keine Ergebnisse</div></div>
       ) : (
@@ -386,6 +404,64 @@ function DisplayResults({ games }: { games: Game[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+function GroupDisplay({ games }: { games: Game[] }) {
+  const grouped = groupStandings(games);
+  return (
+    <main className="group-display-page">
+      <a className="single-court-back" href={displayUrl()}>Courts anzeigen</a>
+      <header className="group-display-header">
+        <h1>Gruppen</h1>
+        <span>{grouped.length === 0 ? "Keine Gruppenergebnisse" : `${grouped.length} Gruppen`}</span>
+      </header>
+      {grouped.length === 0 ? (
+        <section className="group-display-empty">Noch keine abgeschlossenen Spiele mit Gruppe A, B, C, D oder E.</section>
+      ) : (
+        <section className="group-table-grid" aria-label="Gruppentabellen">
+          {grouped.map(({ group, standings }) => (
+            <article className="group-table-card" key={group}>
+              <h2>Gruppe {group}</h2>
+              <div className="group-table-wrap">
+                <table className="group-table">
+                  <thead>
+                    <tr>
+                      <th>Rang</th>
+                      <th>Team</th>
+                      <th>Sp</th>
+                      <th>Pkt</th>
+                      <th>S</th>
+                      <th>N</th>
+                      <th>Sätze</th>
+                      <th>SV</th>
+                      <th>Bälle</th>
+                      <th>BV</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standings.map((row, index) => (
+                      <tr key={row.team}>
+                        <td>{index + 1}</td>
+                        <td>{row.team}</td>
+                        <td>{row.played}</td>
+                        <td>{rankingPoints(row)}</td>
+                        <td>{row.wins}</td>
+                        <td>{row.losses}</td>
+                        <td>{row.setsWon}:{row.setsLost}</td>
+                        <td>{formatRatio(setRatio(row))}</td>
+                        <td>{row.pointsWon}:{row.pointsLost}</td>
+                        <td>{formatRatio(ballRatio(row))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+    </main>
   );
 }
 
@@ -413,6 +489,14 @@ function singleCourtUrl(court: number) {
   return url.toString();
 }
 
+function groupDisplayUrl() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("view", "groups");
+  return url.toString();
+}
+
 function displayCourts(tournament: Tournament | null, games: Game[] = []) {
   const configured = tournament?.courts
     .map((court) => courtNumber(court))
@@ -429,6 +513,170 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
 
 function sortGames(games: Game[]) {
   return [...games].sort((left, right) => gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de"));
+}
+
+function groupStandings(games: Game[]) {
+  const grouped = new Map<string, Game[]>();
+  for (const game of games) {
+    const group = groupLabel(game.round);
+    if (!group) {
+      continue;
+    }
+    grouped.set(group, [...(grouped.get(group) ?? []), game]);
+  }
+
+  return [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, "de", { numeric: true }))
+    .map(([group, groupGames]) => ({
+      group,
+      standings: rankGroupTeams(groupGames),
+    }));
+}
+
+function rankGroupTeams(games: Game[]) {
+  const standings = new Map<string, GroupStanding>();
+  for (const game of games) {
+    const teamA = groupTeamName(game.team_a);
+    const teamB = groupTeamName(game.team_b);
+    if (!teamA || !teamB) {
+      continue;
+    }
+    const rowA = ensureStanding(standings, teamA);
+    const rowB = ensureStanding(standings, teamB);
+    rowA.played += 1;
+    rowB.played += 1;
+
+    const winner = completedWinnerSide(game);
+    if (winner === "A") {
+      rowA.wins += 1;
+      rowB.losses += 1;
+    } else if (winner === "B") {
+      rowB.wins += 1;
+      rowA.losses += 1;
+    }
+
+    for (const [scoreA, scoreB] of completedSetScores(game)) {
+      rowA.pointsWon += scoreA;
+      rowA.pointsLost += scoreB;
+      rowB.pointsWon += scoreB;
+      rowB.pointsLost += scoreA;
+      if (scoreA > scoreB) {
+        rowA.setsWon += 1;
+        rowB.setsLost += 1;
+      } else if (scoreB > scoreA) {
+        rowB.setsWon += 1;
+        rowA.setsLost += 1;
+      }
+    }
+  }
+
+  const ranked = [...standings.values()].sort((left, right) =>
+    rankingPoints(right) - rankingPoints(left)
+    || setRatio(right) - setRatio(left)
+    || ballRatio(right) - ballRatio(left)
+  );
+  return applyTwoTeamHeadToHeadTies(ranked, games);
+}
+
+function ensureStanding(standings: Map<string, GroupStanding>, team: string) {
+  const existing = standings.get(team);
+  if (existing) {
+    return existing;
+  }
+  const created = {
+    team,
+    played: 0,
+    wins: 0,
+    losses: 0,
+    setsWon: 0,
+    setsLost: 0,
+    pointsWon: 0,
+    pointsLost: 0,
+  };
+  standings.set(team, created);
+  return created;
+}
+
+function completedSetScores(game: Game) {
+  return [
+    [game.set1_team_a, game.set1_team_b],
+    [game.set2_team_a, game.set2_team_b],
+    [game.set3_team_a, game.set3_team_b],
+  ].flatMap(([teamA, teamB]) => {
+    const scoreA = parseScore(teamA);
+    const scoreB = parseScore(teamB);
+    return scoreA !== null && scoreB !== null && isPlausibleSetResult({ A: scoreA, B: scoreB })
+      ? [[scoreA, scoreB] as const]
+      : [];
+  });
+}
+
+function applyTwoTeamHeadToHeadTies(standings: GroupStanding[], games: Game[]) {
+  const ranked: GroupStanding[] = [];
+  for (let index = 0; index < standings.length;) {
+    const tied = standings.slice(index).filter((row) => sameRankingMetrics(row, standings[index]));
+    if (tied.length === 2) {
+      ranked.push(...sortTwoTeamHeadToHead(tied[0], tied[1], games));
+    } else {
+      ranked.push(...tied.sort((left, right) => left.team.localeCompare(right.team, "de", { numeric: true })));
+    }
+    index += tied.length;
+  }
+  return ranked;
+}
+
+function sameRankingMetrics(left: GroupStanding, right: GroupStanding) {
+  return rankingPoints(left) === rankingPoints(right)
+    && setRatio(left) === setRatio(right)
+    && ballRatio(left) === ballRatio(right);
+}
+
+function sortTwoTeamHeadToHead(left: GroupStanding, right: GroupStanding, games: Game[]) {
+  const game = games.find((candidate) =>
+    (groupTeamName(candidate.team_a) === left.team && groupTeamName(candidate.team_b) === right.team)
+    || (groupTeamName(candidate.team_a) === right.team && groupTeamName(candidate.team_b) === left.team)
+  );
+  const winner = game ? completedWinnerSide(game) : "";
+  if (winner === "A") {
+    return groupTeamName(game?.team_a) === left.team ? [left, right] : [right, left];
+  }
+  if (winner === "B") {
+    return groupTeamName(game?.team_b) === left.team ? [left, right] : [right, left];
+  }
+  return [left, right].sort((teamLeft, teamRight) => teamLeft.team.localeCompare(teamRight.team, "de", { numeric: true }));
+}
+
+function groupLabel(round: string | null | undefined) {
+  const normalized = (round ?? "").trim().toUpperCase();
+  return /^[A-Z]$/.test(normalized) ? normalized : "";
+}
+
+function groupTeamName(team: string | null | undefined) {
+  const normalized = (team ?? "").trim();
+  return normalized && normalized !== "(Freilos)" ? normalized : "";
+}
+
+function rankingPoints(row: GroupStanding) {
+  return row.wins * 2;
+}
+
+function setRatio(row: GroupStanding) {
+  return ratio(row.setsWon, row.setsLost);
+}
+
+function ballRatio(row: GroupStanding) {
+  return ratio(row.pointsWon, row.pointsLost);
+}
+
+function ratio(won: number, lost: number) {
+  if (lost === 0) {
+    return won > 0 ? Number.POSITIVE_INFINITY : 0;
+  }
+  return won / lost;
+}
+
+function formatRatio(value: number) {
+  return Number.isFinite(value) ? value.toFixed(3) : "∞";
 }
 
 function numericCourtOptions(games: Game[], tournament: Tournament | null = null): string[] {
