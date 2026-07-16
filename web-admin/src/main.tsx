@@ -268,7 +268,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [pendingSyncOverwriteCourts, setPendingSyncOverwriteCourts] = useState<boolean | null>(null);
-  const [pendingHvvAction, setPendingHvvAction] = useState<"sync" | "selectTournament" | "importTournament" | null>(null);
+  const [pendingHvvAction, setPendingHvvAction] = useState<"sync" | "selectTournament" | "importTournament" | "pushDirtyGames" | null>(null);
   const [pendingHvvTournamentSource, setPendingHvvTournamentSource] = useState("");
   const [hvvTournamentSelectionMode, setHvvTournamentSelectionMode] = useState<"update" | "create">("update");
   const [showHvvCredentialsDialog, setShowHvvCredentialsDialog] = useState(false);
@@ -514,6 +514,9 @@ function AdminDashboard({ session }: { session: AppSession }) {
     } else if (overwriteCourts !== null) {
       setPendingHvvAction(null);
       await syncGames(overwriteCourts);
+    } else if (pendingHvvAction === "pushDirtyGames") {
+      setPendingHvvAction(null);
+      await pushDirtyGames();
     }
   }
 
@@ -614,8 +617,10 @@ function AdminDashboard({ session }: { session: AppSession }) {
       return;
     }
     if (!getHvvCredentialsStatus().active) {
-      setError("Bitte zuerst HVV-Zugang ueber HVV laden eingeben.");
-      setActiveTab("settings");
+      setError("");
+      setMessage("");
+      setPendingHvvAction("pushDirtyGames");
+      setShowHvvCredentialsDialog(true);
       return;
     }
     setPushingHvv(true);
