@@ -45,7 +45,7 @@ export function CourtDisplayApp({ court, mode = "courts" }: { court: string; mod
   const completedGames = sortedGames.filter(isCompleted);
 
   if (mode === "groups") {
-    return <GroupDisplay games={completedGames} />;
+    return <GroupDisplay games={sortedGames} />;
   }
 
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
@@ -417,7 +417,7 @@ function GroupDisplay({ games }: { games: Game[] }) {
         <span>{grouped.length === 0 ? "Keine Gruppenergebnisse" : `${grouped.length} Gruppen`}</span>
       </header>
       {grouped.length === 0 ? (
-        <section className="group-display-empty">Noch keine abgeschlossenen Spiele mit Gruppe A, B, C, D oder E.</section>
+        <section className="group-display-empty">Noch keine Spiele mit Gruppe A, B, C, D oder E.</section>
       ) : (
         <section className="group-table-grid" aria-label="Gruppentabellen">
           {grouped.map(({ group, standings }) => (
@@ -543,6 +543,9 @@ function rankGroupTeams(games: Game[]) {
     }
     const rowA = ensureStanding(standings, teamA);
     const rowB = ensureStanding(standings, teamB);
+    if (!isCompleted(game)) {
+      continue;
+    }
     rowA.played += 1;
     rowB.played += 1;
 
