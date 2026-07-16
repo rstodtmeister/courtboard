@@ -3549,7 +3549,7 @@ tbody tr:nth-child(even) {
 
 .group-table-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(8px, 1.2vmin, 16px);
   align-content: start;
   overflow: auto;
@@ -3602,7 +3602,7 @@ tbody tr:nth-child(even) {
 
 .group-table th:nth-child(2),
 .group-table td:nth-child(2) {
-  width: 32%;
+  width: 42%;
   min-width: 0;
   max-width: none;
   text-align: left;
