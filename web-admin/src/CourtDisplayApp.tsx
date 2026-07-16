@@ -396,10 +396,12 @@ function DisplayResults({ games, tournamentId }: { games: Game[]; tournamentId?:
       ) : (
         <div className="display-side-list">
           {games.map((game) => (
-            <div className="display-side-item" key={game.id}>
-              {game.number && `Nr. ${game.number} `}
-              <ResultTeam game={game} team="a" /> vs. <ResultTeam game={game} team="b" />
-              {formatResultWithSets(game) && <span className="display-result-score"> {formatResultWithSets(game)}</span>}
+            <div className="display-side-item display-result-item" key={game.id}>
+              <span className="display-result-number">{game.number ? `Nr. ${game.number}` : ""}</span>
+              <ResultTeam game={game} team="a" />
+              <span className="display-result-vs">vs.</span>
+              <ResultTeam game={game} team="b" />
+              {formatResultWithSets(game) && <span className="display-result-score">{formatResultWithSets(game)}</span>}
             </div>
           ))}
         </div>
@@ -473,9 +475,9 @@ function DisplayGroupsSummary({ games }: { games: Game[] }) {
                   <tr>
                     <th>R</th>
                     <th>Team</th>
-                    <th>Pkt</th>
-                    <th>S</th>
-                    <th>B</th>
+                    <th>Punkte</th>
+                    <th>Sätze</th>
+                    <th>Bälle</th>
                   </tr>
                 </thead>
                 <tbody>
