@@ -3540,18 +3540,25 @@ tbody tr:nth-child(even) {
 
 .display-group-table th:nth-child(2),
 .display-group-table td:nth-child(2) {
-  width: 38%;
+  width: 44%;
   text-align: left;
   font-weight: 800;
 }
 
 .display-group-table th:nth-child(3),
-.display-group-table th:nth-child(4),
-.display-group-table th:nth-child(5),
-.display-group-table td:nth-child(3),
-.display-group-table td:nth-child(4),
-.display-group-table td:nth-child(5) {
-  width: 20%;
+.display-group-table td:nth-child(3) {
+  width: auto;
+  text-align: left;
+}
+
+.display-group-table td:nth-child(3) {
+  display: grid;
+  gap: .12em;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.display-group-table td:nth-child(3) span {
   white-space: nowrap;
 }
 
