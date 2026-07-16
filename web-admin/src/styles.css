@@ -4617,6 +4617,13 @@ tbody tr:nth-child(even) {
     overflow: auto;
   }
 
+  .group-display-page .single-court-back {
+    position: static;
+    width: fit-content;
+    padding: .42em .6em;
+    font-size: .9rem;
+  }
+
   .group-display-header {
     align-items: flex-start;
     gap: 8px;
@@ -4650,41 +4657,35 @@ tbody tr:nth-child(even) {
   }
 
   .group-table-wrap {
-    overflow-x: visible;
-  }
-
-  .group-table,
-  .group-table tbody,
-  .group-table tr {
-    display: block;
-    width: 100%;
-  }
-
-  .group-table thead {
-    display: none;
+    overflow-x: hidden;
   }
 
   .group-table {
-    border-collapse: separate;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
     border-spacing: 0;
-    font-size: .9rem;
+    font-size: clamp(.78rem, 3.2vw, .95rem);
+  }
+
+  .group-table thead {
+    display: table-header-group;
   }
 
   .group-table tbody {
-    padding: 8px;
+    display: table-row-group;
   }
 
   .group-table tbody tr {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-    border: 1px solid #d1d5db;
+    display: table-row;
+    border: 0;
     background: #ffffff;
-    padding: 8px;
+    padding: 0;
   }
 
   .group-table tbody tr + tr {
-    margin-top: 8px;
+    margin-top: 0;
   }
 
   .group-table tbody tr:nth-child(even) {
@@ -4692,59 +4693,70 @@ tbody tr:nth-child(even) {
   }
 
   .group-table td {
-    display: grid;
-    align-content: center;
-    gap: 2px;
+    display: table-cell;
     min-width: 0;
-    border: 0;
-    background: #f3f4f6;
-    padding: 6px;
-    text-align: center;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    border-top: 1px solid #d1d5db;
+    background: transparent;
+    padding: .55em .35em;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .group-table td::before {
-    content: attr(data-label);
-    color: #6b7280;
-    font-size: .64rem;
-    line-height: 1;
-    font-weight: 900;
-    text-transform: uppercase;
+    content: none;
   }
 
   .group-table td:first-child {
-    grid-row: 1;
-    grid-column: 1;
-    background: #111827;
-    color: #ffffff;
-    font-size: 1.15rem;
+    width: 44px;
+    background: transparent;
+    color: #111827;
+    font-size: inherit;
+    text-align: center;
   }
 
   .group-table td:first-child::before {
-    color: #d1d5db;
+    content: none;
   }
 
   .group-table td:nth-child(2) {
-    grid-row: 1;
-    grid-column: 2 / -1;
-    display: block;
+    display: table-cell;
+    width: 44%;
     min-width: 0;
     max-width: none;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    padding: 7px 8px;
+    background: transparent;
+    border-top: 1px solid #d1d5db;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    padding: .55em .35em;
     text-align: left;
-    font-size: 1rem;
+    font-size: inherit;
     font-weight: 900;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .group-table td:nth-child(2)::before {
-    display: block;
-    margin-bottom: 3px;
+    content: none;
+  }
+
+  .group-table th {
+    padding: .5em .35em;
+    font-size: .72rem;
+    text-align: right;
+  }
+
+  .group-table th:first-child {
+    width: 44px;
+    text-align: center;
+  }
+
+  .group-table th:nth-child(2) {
+    width: 44%;
+    text-align: left;
   }
 
   .group-display-empty {
