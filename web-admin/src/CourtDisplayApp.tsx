@@ -371,13 +371,11 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
           <div className="display-open-header">Nr.</div>
           <div className="display-open-header">Court</div>
           <div className="display-open-header">Spiel</div>
-          <div className="display-open-header">Schiedsrichter</div>
           {games.map((game) => (
             <React.Fragment key={game.id}>
               <div className="display-open-cell">{game.number}</div>
               <div className="display-open-cell">{game.court}</div>
               <div className="display-open-cell">{teamLine(game)}</div>
-              <div className="display-open-cell">{game.referee}</div>
             </React.Fragment>
           ))}
         </div>

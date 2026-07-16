@@ -3568,7 +3568,7 @@ tbody tr:nth-child(even) {
 
 .display-open-list {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: max-content max-content minmax(0, 1fr);
   gap: clamp(3px, .55vmin, 6px) clamp(8px, 1.1vmin, 14px);
   font-size: clamp(10px, 1.35vmin, 15px);
   line-height: 1.12;
@@ -4696,11 +4696,6 @@ tbody tr:nth-child(even) {
     font-size: .82rem;
   }
 
-  .display-open-header:nth-child(4),
-  .display-open-cell:nth-child(4n) {
-    display: none;
-  }
-
   .display-open-cell {
     max-width: none;
   }
@@ -5021,11 +5016,6 @@ tbody tr:nth-child(even) {
 
   .display-open-list {
     grid-template-columns: max-content max-content minmax(0, 1fr);
-  }
-
-  .display-open-header:nth-child(4),
-  .display-open-cell:nth-child(4n) {
-    display: none;
   }
 
   .single-court-page {
