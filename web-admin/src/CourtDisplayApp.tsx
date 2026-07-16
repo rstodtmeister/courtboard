@@ -55,7 +55,7 @@ export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { cour
   const currentUrl = window.location.href;
 
   return (
-    <main className="court-display-page">
+    <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
       <section className="court-board" aria-label="Court Anzeige">
         {courts.map((court) => (
           <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} />
