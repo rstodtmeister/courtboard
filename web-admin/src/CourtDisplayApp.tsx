@@ -417,7 +417,7 @@ function GroupDisplay({ games }: { games: Game[] }) {
         <span>{grouped.length === 0 ? "Keine Gruppenergebnisse" : `${grouped.length} Gruppen`}</span>
       </header>
       {grouped.length === 0 ? (
-        <section className="group-display-empty">Noch keine Spiele mit Gruppe A, B, C, D oder E.</section>
+        <section className="group-display-empty">Noch keine Spiele mit Gruppe A, B, C oder D.</section>
       ) : (
         <section className="group-table-grid" aria-label="Gruppentabellen">
           {grouped.map(({ group, standings }) => (
@@ -651,7 +651,7 @@ function sortTwoTeamHeadToHead(left: GroupStanding, right: GroupStanding, games:
 
 function groupLabel(round: string | null | undefined) {
   const normalized = (round ?? "").trim().toUpperCase();
-  return /^[A-Z]$/.test(normalized) ? normalized : "";
+  return /^[A-D]$/.test(normalized) ? normalized : "";
 }
 
 function groupTeamName(team: string | null | undefined) {
