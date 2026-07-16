@@ -3057,10 +3057,11 @@ tbody tr:nth-child(even) {
 
 .court-display-page {
   --display-gap: clamp(14px, 2vmin, 30px);
+  --display-side-width: clamp(320px, 28vw, 520px);
   min-height: 100vh;
   overflow: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) var(--display-side-width);
   gap: var(--display-gap);
   padding: var(--display-gap);
   background: #ffffff;
@@ -3401,8 +3402,9 @@ tbody tr:nth-child(even) {
   grid-template-rows: max-content max-content 1fr;
   gap: var(--display-gap);
   min-height: 0;
-  width: max-content;
-  overflow: visible;
+  width: var(--display-side-width);
+  max-width: var(--display-side-width);
+  overflow: hidden;
 }
 
 .display-side-box,
@@ -3411,7 +3413,7 @@ tbody tr:nth-child(even) {
   padding: clamp(8px, 1.2vmin, 14px);
   background: #ffffff;
   width: auto;
-  min-width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -3455,7 +3457,7 @@ tbody tr:nth-child(even) {
 
 .display-url-box {
   display: grid;
-  grid-template-columns: minmax(300px, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: clamp(10px, 1.4vmin, 18px);
   align-items: start;
 }
@@ -3534,7 +3536,7 @@ tbody tr:nth-child(even) {
 
 .display-qr-stack {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
+  grid-template-columns: max-content;
   gap: clamp(10px, 1.4vmin, 18px);
   align-items: start;
 }
@@ -3566,7 +3568,7 @@ tbody tr:nth-child(even) {
 
 .display-open-list {
   display: grid;
-  grid-template-columns: max-content max-content max-content max-content;
+  grid-template-columns: max-content max-content minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(3px, .55vmin, 6px) clamp(8px, 1.1vmin, 14px);
   font-size: clamp(10px, 1.35vmin, 15px);
   line-height: 1.12;
