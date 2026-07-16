@@ -65,13 +65,16 @@ export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { cour
         <DisplayOpenGames games={openGames} />
         <DisplayResults games={completedGames} tournamentId={tournament?.id ?? tournamentId} />
         <div className="display-side-box display-url-box">
-          <div className="display-qr-inline">
-            <h2>Spielplan</h2>
-            {tournament?.hvv_public_url ? <QrCode value={tournament.hvv_public_url} compact /> : <div>Keine HVV Spielplan URL eingetragen</div>}
-          </div>
-          <div className="display-qr-inline">
-            <h2>Diese Anzeige</h2>
-            <QrCode value={currentUrl} compact />
+          <DisplayGroupsSummary games={sortedGames} />
+          <div className="display-qr-stack">
+            <div className="display-qr-inline">
+              <h2>Spielplan</h2>
+              {tournament?.hvv_public_url ? <QrCode value={tournament.hvv_public_url} compact /> : <div className="display-qr-empty">Keine HVV Spielplan URL eingetragen</div>}
+            </div>
+            <div className="display-qr-inline">
+              <h2>Diese Anzeige</h2>
+              <QrCode value={currentUrl} compact />
+            </div>
           </div>
         </div>
       </aside>
@@ -452,6 +455,48 @@ function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: s
         </section>
       )}
     </main>
+  );
+}
+
+function DisplayGroupsSummary({ games }: { games: Game[] }) {
+  const grouped = groupStandings(games);
+  return (
+    <section className="display-groups-summary" aria-label="Gruppentabellen">
+      <h2>Gruppen</h2>
+      {grouped.length === 0 ? (
+        <div className="display-groups-empty">Noch keine Gruppenergebnisse</div>
+      ) : (
+        <div className="display-groups-list">
+          {grouped.map(({ group, standings }) => (
+            <article className="display-group-card" key={group}>
+              <h3>Gruppe {group}</h3>
+              <table className="display-group-table">
+                <thead>
+                  <tr>
+                    <th>R</th>
+                    <th>Team</th>
+                    <th>Pkt</th>
+                    <th>S</th>
+                    <th>B</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((row, index) => (
+                    <tr key={row.team}>
+                      <td>{index + 1}</td>
+                      <td>{row.team}</td>
+                      <td>{rankingPoints(row)}</td>
+                      <td>{row.setsWon}:{row.setsLost}</td>
+                      <td>{row.pointsWon}:{row.pointsLost}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
