@@ -3533,33 +3533,28 @@ tbody tr:nth-child(even) {
 
 .display-group-table th:first-child,
 .display-group-table td:first-child {
-  width: 2.2em;
+  width: 1.8em;
   text-align: center;
   font-weight: 900;
 }
 
 .display-group-table th:nth-child(2),
 .display-group-table td:nth-child(2) {
-  width: 44%;
+  width: auto;
   text-align: left;
   font-weight: 800;
 }
 
 .display-group-table th:nth-child(3),
-.display-group-table td:nth-child(3) {
-  width: auto;
-  text-align: left;
-}
-
-.display-group-table td:nth-child(3) {
-  display: grid;
-  gap: .12em;
-  font-weight: 800;
-  line-height: 1.08;
-}
-
-.display-group-table td:nth-child(3) span {
+.display-group-table th:nth-child(4),
+.display-group-table th:nth-child(5),
+.display-group-table td:nth-child(3),
+.display-group-table td:nth-child(4),
+.display-group-table td:nth-child(5) {
+  width: 3.5em;
+  text-align: center;
   white-space: nowrap;
+  font-weight: 900;
 }
 
 .display-groups-empty,

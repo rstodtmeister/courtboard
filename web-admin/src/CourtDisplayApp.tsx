@@ -473,9 +473,11 @@ function DisplayGroupsSummary({ games }: { games: Game[] }) {
               <table className="display-group-table">
                 <thead>
                   <tr>
-                    <th>R</th>
-                    <th>Team</th>
-                    <th>Werte</th>
+                    <th className="sr-only">Rang</th>
+                    <th className="sr-only">Team</th>
+                    <th>P</th>
+                    <th>S</th>
+                    <th>B</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -483,11 +485,9 @@ function DisplayGroupsSummary({ games }: { games: Game[] }) {
                     <tr key={row.team}>
                       <td>{index + 1}</td>
                       <td>{row.team}</td>
-                      <td>
-                        <span>Punkte {rankingPoints(row)}</span>
-                        <span>Sätze {row.setsWon}:{row.setsLost}</span>
-                        <span>Bälle {row.pointsWon}:{row.pointsLost}</span>
-                      </td>
+                      <td>{rankingPoints(row)}</td>
+                      <td>{row.setsWon}:{row.setsLost}</td>
+                      <td>{row.pointsWon}:{row.pointsLost}</td>
                     </tr>
                   ))}
                 </tbody>
