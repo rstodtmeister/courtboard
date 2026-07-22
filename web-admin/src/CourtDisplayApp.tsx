@@ -16,7 +16,19 @@ type GroupStanding = {
   pointsLost: number;
 };
 
-export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { court: string; tournamentId?: string; mode?: "courts" | "groups" }) {
+type DisplayOrientation = "normal" | "landscape";
+
+export function CourtDisplayApp({
+  court,
+  tournamentId,
+  mode = "courts",
+  orientation = "normal",
+}: {
+  court: string;
+  tournamentId?: string;
+  mode?: "courts" | "groups";
+  orientation?: DisplayOrientation;
+}) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +47,7 @@ export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { cour
   }, [tournamentId]);
 
   if (loading) {
-    return <main className="court-display-loading">Anzeige wird geladen...</main>;
+    return <DisplayViewport orientation={orientation}><main className="court-display-loading">Anzeige wird geladen...</main></DisplayViewport>;
   }
 
   const courts = displayCourts(tournament, games);
@@ -45,44 +57,60 @@ export function CourtDisplayApp({ court, tournamentId, mode = "courts" }: { cour
   const completedGames = sortedGames.filter(isCompleted);
 
   if (mode === "groups") {
-    return <GroupDisplay games={sortedGames} tournamentId={tournament?.id ?? tournamentId} />;
+    return (
+      <DisplayViewport orientation={orientation}>
+        <GroupDisplay games={sortedGames} tournamentId={tournament?.id ?? tournamentId} orientation={orientation} />
+      </DisplayViewport>
+    );
   }
 
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
-    return <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} />;
+    return (
+      <DisplayViewport orientation={orientation}>
+        <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} orientation={orientation} />
+      </DisplayViewport>
+    );
   }
 
   const currentUrl = window.location.href;
 
   return (
-    <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
-      <section className="court-board" aria-label="Court Anzeige">
-        {courts.map((court) => (
-          <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} />
-        ))}
-      </section>
-      <aside className="display-side-panel">
-        <DisplayOpenGames games={openGames} />
-        <DisplayResults games={completedGames} />
-        <div className="display-side-box display-url-box">
-          <DisplayGroupsSummary games={sortedGames} />
-          <div className="display-qr-stack">
-            <div className="display-qr-inline">
-              <h2>Spielplan</h2>
-              {tournament?.hvv_public_url ? <QrCode value={tournament.hvv_public_url} compact /> : <div className="display-qr-empty">Keine HVV Spielplan URL eingetragen</div>}
-            </div>
-            <div className="display-qr-inline">
-              <h2>Diese Anzeige</h2>
-              <QrCode value={currentUrl} compact />
+    <DisplayViewport orientation={orientation}>
+      <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
+        <section className="court-board" aria-label="Court Anzeige">
+          {courts.map((court) => (
+            <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} />
+          ))}
+        </section>
+        <aside className="display-side-panel">
+          <DisplayOpenGames games={openGames} />
+          <DisplayResults games={completedGames} />
+          <div className="display-side-box display-url-box">
+            <DisplayGroupsSummary games={sortedGames} />
+            <div className="display-qr-stack">
+              <div className="display-qr-inline">
+                <h2>Spielplan</h2>
+                {tournament?.hvv_public_url ? <QrCode value={tournament.hvv_public_url} compact /> : <div className="display-qr-empty">Keine HVV Spielplan URL eingetragen</div>}
+              </div>
+              <div className="display-qr-inline">
+                <h2>Diese Anzeige</h2>
+                <QrCode value={currentUrl} compact />
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
-    </main>
+        </aside>
+      </main>
+    </DisplayViewport>
   );
 }
 
-function SingleCourtDisplay({ court, tournamentId, games }: { court: number; tournamentId?: string; games: Game[] }) {
+function DisplayViewport({ orientation, children }: { orientation: DisplayOrientation; children: React.ReactNode }) {
+  return orientation === "landscape"
+    ? <div className="forced-landscape-display">{children}</div>
+    : <>{children}</>;
+}
+
+function SingleCourtDisplay({ court, tournamentId, games, orientation }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
@@ -90,7 +118,7 @@ function SingleCourtDisplay({ court, tournamentId, games }: { court: number; tou
   const started = scoreState ? hasStartedScore(scoreState) : false;
   return (
     <main className="single-court-page">
-      <a className="single-court-back" href={displayUrl(tournamentId)}>Alle Courts</a>
+      <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
       <header className="single-court-meta">
         <h1>Court {court}</h1>
         {currentGame && <div>{[`Spiel ${currentGame.number}`.trim(), status].filter(Boolean).join(" · ")}</div>}
@@ -232,8 +260,8 @@ function SingleCourtSetHistory({ game }: { game: Game }) {
   );
 }
 
-function CourtPanel({ court, tournamentId, games }: { court: number; tournamentId?: string; games: Game[] }) {
-  const courtUrl = singleCourtUrl(court, tournamentId);
+function CourtPanel({ court, tournamentId, games, orientation }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation }) {
+  const courtUrl = singleCourtUrl(court, tournamentId, orientation);
   return (
     <a className="display-court-section" href={courtUrl} aria-label={`Court ${court} Einzelansicht oeffnen`} title="Einzelansicht oeffnen">
       <div className="display-court-heading">
@@ -409,11 +437,11 @@ function DisplayResults({ games }: { games: Game[] }) {
   );
 }
 
-function GroupDisplay({ games, tournamentId }: { games: Game[]; tournamentId?: string }) {
+function GroupDisplay({ games, tournamentId, orientation }: { games: Game[]; tournamentId?: string; orientation: DisplayOrientation }) {
   const grouped = groupStandings(games);
   return (
     <main className="group-display-page">
-      <a className="single-court-back" href={displayUrl(tournamentId)}>Courts anzeigen</a>
+      <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Courts anzeigen</a>
       <header className="group-display-header">
         <h1>Gruppen</h1>
         <span>{grouped.length === 0 ? "Keine Gruppenergebnisse" : `${grouped.length} Gruppen`}</span>
@@ -500,7 +528,7 @@ function ResultTeam({ game, team }: { game: Game; team: "a" | "b" }) {
 }
 
 
-function displayUrl(tournamentId?: string) {
+function displayUrl(tournamentId?: string, orientation: DisplayOrientation = "normal") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
@@ -508,10 +536,13 @@ function displayUrl(tournamentId?: string) {
   if (tournamentId) {
     url.searchParams.set("tournamentId", tournamentId);
   }
+  if (orientation === "landscape") {
+    url.searchParams.set("orientation", "landscape");
+  }
   return url.toString();
 }
 
-function singleCourtUrl(court: number, tournamentId?: string) {
+function singleCourtUrl(court: number, tournamentId?: string, orientation: DisplayOrientation = "normal") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
@@ -520,16 +551,22 @@ function singleCourtUrl(court: number, tournamentId?: string) {
   if (tournamentId) {
     url.searchParams.set("tournamentId", tournamentId);
   }
+  if (orientation === "landscape") {
+    url.searchParams.set("orientation", "landscape");
+  }
   return url.toString();
 }
 
-function groupDisplayUrl(tournamentId?: string) {
+function groupDisplayUrl(tournamentId?: string, orientation: DisplayOrientation = "normal") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "groups");
   if (tournamentId) {
     url.searchParams.set("tournamentId", tournamentId);
+  }
+  if (orientation === "landscape") {
+    url.searchParams.set("orientation", "landscape");
   }
   return url.toString();
 }

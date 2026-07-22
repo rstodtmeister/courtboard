@@ -5956,3 +5956,75 @@ tbody tr:nth-child(even) {
 .score-flow-actions.manual-result-actions button {
   width: 100%;
 }
+
+.forced-landscape-display {
+  position: fixed;
+  inset: 0;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.forced-landscape-display > .court-display-loading,
+.forced-landscape-display > .court-display-page,
+.forced-landscape-display > .group-display-page,
+.forced-landscape-display > .single-court-page {
+  position: absolute;
+  top: 0;
+  left: 100dvw;
+  width: 100dvh;
+  height: 100dvw;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  transform: rotate(90deg);
+  transform-origin: top left;
+}
+
+.forced-landscape-display > .court-display-page {
+  --display-gap: clamp(8px, 1.25vmin, 18px);
+  --display-side-width: clamp(300px, 25vw, 460px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--display-side-width);
+  gap: var(--display-gap);
+  overflow: hidden;
+  padding: var(--display-gap);
+}
+
+.forced-landscape-display .court-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--display-gap);
+  width: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.forced-landscape-display .display-court-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  container-type: size;
+}
+
+.forced-landscape-display .display-games {
+  display: grid;
+  min-height: 0;
+}
+
+.forced-landscape-display .display-game {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.forced-landscape-display .display-side-panel {
+  display: grid;
+  width: auto;
+  margin-top: 0;
+}

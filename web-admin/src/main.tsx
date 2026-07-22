@@ -72,6 +72,7 @@ function App() {
   const view = params.get("view") ?? "";
   const court = params.get("court") ?? "";
   const tournamentId = params.get("tournamentId") ?? "";
+  const orientation = params.get("orientation") === "landscape" ? "landscape" : "normal";
 
   if (auth === "confirmed") {
     return <AuthConfirmedApp />;
@@ -82,11 +83,11 @@ function App() {
   }
 
   if (view === "courts") {
-    return <CourtDisplayApp court={court} tournamentId={tournamentId} />;
+    return <CourtDisplayApp court={court} tournamentId={tournamentId} orientation={orientation} />;
   }
 
   if (view === "groups") {
-    return <CourtDisplayApp court="" tournamentId={tournamentId} mode="groups" />;
+    return <CourtDisplayApp court="" tournamentId={tournamentId} mode="groups" orientation={orientation} />;
   }
 
   return <AdminApp />;
