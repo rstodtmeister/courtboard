@@ -1561,6 +1561,7 @@ function CourtLinksPanel({
   onUnlockCourt: (court: string) => Promise<void>;
 }) {
   const sortedGames = sortGames(games);
+  const [displayOrientation, setDisplayOrientation] = useState<"normal" | "landscape">("normal");
 
   return (
     <section className="court-link-panel">
@@ -1569,7 +1570,13 @@ function CourtLinksPanel({
           <h3>Court-QR-Codes</h3>
           <p>Ein fester QR-Code pro Court. Das erste Geraet sperrt die Eingabe fuer das aktuelle Spiel.</p>
         </div>
-        <a className="secondary-link" href={displayUrl(tournamentId)} target="_blank" rel="noreferrer">Courts anzeigen</a>
+        <div className="court-display-link-controls">
+          <select value={displayOrientation} onChange={(event) => setDisplayOrientation(event.target.value as "normal" | "landscape")} aria-label="Ausrichtung fuer Courts-Anzeige">
+            <option value="normal">Standard</option>
+            <option value="landscape">Querformat</option>
+          </select>
+          <a className="secondary-link" href={displayUrl(tournamentId, displayOrientation)} target="_blank" rel="noreferrer">Courts anzeigen</a>
+        </div>
       </div>
       <div className="court-link-grid">
         {courts.map((entry) => {
@@ -2285,13 +2292,16 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function displayUrl(tournamentId?: string) {
+function displayUrl(tournamentId?: string, orientation: "normal" | "landscape" = "normal") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("view", "courts");
   if (tournamentId) {
     url.searchParams.set("tournamentId", tournamentId);
+  }
+  if (orientation === "landscape") {
+    url.searchParams.set("orientation", "landscape");
   }
   return url.toString();
 }

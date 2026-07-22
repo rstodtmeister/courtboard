@@ -406,6 +406,17 @@ select {
   margin-bottom: 16px;
 }
 
+.court-display-link-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.court-display-link-controls select {
+  width: auto;
+  min-width: 132px;
+}
+
 .court-link-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
