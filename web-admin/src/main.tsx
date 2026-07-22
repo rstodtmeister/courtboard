@@ -413,7 +413,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
 
     try {
       await disableScoreLink(linkId);
-      const lockedGame = games.find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
+      const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
       if (lockedGame) {
         await unlockScoreGame(lockedGame.id);
       }
@@ -454,7 +454,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
   }
 
   async function unlockCourt(court: string) {
-    const lockedGame = games.find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
+    const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
     if (!lockedGame) {
       setMessage(`Court ${court} ist frei.`);
       return;
@@ -1559,6 +1559,8 @@ function CourtLinksPanel({
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
   onUnlockCourt: (court: string) => Promise<void>;
 }) {
+  const sortedGames = sortGames(games);
+
   return (
     <section className="court-link-panel">
       <div className="subsection-heading">
@@ -1571,8 +1573,8 @@ function CourtLinksPanel({
       <div className="court-link-grid">
         {courts.map((entry) => {
           const link = links.find((item) => item.court === entry.court);
-          const currentGame = games.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game));
-          const lockedGame = games.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game) && game.score_locked_by_device);
+          const currentGame = sortedGames.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game));
+          const lockedGame = sortedGames.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game) && game.score_locked_by_device);
           const value = link?.token ? scoreUrl(link.token) : "";
           return (
             <div className="court-link-card" key={entry.court}>

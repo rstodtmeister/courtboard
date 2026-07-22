@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: gamesError.message }, 500);
     }
 
-    const candidateGames = games ?? [];
+    const candidateGames = sortGames(games ?? []);
     const lockGame = link.court && !link.game_id
       ? candidateGames.find((game) => !game.completed)
       : candidateGames[0];
@@ -222,3 +222,15 @@ Deno.serve(async (req) => {
 
   return jsonResponse({ ok: true, hvvSynced, hvvError: hvvError || null });
 });
+
+function sortGames<T extends { number: string | null }>(games: T[]) {
+  return [...games].sort((left, right) =>
+    gameNumberSortKey(left.number) - gameNumberSortKey(right.number)
+    || (left.number ?? "").localeCompare(right.number ?? "", "de", { numeric: true })
+  );
+}
+
+function gameNumberSortKey(number: string | null) {
+  const match = (number ?? "").match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
+}

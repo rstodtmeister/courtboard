@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -376,7 +377,31 @@ public class LocalApiServer {
                 result.add(game);
             }
         }
+        result.sort(Comparator
+                .comparingInt((GameState game) -> gameNumberSortKey(game.number))
+                .thenComparing(game -> game.number, String.CASE_INSENSITIVE_ORDER));
         return result;
+    }
+
+    private static int gameNumberSortKey(String number) {
+        if (number == null || number.isBlank()) {
+            return Integer.MAX_VALUE;
+        }
+        for (int index = 0; index < number.length(); index++) {
+            char character = number.charAt(index);
+            if (Character.isDigit(character)) {
+                int end = index + 1;
+                while (end < number.length() && Character.isDigit(number.charAt(end))) {
+                    end++;
+                }
+                try {
+                    return Integer.parseInt(number.substring(index, end));
+                } catch (NumberFormatException ignored) {
+                    return Integer.MAX_VALUE;
+                }
+            }
+        }
+        return Integer.MAX_VALUE;
     }
 
     private LockedGamesResult lockedGamesForDevice(LinkState link, String deviceId) {
