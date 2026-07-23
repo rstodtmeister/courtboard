@@ -22,7 +22,7 @@ type SubmitScoreRequest = {
 };
 
 const gameSelect =
-  "id,tournament_id,number,round,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
+  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 
 Deno.serve(async (req) => {
   const cors = handleCors(req);
@@ -223,11 +223,15 @@ Deno.serve(async (req) => {
   return jsonResponse({ ok: true, hvvSynced, hvvError: hvvError || null });
 });
 
-function sortGames<T extends { number: string | null }>(games: T[]) {
+function sortGames<T extends { number: string | null; display_order?: number | null }>(games: T[]) {
   return [...games].sort((left, right) =>
-    gameNumberSortKey(left.number) - gameNumberSortKey(right.number)
+    gameOrderSortKey(left) - gameOrderSortKey(right)
     || (left.number ?? "").localeCompare(right.number ?? "", "de", { numeric: true })
   );
+}
+
+function gameOrderSortKey(game: { number: string | null; display_order?: number | null }) {
+  return game.display_order ?? gameNumberSortKey(game.number);
 }
 
 function gameNumberSortKey(number: string | null) {

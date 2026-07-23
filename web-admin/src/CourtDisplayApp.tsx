@@ -586,7 +586,11 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
 }
 
 function sortGames(games: Game[]) {
-  return [...games].sort((left, right) => gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de"));
+  return [...games].sort((left, right) => gameOrderSortKey(left) - gameOrderSortKey(right) || left.number.localeCompare(right.number, "de", { numeric: true }));
+}
+
+function gameOrderSortKey(game: Game) {
+  return game.display_order ?? gameNumberSortKey(game.number);
 }
 
 function groupStandings(games: Game[]) {

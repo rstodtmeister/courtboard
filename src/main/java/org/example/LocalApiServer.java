@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LocalApiServer {
     private final WebPageScraper scraper;
@@ -38,6 +40,7 @@ public class LocalApiServer {
         server.createContext("/api/health", this::handleHealth);
         server.createContext("/api/games", this::handleGames);
         server.createContext("/api/games/update", this::handleUpdateGame);
+        server.createContext("/api/games/reorder", this::handleReorderGames);
         server.createContext("/api/games/sync", this::handleSyncGames);
         server.createContext("/api/score-links", this::handleScoreLinks);
         server.createContext("/api/score-links/disable", this::handleDisableScoreLink);
@@ -151,6 +154,27 @@ public class LocalApiServer {
         }
         updateGameFromBody(game, body);
         writeJson(exchange, 200, "{\"game\":" + gameJson(game) + "}");
+    }
+
+    private void handleReorderGames(HttpExchange exchange) throws IOException {
+        if (handleCors(exchange)) {
+            return;
+        }
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            writeJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+            return;
+        }
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        List<GameState> updated = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\{[^{}]*\"gameId\"\\s*:\\s*\"([^\"]+)\"[^{}]*\"displayOrder\"\\s*:\\s*(\\d+)[^{}]*}").matcher(body);
+        while (matcher.find()) {
+            GameState game = findGame(matcher.group(1));
+            if (game != null) {
+                game.displayOrder = Integer.parseInt(matcher.group(2));
+                updated.add(game);
+            }
+        }
+        writeJson(exchange, 200, "{\"games\":" + gamesJson(updated) + "}");
     }
 
     private void handleScoreLinks(HttpExchange exchange) throws IOException {
@@ -378,9 +402,13 @@ public class LocalApiServer {
             }
         }
         result.sort(Comparator
-                .comparingInt((GameState game) -> gameNumberSortKey(game.number))
+                .comparingInt((GameState game) -> gameOrderSortKey(game))
                 .thenComparing(game -> game.number, String.CASE_INSENSITIVE_ORDER));
         return result;
+    }
+
+    private static int gameOrderSortKey(GameState game) {
+        return game.displayOrder > 0 ? game.displayOrder : gameNumberSortKey(game.number);
     }
 
     private static int gameNumberSortKey(String number) {
@@ -611,6 +639,7 @@ public class LocalApiServer {
                 .append("\"round\":").append(jsonString(game.round)).append(',')
                 .append("\"game_date\":").append(jsonString(game.date)).append(',')
                 .append("\"court\":").append(jsonString(game.court)).append(',')
+                .append("\"display_order\":").append(jsonInteger(game.displayOrder)).append(',')
                 .append("\"team_a\":").append(jsonString(game.teamA)).append(',')
                 .append("\"team_b\":").append(jsonString(game.teamB)).append(',')
                 .append("\"team_a_players\":").append(jsonArray(game.teamAPlayers)).append(',')
@@ -660,6 +689,10 @@ public class LocalApiServer {
             builder.append(jsonString(values.get(index)));
         }
         return builder.append(']').toString();
+    }
+
+    private String jsonInteger(int value) {
+        return value > 0 ? String.valueOf(value) : "null";
     }
 
     private String linkJson(LinkState link) {
@@ -907,6 +940,7 @@ public class LocalApiServer {
         private final String round;
         private final String date;
         private String court;
+        private int displayOrder;
         private final String teamA;
         private final String teamB;
         private final List<String> teamAPlayers;

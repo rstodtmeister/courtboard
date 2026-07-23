@@ -5,6 +5,7 @@ export type Game = {
   round?: string | null;
   game_date: string | null;
   court: string | null;
+  display_order?: number | null;
   team_a: string | null;
   team_b: string | null;
   team_a_players?: string[];

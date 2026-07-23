@@ -801,6 +801,21 @@ tbody tr:nth-child(even) {
   background: #f6fcf8;
 }
 
+.mobile-game-card.dragging {
+  opacity: .72;
+  border-color: #1f4ea0;
+}
+
+.mobile-game-card.drag-over {
+  outline: 2px dashed #c8d0dc;
+  outline-offset: 2px;
+}
+
+.mobile-game-card.drop-allowed {
+  outline-color: #1f4ea0;
+  background: #f4f8ff;
+}
+
 .mobile-game-card.result-card {
   background: #ffffff;
 }
@@ -951,7 +966,7 @@ tbody tr:nth-child(even) {
 
 .mobile-game-assignment {
   display: grid;
-  grid-template-columns: minmax(30px, auto) auto minmax(128px, auto) minmax(0, 1fr) auto;
+  grid-template-columns: 30px minmax(30px, auto) auto minmax(128px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-height: 40px;
@@ -960,6 +975,37 @@ tbody tr:nth-child(even) {
   border: 1px solid #dde3ec;
   border-radius: 6px;
   background: #ffffff;
+}
+
+.mobile-drag-handle {
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-color: #c8d0dc;
+  border-radius: 5px;
+  padding: 0;
+  background: #ffffff;
+  color: #59616c;
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+  touch-action: none;
+  cursor: grab;
+}
+
+.mobile-drag-handle:active {
+  cursor: grabbing;
+}
+
+.mobile-game-drag-active {
+  overflow: hidden;
+  overscroll-behavior: none;
+  user-select: none;
 }
 
 .mobile-game-number {
@@ -982,12 +1028,12 @@ tbody tr:nth-child(even) {
 }
 
 .mobile-game-assignment .mobile-game-number {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 1;
 }
 
 .mobile-assignment-label {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   color: #59616c;
   font-size: .72rem;
@@ -997,7 +1043,7 @@ tbody tr:nth-child(even) {
 }
 
 .mobile-court-buttons {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1;
   display: grid;
   grid-template-columns: repeat(5, 30px);
@@ -4192,12 +4238,12 @@ tbody tr:nth-child(even) {
   }
 
   .mobile-game-assignment {
-    grid-template-columns: minmax(28px, auto) auto minmax(0, 1fr) auto;
+    grid-template-columns: 30px minmax(28px, auto) auto minmax(0, 1fr) auto;
     gap: 6px;
   }
 
   .mobile-court-buttons {
-    grid-column: 3 / 4;
+    grid-column: 4 / 5;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     max-width: 176px;
   }
@@ -4216,7 +4262,7 @@ tbody tr:nth-child(even) {
   }
 
   .mobile-game-assignment .mobile-game-state {
-    grid-column: 4;
+    grid-column: 5;
     grid-row: 1;
     justify-self: end;
   }

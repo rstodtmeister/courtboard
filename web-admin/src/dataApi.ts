@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse, Tournament } from "./types";
 
 const gameSelect =
-  "id,tournament_id,number,round,game_date,court,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
+  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 const tournamentSelect =
   "id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts";
 
@@ -775,6 +775,42 @@ export async function saveGame(game: Game, draft: GameDraft): Promise<Game> {
   return data;
 }
 
+export async function updateGameDisplayOrders(updates: Array<{ gameId: string; displayOrder: number }>): Promise<Game[]> {
+  if (updates.length === 0) {
+    return [];
+  }
+
+  if (dataMode === "local") {
+    const store = readStore();
+    const data = await localJson<{ games: Game[] }>("/api/games/reorder", {
+      method: "POST",
+      body: JSON.stringify({ orders: updates }),
+    });
+    const updatedById = new Map(data.games.map((game) => [game.id, game]));
+    writeStore({
+      ...store,
+      games: store.games.map((game) => updatedById.get(game.id) ?? game),
+    });
+    return data.games;
+  }
+
+  const updatedGames = await Promise.all(updates.map(async (update) => {
+    const { data, error } = await getSupabase()
+      .from("games")
+      .update({ display_order: update.displayOrder })
+      .eq("id", update.gameId)
+      .select(gameSelect)
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    return data;
+  }));
+
+  return updatedGames;
+}
+
 export async function createScoreLink(params: { tournamentId: string; gameId?: string; court?: string }): Promise<ScoreLinkResponse> {
   if (dataMode === "local") {
     return localJson<ScoreLinkResponse>("/api/score-links", {
@@ -1077,7 +1113,7 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
       location: tournament.location ?? null,
       token_base_url: tournament.token_base_url ?? "",
     })),
-    games: (store.games ?? seeded.games).map((game) => ({ ...game, completed: game.completed ?? false })),
+    games: (store.games ?? seeded.games).map((game) => ({ ...game, display_order: game.display_order ?? null, completed: game.completed ?? false })),
     links: (store.links ?? []).map((link) => ({
       ...link,
       disabled_at: link.disabled_at ?? null,
@@ -1093,6 +1129,7 @@ function createGame(tournamentId: string, number: string, gameDate: string, cour
     number,
     game_date: gameDate,
     court,
+    display_order: null,
     team_a: teamA,
     team_b: teamB,
     referee,

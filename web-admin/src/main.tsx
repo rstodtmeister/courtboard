@@ -31,6 +31,7 @@ import {
   submitScore,
   unlockScoreGame,
   updateAdminUser,
+  updateGameDisplayOrders,
 } from "./dataApi";
 import { gameRatingOptions, noRefereeSelection, specialGameRatingOptions } from "./appConfig";
 import type { PdfSheetType } from "./pdfExport";
@@ -367,6 +368,24 @@ function AdminDashboard({ session }: { session: AppSession }) {
       return true;
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Spiel konnte nicht gespeichert werden.");
+      return false;
+    }
+  }
+
+  async function reorderGames(updates: Array<{ gameId: string; displayOrder: number }>) {
+    setError("");
+    setMessage("");
+
+    try {
+      const updatedGames = await updateGameDisplayOrders(updates);
+      setGames((current) => {
+        const updatedById = new Map(updatedGames.map((game) => [game.id, game]));
+        return current.map((game) => updatedById.get(game.id) ?? game);
+      });
+      setMessage("Spielreihenfolge gespeichert.");
+      return true;
+    } catch (reorderError) {
+      setError(reorderError instanceof Error ? reorderError.message : "Spielreihenfolge konnte nicht gespeichert werden.");
       return false;
     }
   }
@@ -834,7 +853,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       ) : (
         <div className="admin-tab-panel">
           {activeTab === "games" && (
-            <GamesEditor games={games} tournament={tournament} onSave={saveGame} onUnlockGame={unlockGame} onPrintPdf={printPdf} printing={printing} />
+            <GamesEditor games={games} tournament={tournament} onSave={saveGame} onReorder={reorderGames} onUnlockGame={unlockGame} onPrintPdf={printPdf} printing={printing} />
           )}
           {activeTab === "courts" && (
             courts.length > 0 ? (
@@ -1634,6 +1653,7 @@ function GamesEditor({
   games,
   tournament,
   onSave,
+  onReorder,
   onUnlockGame,
   onPrintPdf,
   printing,
@@ -1641,6 +1661,7 @@ function GamesEditor({
   games: Game[];
   tournament: Tournament | null;
   onSave: (game: Game, draft: GameDraft) => Promise<boolean>;
+  onReorder: (updates: Array<{ gameId: string; displayOrder: number }>) => Promise<boolean>;
   onUnlockGame: (gameId: string) => Promise<void>;
   onPrintPdf: (games: Game[], sheetType: PdfSheetType) => Promise<void>;
   printing: PdfSheetType | "";
@@ -1648,6 +1669,8 @@ function GamesEditor({
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
   const [showCompletedGames, setShowCompletedGames] = useState(false);
+  const [draggingGameId, setDraggingGameId] = useState<string | null>(null);
+  const [dragOverGameId, setDragOverGameId] = useState<string | null>(null);
   const sortedGames = useMemo(() => sortGames(games), [games]);
   const visibleGames = showCompletedGames ? sortedGames.filter(isCompleted) : sortedGames.filter((game) => !isCompleted(game));
   const selectedGames = games.filter((game) => selectedGameIds.includes(game.id));
@@ -1666,6 +1689,33 @@ function GamesEditor({
     setSelectedGameIds((current) => checked
       ? [...new Set([...current, ...visibleIds])]
       : current.filter((id) => !visibleIds.includes(id)));
+  }
+
+  function moveGameOrder(sourceGameId: string, targetGameId: string | null) {
+    setDraggingGameId(null);
+    setDragOverGameId(null);
+    if (!targetGameId || sourceGameId === targetGameId) {
+      return;
+    }
+
+    const sourceGame = games.find((game) => game.id === sourceGameId);
+    const targetGame = games.find((game) => game.id === targetGameId);
+    if (!sourceGame || !targetGame || isCompleted(sourceGame) || isCompleted(targetGame) || !isAssignedCourt(sourceGame.court) || sourceGame.court !== targetGame.court) {
+      return;
+    }
+
+    const courtGames = sortGames(games).filter((game) => !isCompleted(game) && game.court === sourceGame.court);
+    const sourceIndex = courtGames.findIndex((game) => game.id === sourceGameId);
+    const targetIndex = courtGames.findIndex((game) => game.id === targetGameId);
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const reordered = [...courtGames];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const updates = reordered.map((game, index) => ({ gameId: game.id, displayOrder: (index + 1) * 10 }));
+    void onReorder(updates);
   }
 
   if (games.length === 0) {
@@ -1709,6 +1759,12 @@ function GamesEditor({
             onSave={onSave}
             onEdit={setEditingGame}
             onUnlockGame={onUnlockGame}
+            dragging={draggingGameId === game.id}
+            dragOver={dragOverGameId === game.id && draggingGameId !== game.id}
+            canDrop={Boolean(draggingGameId && isAssignedCourt(game.court) && games.find((item) => item.id === draggingGameId)?.court === game.court)}
+            onDragStart={setDraggingGameId}
+            onDragOver={setDragOverGameId}
+            onDragEnd={moveGameOrder}
           />
         ))}
       </div>
@@ -1778,6 +1834,12 @@ function MobileGameCard({
   onSave,
   onEdit,
   onUnlockGame,
+  dragging,
+  dragOver,
+  canDrop,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
 }: {
   game: Game;
   games: Game[];
@@ -1787,10 +1849,18 @@ function MobileGameCard({
   onSave: (game: Game, draft: GameDraft) => Promise<boolean>;
   onEdit: (game: Game) => void;
   onUnlockGame: (gameId: string) => Promise<void>;
+  dragging: boolean;
+  dragOver: boolean;
+  canDrop: boolean;
+  onDragStart: (gameId: string) => void;
+  onDragOver: (gameId: string | null) => void;
+  onDragEnd: (sourceGameId: string, targetGameId: string | null) => void;
 }) {
   const completed = isCompleted(game);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const refereeGroups = useMemo(() => prioritizedRefereeOptions(game, games, refereeOptions), [game, games, refereeOptions]);
+  const dragTargetRef = useRef<string | null>(null);
+
   async function updateAssignment(key: "court" | "referee", value: string) {
     if ((game[key] ?? "") === value) {
       return;
@@ -1807,9 +1877,51 @@ function MobileGameCard({
     return <CompletedMobileGameCard game={game} games={games} onEdit={onEdit} />;
   }
 
+  function handleDragStart(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragTargetRef.current = game.id;
+    document.body.classList.add("mobile-game-drag-active");
+    onDragStart(game.id);
+    onDragOver(game.id);
+  }
+
+  function handleDragMove(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragging) {
+      return;
+    }
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-mobile-game-id]");
+    const targetGameId = target?.dataset.mobileGameId ?? null;
+    dragTargetRef.current = targetGameId;
+    onDragOver(targetGameId);
+  }
+
+  function handleDragEnd(event: React.PointerEvent<HTMLButtonElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.classList.remove("mobile-game-drag-active");
+    onDragEnd(game.id, dragTargetRef.current);
+    dragTargetRef.current = null;
+  }
+
   return (
-    <article className={mobileGameCardClass(game, saveState)}>
+    <article className={mobileGameCardClass(game, saveState, dragging, dragOver, canDrop)} data-mobile-game-id={game.id}>
       <div className="mobile-game-assignment">
+        <button
+          type="button"
+          className="mobile-drag-handle"
+          aria-label={`Spiel ${game.number} verschieben`}
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
+          disabled={saveState === "saving"}
+        >
+          ≡
+        </button>
         <strong className="mobile-game-number">{game.number || "-"}</strong>
         <span className="mobile-assignment-label">Court</span>
         <div className="mobile-court-buttons" role="group" aria-label={`Court fuer Spiel ${game.number}`}>
@@ -2333,7 +2445,11 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
 }
 
 function sortGames(games: Game[]) {
-  return [...games].sort((left, right) => gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de"));
+  return [...games].sort((left, right) => gameOrderSortKey(left) - gameOrderSortKey(right) || left.number.localeCompare(right.number, "de", { numeric: true }));
+}
+
+function gameOrderSortKey(game: Game) {
+  return game.display_order ?? gameNumberSortKey(game.number);
 }
 
 function numericCourtOptions(games: Game[], tournament: Tournament | null = null): string[] {
@@ -2376,7 +2492,7 @@ function uniqueAssignmentValues(values: Array<string | null | undefined>) {
     .filter((value): value is string => Boolean(value) && value !== "(Freilos)" && !isLegacyPreviousGameReferee(value)))];
 }
 
-function mobileGameCardClass(game: Game, saveState: "idle" | "saving" | "saved") {
+function mobileGameCardClass(game: Game, saveState: "idle" | "saving" | "saved", dragging = false, dragOver = false, canDrop = false) {
   return [
     "mobile-game-card",
     `court-${courtLabel(game.court).toLowerCase()}`,
@@ -2385,6 +2501,9 @@ function mobileGameCardClass(game: Game, saveState: "idle" | "saving" | "saved")
     game.dirty ? "dirty-row" : "",
     saveState === "saving" ? "saving" : "",
     saveState === "saved" ? "saved" : "",
+    dragging ? "dragging" : "",
+    dragOver ? "drag-over" : "",
+    dragOver && canDrop ? "drop-allowed" : "",
   ].filter(Boolean).join(" ").replace("court--", "court-none");
 }
 
