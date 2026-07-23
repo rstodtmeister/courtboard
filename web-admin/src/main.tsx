@@ -2535,11 +2535,37 @@ function displayCourts(tournament: Tournament | null, games: Game[] = []) {
 }
 
 function sortGames(games: Game[]) {
-  return [...games].sort((left, right) => gameOrderSortKey(left) - gameOrderSortKey(right) || left.number.localeCompare(right.number, "de", { numeric: true }));
+  const sorted = [...games].sort(compareGameNumbers);
+  const indexesByCourt = new Map<string, number[]>();
+  const gamesByCourt = new Map<string, Game[]>();
+
+  sorted.forEach((game, index) => {
+    const court = (game.court ?? "").trim();
+    if (!court || isCompleted(game)) {
+      return;
+    }
+    indexesByCourt.set(court, [...(indexesByCourt.get(court) ?? []), index]);
+    gamesByCourt.set(court, [...(gamesByCourt.get(court) ?? []), game]);
+  });
+
+  for (const [court, courtGames] of gamesByCourt) {
+    const orderedCourtGames = [...courtGames].sort((left, right) =>
+      gameOrderSortKey(left) - gameOrderSortKey(right) || compareGameNumbers(left, right)
+    );
+    indexesByCourt.get(court)?.forEach((index, orderIndex) => {
+      sorted[index] = orderedCourtGames[orderIndex];
+    });
+  }
+
+  return sorted;
 }
 
 function gameOrderSortKey(game: Game) {
   return game.display_order ?? gameNumberSortKey(game.number);
+}
+
+function compareGameNumbers(left: Game, right: Game) {
+  return gameNumberSortKey(left.number) - gameNumberSortKey(right.number) || left.number.localeCompare(right.number, "de", { numeric: true });
 }
 
 function numericCourtOptions(games: Game[], tournament: Tournament | null = null): string[] {
