@@ -730,6 +730,38 @@ tbody tr:nth-child(even) {
   width: 82px;
 }
 
+.drag-cell {
+  width: 42px;
+  text-align: center;
+}
+
+.desktop-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-color: #c8d0dc;
+  border-radius: 5px;
+  padding: 0;
+  background: #ffffff;
+  color: #59616c;
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: grab;
+}
+
+.desktop-drag-handle:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.desktop-drag-handle:active {
+  cursor: grabbing;
+}
+
 .select-cell {
   width: 44px;
   text-align: center;
@@ -1229,6 +1261,20 @@ tbody tr:nth-child(even) {
 
 .dirty-row {
   background: #fffdf6;
+}
+
+.dragging-row {
+  opacity: .62;
+}
+
+.drag-over-row {
+  outline: 2px dashed #c8d0dc;
+  outline-offset: -2px;
+}
+
+.drop-allowed-row {
+  outline-color: #1f4ea0;
+  background: #f4f8ff;
 }
 
 .row-actions {

@@ -1772,6 +1772,7 @@ function GamesEditor({
         <table className="edit-table">
           <thead>
             <tr>
+              <th className="drag-cell" aria-label="Reihenfolge"></th>
               <th className="select-cell">
                 <input
                   type="checkbox"
@@ -1801,6 +1802,12 @@ function GamesEditor({
                 onSave={onSave}
                 onEdit={setEditingGame}
                 onUnlockGame={onUnlockGame}
+                dragging={draggingGameId === game.id}
+                dragOver={dragOverGameId === game.id && draggingGameId !== game.id}
+                canDrop={Boolean(draggingGameId && isAssignedCourt(game.court) && games.find((item) => item.id === draggingGameId)?.court === game.court)}
+                onDragStart={setDraggingGameId}
+                onDragOver={setDragOverGameId}
+                onDragEnd={moveGameOrder}
               />
             ))}
           </tbody>
@@ -2023,6 +2030,12 @@ function GameEditorRow({
   onSave,
   onEdit,
   onUnlockGame,
+  dragging,
+  dragOver,
+  canDrop,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
 }: {
   game: Game;
   games: Game[];
@@ -2032,14 +2045,62 @@ function GameEditorRow({
   onSave: (game: Game, draft: GameDraft) => Promise<boolean>;
   onEdit: (game: Game) => void;
   onUnlockGame: (gameId: string) => Promise<void>;
+  dragging: boolean;
+  dragOver: boolean;
+  canDrop: boolean;
+  onDragStart: (gameId: string) => void;
+  onDragOver: (gameId: string | null) => void;
+  onDragEnd: (sourceGameId: string, targetGameId: string | null) => void;
 }) {
   const completed = isCompleted(game);
+  const draggable = !completed && isAssignedCourt(game.court);
   async function updateAssignment(key: "court" | "referee", value: string) {
     await onSave(game, { ...draftFromGame(game), [key]: value });
   }
 
+  function handleDragStart(event: React.DragEvent<HTMLButtonElement>) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", game.id);
+    onDragStart(game.id);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLTableRowElement>) {
+    if (!draggable) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = canDrop ? "move" : "none";
+    onDragOver(game.id);
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLTableRowElement>) {
+    event.preventDefault();
+    onDragEnd(event.dataTransfer.getData("text/plain"), game.id);
+  }
+
+  function handleDragEnd() {
+    onDragEnd(game.id, null);
+  }
+
   return (
-    <tr className={game.dirty ? "dirty-row" : ""}>
+    <tr
+      className={gameRowClass(game, dragging, dragOver, canDrop)}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <td className="drag-cell">
+        <button
+          type="button"
+          className="desktop-drag-handle"
+          aria-label={`Spiel ${game.number} verschieben`}
+          draggable={draggable}
+          disabled={!draggable}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          ≡
+        </button>
+      </td>
       <td className="select-cell">
         <input
           type="checkbox"
@@ -2490,6 +2551,15 @@ function uniqueAssignmentValues(values: Array<string | null | undefined>) {
   return [...new Set(values
     .map((value) => (value ?? "").trim())
     .filter((value): value is string => Boolean(value) && value !== "(Freilos)" && !isLegacyPreviousGameReferee(value)))];
+}
+
+function gameRowClass(game: Game, dragging = false, dragOver = false, canDrop = false) {
+  return [
+    game.dirty ? "dirty-row" : "",
+    dragging ? "dragging-row" : "",
+    dragOver ? "drag-over-row" : "",
+    dragOver && canDrop ? "drop-allowed-row" : "",
+  ].filter(Boolean).join(" ");
 }
 
 function mobileGameCardClass(game: Game, saveState: "idle" | "saving" | "saved", dragging = false, dragOver = false, canDrop = false) {
