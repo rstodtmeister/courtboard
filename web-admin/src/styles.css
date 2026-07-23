@@ -1359,6 +1359,36 @@ tbody tr:nth-child(even) {
   color: #303846;
 }
 
+.hvv-progress-dialog {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  width: min(460px, 100%);
+}
+
+.hvv-progress-dialog h3 {
+  padding-right: 0;
+}
+
+.hvv-progress-dialog p {
+  margin: 4px 0 0;
+  color: #59616c;
+}
+
+.hvv-progress-spinner {
+  width: 34px;
+  height: 34px;
+  border: 4px solid #dde3ec;
+  border-top-color: #1f4ea0;
+  border-radius: 999px;
+  animation: hvv-progress-spin .8s linear infinite;
+}
+
+@keyframes hvv-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .game-edit-dialog {
   width: min(620px, 100%);
   max-height: calc(100vh - 48px);

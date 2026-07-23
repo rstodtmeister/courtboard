@@ -277,6 +277,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
   const [showHvvTournamentDialog, setShowHvvTournamentDialog] = useState(false);
   const [hvvTournamentOptions, setHvvTournamentOptions] = useState<HvvTournamentOption[]>([]);
   const [loadingHvvTournaments, setLoadingHvvTournaments] = useState(false);
+  const [hvvProgressMessage, setHvvProgressMessage] = useState("");
   const isSuperadmin = session.user.role === "superadmin";
 
   const loadDashboard = useCallback(async (options: { silent?: boolean; initial?: boolean } = {}) => {
@@ -495,6 +496,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       return;
     }
     setSyncing(true);
+    setHvvProgressMessage("Spiele werden aus HVV geladen. Das kann einen Moment dauern.");
     setError("");
     setMessage("");
     try {
@@ -503,6 +505,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       setError(syncError instanceof Error ? syncError.message : "Spiele konnten nicht geladen werden.");
     } finally {
       setSyncing(false);
+      setHvvProgressMessage("");
     }
   }
 
@@ -558,6 +561,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
 
     setHvvTournamentSelectionMode(mode);
     setLoadingHvvTournaments(true);
+    setHvvProgressMessage(mode === "create" ? "HVV-Turniere werden geladen." : "HVV-Turnierliste wird geladen.");
     setError("");
     setMessage("");
     try {
@@ -571,6 +575,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       setError(loadError instanceof Error ? loadError.message : "HVV-Turniere konnten nicht geladen werden.");
     } finally {
       setLoadingHvvTournaments(false);
+      setHvvProgressMessage("");
     }
   }
 
@@ -595,6 +600,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
     if (hvvTournamentSelectionMode === "create" || !tournament) {
       let created: Tournament;
       try {
+        setHvvProgressMessage("Turnier wird angelegt.");
         created = await createTournament(nextTournament);
         setTournaments((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name, "de")));
         setTournament(created);
@@ -605,16 +611,20 @@ function AdminDashboard({ session }: { session: AppSession }) {
       } catch (createError) {
         setError(createError instanceof Error ? createError.message : "HVV-Turnier konnte nicht importiert werden.");
         return;
+      } finally {
+        setHvvProgressMessage("");
       }
 
       try {
         setSyncing(true);
+        setHvvProgressMessage("Spiele werden aus HVV importiert. Das kann einen Moment dauern.");
         await loadGamesFromHvv(created.id, true);
         setActiveTab("games");
       } catch (syncError) {
         setError(syncError instanceof Error ? syncError.message : "HVV-Turnier importiert, aber Spiele konnten nicht geladen werden.");
       } finally {
         setSyncing(false);
+        setHvvProgressMessage("");
       }
       return;
     }
@@ -623,11 +633,13 @@ function AdminDashboard({ session }: { session: AppSession }) {
     if (saved) {
       try {
         setSyncing(true);
+        setHvvProgressMessage("Spiele werden aus HVV geladen. Das kann einen Moment dauern.");
         await loadGamesFromHvv(tournament.id, true);
       } catch (syncError) {
         setError(syncError instanceof Error ? syncError.message : "Spiele konnten nicht geladen werden.");
       } finally {
         setSyncing(false);
+        setHvvProgressMessage("");
       }
     }
   }
@@ -644,6 +656,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       return;
     }
     setPushingHvv(true);
+    setHvvProgressMessage("Änderungen werden an HVV übertragen.");
     setError("");
     setMessage("");
     try {
@@ -662,6 +675,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
       setError(pushError instanceof Error ? pushError.message : "Geaenderte Spiele konnten nicht an HVV uebertragen werden.");
     } finally {
       setPushingHvv(false);
+      setHvvProgressMessage("");
     }
   }
 
@@ -936,6 +950,7 @@ function AdminDashboard({ session }: { session: AppSession }) {
           onClose={() => setShowHvvTournamentDialog(false)}
         />
       )}
+      {hvvProgressMessage && <HvvProgressDialog message={hvvProgressMessage} />}
     </section>
   );
 }
@@ -995,6 +1010,20 @@ function AdminTabs({
         </button>
       ))}
     </nav>
+  );
+}
+
+function HvvProgressDialog({ message }: { message: string }) {
+  return (
+    <div className="app-dialog-backdrop" role="presentation">
+      <section className="app-dialog hvv-progress-dialog" role="status" aria-live="polite" aria-label="HVV Vorgang laeuft">
+        <div className="hvv-progress-spinner" aria-hidden="true" />
+        <div>
+          <h3>HVV wird geladen</h3>
+          <p>{message}</p>
+        </div>
+      </section>
+    </div>
   );
 }
 
