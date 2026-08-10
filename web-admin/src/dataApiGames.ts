@@ -14,7 +14,7 @@ export async function listGames(tournamentId?: string): Promise<Game[]> {
   const tournament = tournamentId ? { id: tournamentId } : await getPrimaryTournament();
   const { data, error } = await getSupabase()
     .from("games")
-    .select(gameSelect)
+    .select(`${gameSelect},score_blocked_device,score_blocked_until`)
     .eq("tournament_id", tournament.id)
     .order("number", { ascending: true });
 

@@ -29,6 +29,8 @@ export type Game = {
   point_history?: string | null;
   score_locked_by_device?: string | null;
   score_locked_at?: string | null;
+  score_blocked_device?: string | null;
+  score_blocked_until?: string | null;
 };
 
 export type Tournament = {

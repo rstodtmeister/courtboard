@@ -28,7 +28,7 @@ import type { PdfSheetType } from "../pdfExport";
 import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreLink, Tournament } from "../types";
 import type { AdminTab } from "../workflowTypes";
 import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournamentDialog, sortHvvTournamentsByDate, TournamentPanel, AdminUsersPanel } from "./dashboardSections";
-import { GamesEditor, isAssignedCourt, isCompleted, resolvedReferee, sortGames } from "./GamesEditor";
+import { GamesEditor, hasActiveScoreDeviceBlock, isAssignedCourt, isCompleted, resolvedReferee, sortGames } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
 
 type PendingHvvAction = "sync" | "selectTournament" | "importTournament" | "pushDirtyGames" | null;
@@ -222,7 +222,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
 
     try {
       await disableScoreLink(linkId);
-      const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
+      const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && (game.score_locked_by_device || hasActiveScoreDeviceBlock(game)));
       if (lockedGame) {
         await unlockScoreGame(lockedGame.id);
       }
@@ -253,7 +253,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
   }
 
   async function unlockCourt(court: string) {
-    const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && game.score_locked_by_device);
+    const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && (game.score_locked_by_device || hasActiveScoreDeviceBlock(game)));
     if (!lockedGame) {
       setMessage(`Court ${court} ist frei.`);
       return;

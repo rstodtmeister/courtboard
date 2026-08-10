@@ -272,12 +272,10 @@ public class LocalApiServer {
             return;
         }
         synchronized (game) {
-            if (!game.scoreLockedByDevice.isBlank()) {
-                game.scoreBlockedDevice = game.scoreLockedByDevice;
-                game.scoreBlockedUntil = java.time.Instant.now().plusSeconds(5 * 60).toString();
-            }
             game.scoreLockedByDevice = "";
             game.scoreLockedAt = "";
+            game.scoreBlockedDevice = "";
+            game.scoreBlockedUntil = "";
         }
         writeJson(exchange, 200, "{\"ok\":true}");
     }
@@ -325,6 +323,9 @@ public class LocalApiServer {
                 writeJson(exchange, 400, "{\"error\":" + LocalApiJson.jsonString(exception.getMessage()) + "}");
                 return;
             }
+            if (game.completed && !link.court.isBlank() && link.gameId.isBlank()) {
+                blockDeviceForNextCourtGame(link, game, deviceId);
+            }
             if (game.scoreLockedByDevice.isBlank() && !game.completed) {
                 game.scoreLockedByDevice = deviceId;
                 game.scoreLockedAt = java.time.Instant.now().toString();
@@ -332,6 +333,19 @@ public class LocalApiServer {
         }
         link.usedAt = java.time.Instant.now().toString();
         writeJson(exchange, 200, "{\"ok\":true}");
+    }
+
+    private void blockDeviceForNextCourtGame(LinkState link, GameState completedGame, String deviceId) {
+        for (GameState candidate : allowedGames(link)) {
+            if (candidate == completedGame || candidate.completed) {
+                continue;
+            }
+            synchronized (candidate) {
+                candidate.scoreBlockedDevice = deviceId;
+                candidate.scoreBlockedUntil = java.time.Instant.now().plusSeconds(5 * 60).toString();
+            }
+            return;
+        }
     }
 
     private void handleQr(HttpExchange exchange) throws IOException {

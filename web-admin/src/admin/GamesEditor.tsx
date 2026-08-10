@@ -815,6 +815,14 @@ export function isCompleted(game: Game) {
   return Boolean(game.completed || isSpecialRating(game.game_rating));
 }
 
+export function hasActiveScoreDeviceBlock(game: Game) {
+  if (!game.score_blocked_device || !game.score_blocked_until) {
+    return false;
+  }
+  const blockedUntil = Date.parse(game.score_blocked_until);
+  return Number.isFinite(blockedUntil) && blockedUntil > Date.now();
+}
+
 function isCompletedDraft(draft: GameDraft) {
   return Boolean(draft.completed || isSpecialRating(draft.game_rating));
 }

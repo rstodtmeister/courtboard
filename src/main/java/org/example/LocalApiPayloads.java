@@ -70,7 +70,9 @@ final class LocalApiPayloads {
                 .append("\"completed\":").append(game.completed).append(',')
                 .append("\"point_history\":").append(LocalApiJson.jsonString(game.pointHistory.isBlank() ? null : game.pointHistory)).append(',')
                 .append("\"score_locked_by_device\":").append(LocalApiJson.jsonString(game.scoreLockedByDevice.isBlank() ? null : game.scoreLockedByDevice)).append(',')
-                .append("\"score_locked_at\":").append(LocalApiJson.jsonString(game.scoreLockedAt.isBlank() ? null : game.scoreLockedAt))
+                .append("\"score_locked_at\":").append(LocalApiJson.jsonString(game.scoreLockedAt.isBlank() ? null : game.scoreLockedAt)).append(',')
+                .append("\"score_blocked_device\":").append(LocalApiJson.jsonString(game.scoreBlockedDevice.isBlank() ? null : game.scoreBlockedDevice)).append(',')
+                .append("\"score_blocked_until\":").append(LocalApiJson.jsonString(game.scoreBlockedUntil.isBlank() ? null : game.scoreBlockedUntil))
                 .append('}')
                 .toString();
     }
@@ -115,7 +117,9 @@ final class LocalApiPayloads {
                 .append("\"completed\":").append(game.completed).append(',')
                 .append("\"point_history\":").append(LocalApiJson.jsonString(game.pointHistory.isBlank() ? null : game.pointHistory)).append(',')
                 .append("\"score_locked_by_device\":").append(LocalApiJson.jsonString(game.scoreLockedByDevice.isBlank() ? null : "locked")).append(',')
-                .append("\"score_locked_at\":null")
+                .append("\"score_locked_at\":null,")
+                .append("\"score_blocked_device\":").append(LocalApiJson.jsonString(game.scoreBlockedDevice.isBlank() ? null : "blocked")).append(',')
+                .append("\"score_blocked_until\":").append(LocalApiJson.jsonString(game.scoreBlockedUntil.isBlank() ? null : game.scoreBlockedUntil))
                 .append('}')
                 .toString();
     }

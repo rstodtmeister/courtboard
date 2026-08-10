@@ -103,6 +103,8 @@ export async function unlockScoreGame(gameId: string): Promise<void> {
     .update({
       score_locked_by_device: null,
       score_locked_at: null,
+      score_blocked_device: null,
+      score_blocked_until: null,
     })
     .eq("id", gameId);
 
