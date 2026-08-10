@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -30,6 +31,7 @@ public class LocalApiServer {
     private final String adminSessionKey;
     private final List<GameState> games = new ArrayList<>();
     private final List<LinkState> links = new ArrayList<>();
+    private final Map<String, CourtLockState> courtLocks = new HashMap<>();
 
     public LocalApiServer(int port) {
         this.port = port;
@@ -94,6 +96,9 @@ public class LocalApiServer {
             }
             synchronized (games) {
                 games.clear();
+                synchronized (courtLocks) {
+                    courtLocks.clear();
+                }
                 for (GameRow row : rows) {
                     games.add(new GameState(row));
                 }
@@ -266,17 +271,23 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        GameState game = findGame(LocalApiJson.jsonField(body, "gameId"));
+        String gameId = LocalApiJson.jsonField(body, "gameId");
+        String tournamentId = LocalApiJson.jsonField(body, "tournamentId");
+        String court = LocalApiJson.jsonField(body, "court");
+        GameState game = findGame(gameId);
+        if (game == null && !court.isBlank()) {
+            for (GameState candidate : allGames()) {
+                if (candidate.court.equals(court) && (tournamentId.isBlank() || candidate.tournamentId.equals(tournamentId))) {
+                    game = candidate;
+                    break;
+                }
+            }
+        }
         if (game == null) {
-            writeJson(exchange, 404, "{\"error\":\"Spiel nicht gefunden\"}");
+            writeJson(exchange, 404, "{\"error\":\"Court oder Spiel nicht gefunden\"}");
             return;
         }
-        synchronized (game) {
-            game.scoreLockedByDevice = "";
-            game.scoreLockedAt = "";
-            game.scoreBlockedDevice = "";
-            game.scoreBlockedUntil = "";
-        }
+        clearCourtLock(game);
         writeJson(exchange, 200, "{\"ok\":true}");
     }
 
@@ -304,13 +315,15 @@ public class LocalApiServer {
             return;
         }
         String deviceId = LocalApiJson.jsonField(body, "deviceId");
-        synchronized (game) {
+        synchronized (courtLocks) {
+          synchronized (game) {
             if (deviceId.isBlank()) {
                 writeJson(exchange, 403, "{\"error\":\"Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen.\"}");
                 return;
             }
-            if (isScoreDeviceBlocked(game, deviceId)) {
-                writeJson(exchange, 423, "{\"error\":\"Keine Eingabe moeglich. Bitte beim Admin melden.\"}");
+            String courtError = acquireCourtLock(game, deviceId);
+            if (!courtError.isBlank()) {
+                writeJson(exchange, 423, "{\"error\":" + LocalApiJson.jsonString(courtError) + "}");
                 return;
             }
             if (!game.scoreLockedByDevice.isBlank() && !game.scoreLockedByDevice.equals(deviceId)) {
@@ -323,20 +336,35 @@ public class LocalApiServer {
                 writeJson(exchange, 400, "{\"error\":" + LocalApiJson.jsonString(exception.getMessage()) + "}");
                 return;
             }
-            if (game.completed && !link.court.isBlank() && link.gameId.isBlank()) {
-                blockDeviceForNextCourtGame(link, game, deviceId);
+            if (game.completed && !game.court.isBlank()) {
+                completeCourtLock(game, deviceId);
             }
             if (game.scoreLockedByDevice.isBlank() && !game.completed) {
                 game.scoreLockedByDevice = deviceId;
                 game.scoreLockedAt = java.time.Instant.now().toString();
             }
+          }
         }
         link.usedAt = java.time.Instant.now().toString();
         writeJson(exchange, 200, "{\"ok\":true}");
     }
 
-    private void blockDeviceForNextCourtGame(LinkState link, GameState completedGame, String deviceId) {
-        for (GameState candidate : allowedGames(link)) {
+    private void completeCourtLock(GameState completedGame, String deviceId) {
+        CourtLockState lock = courtLocks.computeIfAbsent(courtKey(completedGame), ignored -> new CourtLockState());
+        lock.activeGameId = "";
+        lock.activeDeviceId = "";
+        lock.lockedAt = null;
+        lock.blockedDeviceId = deviceId;
+        lock.blockedUntil = java.time.Instant.now().plusSeconds(5 * 60);
+        clearLegacyCourtState(completedGame);
+        List<GameState> candidates = allGames();
+        candidates.sort(Comparator
+                .comparingInt((GameState game) -> gameOrderSortKey(game))
+                .thenComparing(game -> game.number, String.CASE_INSENSITIVE_ORDER));
+        for (GameState candidate : candidates) {
+            if (!candidate.tournamentId.equals(completedGame.tournamentId) || !candidate.court.equals(completedGame.court)) {
+                continue;
+            }
             if (candidate == completedGame || candidate.completed) {
                 continue;
             }
@@ -568,19 +596,58 @@ public class LocalApiServer {
             }
         }
 
-        synchronized (game) {
-            if (isScoreDeviceBlocked(game, deviceId)) {
-                return LockedGamesResult.error(423, "Keine Eingabe moeglich. Bitte beim Admin melden.");
-            }
-            if (!game.scoreLockedByDevice.isBlank() && !game.scoreLockedByDevice.equals(deviceId)) {
-                return LockedGamesResult.error(423, "Dieses Spiel wird bereits auf einem anderen Geraet erfasst.");
-            }
-            if (game.scoreLockedByDevice.isBlank() && !game.completed) {
-                game.scoreLockedByDevice = deviceId;
-                game.scoreLockedAt = java.time.Instant.now().toString();
+        synchronized (courtLocks) {
+            synchronized (game) {
+                String courtError = acquireCourtLock(game, deviceId);
+                if (!courtError.isBlank()) {
+                    return LockedGamesResult.error(423, courtError);
+                }
             }
         }
         return LockedGamesResult.ok(List.of(game));
+    }
+
+    private String acquireCourtLock(GameState game, String deviceId) {
+        CourtLockState lock = courtLocks.computeIfAbsent(courtKey(game), ignored -> new CourtLockState());
+        java.time.Instant now = java.time.Instant.now();
+        if (deviceId.equals(lock.blockedDeviceId) && lock.blockedUntil != null && now.isBefore(lock.blockedUntil)) {
+            return "Keine Eingabe moeglich. Bitte beim Admin melden.";
+        }
+        boolean active = lock.lockedAt != null && now.isBefore(lock.lockedAt.plusSeconds(30 * 60));
+        if (active && (!deviceId.equals(lock.activeDeviceId) || !game.id.equals(lock.activeGameId))) {
+            return "Dieser Court wird bereits auf einem anderen Geraet erfasst.";
+        }
+        clearLegacyCourtState(game);
+        lock.activeGameId = game.id;
+        lock.activeDeviceId = deviceId;
+        lock.lockedAt = now;
+        lock.blockedDeviceId = "";
+        lock.blockedUntil = null;
+        game.scoreLockedByDevice = deviceId;
+        game.scoreLockedAt = now.toString();
+        return "";
+    }
+
+    private void clearCourtLock(GameState game) {
+        synchronized (courtLocks) {
+            courtLocks.remove(courtKey(game));
+            clearLegacyCourtState(game);
+        }
+    }
+
+    private void clearLegacyCourtState(GameState game) {
+        for (GameState candidate : allGames()) {
+            if (candidate.tournamentId.equals(game.tournamentId) && candidate.court.equals(game.court)) {
+                candidate.scoreLockedByDevice = "";
+                candidate.scoreLockedAt = "";
+                candidate.scoreBlockedDevice = "";
+                candidate.scoreBlockedUntil = "";
+            }
+        }
+    }
+
+    private static String courtKey(GameState game) {
+        return game.tournamentId + "\u0000" + game.court.trim();
     }
 
     private boolean isScoreDeviceBlocked(GameState game, String deviceId) {
@@ -598,6 +665,14 @@ public class LocalApiServer {
         game.scoreBlockedDevice = "";
         game.scoreBlockedUntil = "";
         return false;
+    }
+
+    private static final class CourtLockState {
+        String activeGameId = "";
+        String activeDeviceId = "";
+        java.time.Instant lockedAt;
+        String blockedDeviceId = "";
+        java.time.Instant blockedUntil;
     }
 
     private boolean isAllowed(LinkState link, GameState game) {

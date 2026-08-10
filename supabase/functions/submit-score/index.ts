@@ -112,9 +112,27 @@ Deno.serve(async (req) => {
     }
 
     const candidateGames = sortGames(games ?? []);
-    const lockGame = link.court && !link.game_id
+    let lockGame = link.court && !link.game_id
       ? candidateGames.find((game) => !game.completed)
       : candidateGames[0];
+
+    if (link.court && !link.game_id && deviceId) {
+      const { data: courtLock, error: courtLockError } = await adminClient
+        .from("score_court_locks")
+        .select("active_game_id,active_device_id,locked_at")
+        .eq("tournament_id", link.tournament_id)
+        .eq("court", link.court.trim())
+        .maybeSingle();
+      if (courtLockError) {
+        return jsonResponse({ error: courtLockError.message }, 500);
+      }
+      const lockedAt = courtLock?.locked_at ? new Date(courtLock.locked_at).getTime() : 0;
+      const sameDeviceLockIsActive = courtLock?.active_device_id === deviceId
+        && lockedAt >= Date.now() - 30 * 60 * 1000;
+      if (sameDeviceLockIsActive) {
+        lockGame = candidateGames.find((game) => game.id === courtLock.active_game_id && !game.completed) ?? lockGame;
+      }
+    }
 
     if (lockGame && !lockGame.completed) {
       if (!deviceId) {

@@ -98,16 +98,28 @@ export async function unlockScoreGame(gameId: string): Promise<void> {
     return;
   }
 
-  const { error } = await getSupabase()
-    .from("games")
-    .update({
-      score_locked_by_device: null,
-      score_locked_at: null,
-      score_blocked_device: null,
-      score_blocked_until: null,
-    })
-    .eq("id", gameId);
+  const { error } = await getSupabase().rpc("unlock_score_game_lock", {
+    p_game_id: gameId,
+  });
 
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unlockScoreCourt(tournamentId: string, court: string): Promise<void> {
+  if (dataMode === "local") {
+    await localAdminJson<{ ok: boolean }>("/api/score-entry/unlock", {
+      method: "POST",
+      body: JSON.stringify({ tournamentId, court }),
+    });
+    return;
+  }
+
+  const { error } = await getSupabase().rpc("unlock_score_court", {
+    p_tournament_id: tournamentId,
+    p_court: court,
+  });
   if (error) {
     throw new Error(error.message);
   }

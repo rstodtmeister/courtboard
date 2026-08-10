@@ -19,6 +19,7 @@ import {
   setHvvCredentials,
   syncGamesFromHvv,
   unlockScoreGame,
+  unlockScoreCourt,
   updateAdminUser,
   updateGameDisplayOrders,
 } from "../dataApi";
@@ -254,12 +255,15 @@ export function AdminDashboard({ session }: { session: AppSession }) {
   }
 
   async function unlockCourt(court: string) {
-    const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && (game.score_locked_by_device || hasActiveScoreDeviceBlock(game)));
-    if (!lockedGame) {
-      setMessage(`Court ${court} ist frei.`);
-      return;
+    setError("");
+    setMessage("");
+    try {
+      await unlockScoreCourt(selectedTournamentId, court);
+      setGames(await listGames(selectedTournamentId));
+      setMessage(`Court ${court} wurde entsperrt.`);
+    } catch (unlockError) {
+      setError(unlockError instanceof Error ? unlockError.message : "Court konnte nicht entsperrt werden.");
     }
-    await unlockGame(lockedGame.id);
   }
 
   async function saveCourtStream(court: string, value: string) {

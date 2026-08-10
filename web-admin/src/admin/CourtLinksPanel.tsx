@@ -106,7 +106,7 @@ export function CourtLinksPanel({
                   QR-Code erzeugen
                 </button>
               )}
-              <button type="button" className="secondary" onClick={() => onUnlockCourt(entry.court)} disabled={!lockedGame}>
+              <button type="button" className="secondary" onClick={() => onUnlockCourt(entry.court)}>
                 Court entsperren
               </button>
               {link && value && (
