@@ -160,10 +160,17 @@ export async function requestPasswordReset(email: string): Promise<{ error?: str
     return { error: "Passwort-Reset ist im lokalen Modus nicht verfuegbar." };
   }
 
-  const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
-    redirectTo: `${loginUrl()}?auth=recover`,
-  });
-  return error ? { error: error.message } : {};
+  try {
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
+      redirectTo: `${loginUrl()}?auth=recover`,
+    });
+    return error ? { error: error.message } : {};
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unbekannter Fehler";
+    return {
+      error: `Reset-E-Mail konnte nicht angefordert werden (${detail}). Pruefe VITE_SUPABASE_URL, Netzwerkzugriff und die erlaubte Redirect-URL ?auth=recover in Supabase Auth.`,
+    };
+  }
 }
 
 export async function setAdminPassword(password: string): Promise<{ error?: string }> {
