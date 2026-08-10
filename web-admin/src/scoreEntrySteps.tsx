@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { gameRatingOptions, noRefereeSelection, specialGameRatingOptions } from "./appConfig";
 import { completedSetRows, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, secondServer, serviceOrder, setScoreForSide } from "./scoreLogic";
-import { completedResultParts, completedWinnerSide, playersForTeam, setPointClass, shortTeamLabel, teamOptions } from "./scoreEntryHelpers";
+import { completedResultParts, completedWinnerSide, playersForTeam, setPointClass, shortTeamLabel, sortRefereeOptions, teamOptions } from "./scoreEntryHelpers";
 import type { Game, GameDraft } from "./types";
 import type { LiveSnapshot, ScoreEntryResumeState, ServerSetupStep, TeamKey } from "./workflowTypes";
 
@@ -69,9 +69,10 @@ export function RefereeSelectStep({
   const [selectedReferee, setSelectedReferee] = useState(draft.referee || game.referee || "");
   const options = (allTeams.length > 0 ? allTeams : teamOptions(games))
     .filter((team) => team !== game.team_a && team !== game.team_b);
-  const selectableOptions = selectedReferee && selectedReferee !== noRefereeSelection && !options.includes(selectedReferee)
-    ? [selectedReferee, ...options]
-    : options;
+  const selectableOptions = sortRefereeOptions([
+    ...(selectedReferee && selectedReferee !== noRefereeSelection ? [selectedReferee] : []),
+    ...options,
+  ]);
   const refereeValue = selectedReferee === noRefereeSelection ? "" : selectedReferee;
   const resultOnly = selectedReferee === noRefereeSelection;
 

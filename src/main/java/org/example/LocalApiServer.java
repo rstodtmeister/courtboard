@@ -471,7 +471,9 @@ public class LocalApiServer {
     }
 
     private List<String> allTeamNames() {
-        java.util.TreeSet<String> teams = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        java.util.TreeSet<String> teams = new java.util.TreeSet<>(Comparator
+                .comparing(LocalApiServer::isUnresolvedTeamReference)
+                .thenComparing(String.CASE_INSENSITIVE_ORDER));
         for (GameState game : allGames()) {
             if (!game.teamA.isBlank() && !"(Freilos)".equalsIgnoreCase(game.teamA)) {
                 teams.add(game.teamA);
@@ -481,6 +483,13 @@ public class LocalApiServer {
             }
         }
         return new ArrayList<>(teams);
+    }
+
+    private static boolean isUnresolvedTeamReference(String value) {
+        String normalized = value == null ? "" : value.trim();
+        return normalized.matches("(?i).*\\b(?:gewinner|sieger|verlierer)\\s+(?:(?:aus|von)\\s+)?(?:spiel|match|partie)\\b.*")
+                || normalized.matches("(?i).*\\b(?:pool|gruppe)\\s+[a-z0-9-]+\\s+(?:platz|rang)\\s*\\d+\\b.*")
+                || normalized.matches("(?i).*\\b(?:platz|rang)\\s*\\d+\\s+(?:(?:aus|von)\\s+)?(?:pool|gruppe)\\b.*");
     }
 
     private List<GameState> allowedGames(LinkState link) {

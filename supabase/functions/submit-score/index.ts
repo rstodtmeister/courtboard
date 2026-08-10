@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
       .flatMap((game) => [game.team_a, game.team_b])
       .map((team) => (team ?? "").trim())
       .filter((team) => team && team !== "(Freilos)"))]
-      .sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
+      .sort(refereeOptionComparator);
 
     const responseGames = link.court && !link.game_id
       ? (lockGame ? [lockGame] : [])
@@ -283,4 +283,15 @@ function scoreDatabaseError(message: string) {
     return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
   }
   return jsonResponse({ error: message }, 500);
+}
+
+function refereeOptionComparator(left: string, right: string) {
+  return Number(isUnresolvedTeamReference(left)) - Number(isUnresolvedTeamReference(right))
+    || left.localeCompare(right, "de", { numeric: true });
+}
+
+function isUnresolvedTeamReference(value: string) {
+  return /\b(?:gewinner|sieger|verlierer)\s+(?:(?:aus|von)\s+)?(?:spiel|match|partie)\b/i.test(value)
+    || /\b(?:pool|gruppe)\s+[a-z0-9-]+\s+(?:platz|rang)\s*\d+\b/i.test(value)
+    || /\b(?:platz|rang)\s*\d+\s+(?:(?:aus|von)\s+)?(?:pool|gruppe)\b/i.test(value);
 }

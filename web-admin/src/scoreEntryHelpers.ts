@@ -34,7 +34,20 @@ export function teamOptions(games: Game[]): string[] {
   const values = games.flatMap((game) => [game.team_a, game.team_b])
     .map((value) => (value ?? "").trim())
     .filter((value): value is string => Boolean(value) && value !== "(Freilos)");
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
+  return sortRefereeOptions(values);
+}
+
+export function sortRefereeOptions(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+    .sort((left, right) => Number(isUnresolvedTeamReference(left)) - Number(isUnresolvedTeamReference(right))
+      || left.localeCompare(right, "de", { numeric: true }));
+}
+
+export function isUnresolvedTeamReference(value: string): boolean {
+  const normalized = value.trim();
+  return /\b(?:gewinner|sieger|verlierer)\s+(?:(?:aus|von)\s+)?(?:spiel|match|partie)\b/i.test(normalized)
+    || /\b(?:pool|gruppe)\s+[a-z0-9-]+\s+(?:platz|rang)\s*\d+\b/i.test(normalized)
+    || /\b(?:platz|rang)\s*\d+\s+(?:(?:aus|von)\s+)?(?:pool|gruppe)\b/i.test(normalized);
 }
 
 export function playersForTeam(team: string | null, players?: string[]) {
