@@ -784,25 +784,11 @@ public class ApplicationWindow extends JFrame {
     }
 
     private void replaceRows(List<RowSelection> rows, DefaultTableModel tableModel, TableRowSorter<DefaultTableModel> sorter, List<RowSelection> refreshedRows) {
-        sorter.setSortKeys(List.of());
-        tableModel.setRowCount(0);
-        for (RowSelection row : refreshedRows) {
-            GameRow gameRow = row.gameRow();
-            tableModel.addRow(tableRow(gameRow));
-        }
-        rows.clear();
-        rows.addAll(refreshedRows);
-        applyDefaultGameSort(sorter);
+        ApplicationWindowGameSupport.replaceRows(rows, tableModel, sorter, refreshedRows, this::applyDefaultGameSort, this::tableRow);
     }
 
     private List<RowSelection> rowSelections(ScrapedPage scrapedPage) {
-        List<RowSelection> rows = new ArrayList<>();
-        for (PageSection section : scrapedPage.sections()) {
-            for (String paragraph : section.paragraphs()) {
-                rows.add(new RowSelection(section.heading(), GameRow.fromParagraph(paragraph)));
-            }
-        }
-        return rows;
+        return ApplicationWindowGameSupport.rowSelections(scrapedPage);
     }
 
     private String loginStatusText(WebPageScraper.LoginStatus loginStatus) {
@@ -814,37 +800,11 @@ public class ApplicationWindow extends JFrame {
     }
 
     private Object[] tableRow(GameRow gameRow) {
-        return new Object[]{
-                Boolean.FALSE,
-                gameRow.number(),
-                gameRow.court(),
-                gameRow.teamA(),
-                gameRow.teamB(),
-                gameRow.referee(),
-                gameRow.result(),
-                printedGameKeys.contains(gameKey(gameRow)) ? "Ja" : "",
-                gameRow.isCompleted() ? "Abgeschlossen" : "",
-                gameRow.gameRating(),
-                gameRow.set1TeamA(),
-                gameRow.set1TeamB(),
-                gameRow.set2TeamA(),
-                gameRow.set2TeamB(),
-                gameRow.set3TeamA(),
-                gameRow.set3TeamB(),
-                "Bearbeiten",
-                gameRow.editUrl().isBlank() ? "Kein Edit-Link" : ""
-        };
+        return ApplicationWindowGameSupport.tableRow(gameRow, COLUMN_SELECTION, COLUMN_STATUS, printedGameKeys.contains(gameKey(gameRow)) ? "Ja" : "");
     }
 
     private boolean isQuickEditColumn(int column) {
-        return column == COLUMN_COURT
-                || column == COLUMN_GAME_RATING
-                || column == COLUMN_SET_1_TEAM_A
-                || column == COLUMN_SET_1_TEAM_B
-                || column == COLUMN_SET_2_TEAM_A
-                || column == COLUMN_SET_2_TEAM_B
-                || column == COLUMN_SET_3_TEAM_A
-                || column == COLUMN_SET_3_TEAM_B;
+        return ApplicationWindowGameSupport.isQuickEditColumn(column, COLUMN_COURT, COLUMN_GAME_RATING, COLUMN_SET_1_TEAM_A, COLUMN_SET_1_TEAM_B, COLUMN_SET_2_TEAM_A, COLUMN_SET_2_TEAM_B, COLUMN_SET_3_TEAM_A, COLUMN_SET_3_TEAM_B);
     }
 
     private void hideTableColumn(JTable table, int modelColumn) {
@@ -891,205 +851,17 @@ public class ApplicationWindow extends JFrame {
     }
 
     private void showGameEditDialog(List<RowSelection> rows, DefaultTableModel tableModel, int modelRow, Component parent, GameEditUpdate editValues) {
-        if (modelRow < 0 || modelRow >= rows.size()) {
-            return;
-        }
-
-        GameRow gameRow = rows.get(modelRow).gameRow();
-        JTextField courtField = new JTextField(firstNonBlank(editValues.court(), gameRow.court(), tableValue(tableModel, modelRow, COLUMN_COURT)), 8);
-        JComboBox<String> ratingComboBox = new JComboBox<>(GAME_RATING_OPTIONS);
-        ratingComboBox.setSelectedItem(firstNonBlank(editValues.gameRating(), gameRow.gameRating(), tableValue(tableModel, modelRow, COLUMN_GAME_RATING)));
-        String[] resultScores = setScoresFromResult(gameRow.result());
-        JTextField set1TeamAField = new JTextField(firstNonBlank(editValues.set1TeamA(), gameRow.set1TeamA(), tableValue(tableModel, modelRow, COLUMN_SET_1_TEAM_A), resultScores[0]), 5);
-        JTextField set1TeamBField = new JTextField(firstNonBlank(editValues.set1TeamB(), gameRow.set1TeamB(), tableValue(tableModel, modelRow, COLUMN_SET_1_TEAM_B), resultScores[1]), 5);
-        JTextField set2TeamAField = new JTextField(firstNonBlank(editValues.set2TeamA(), gameRow.set2TeamA(), tableValue(tableModel, modelRow, COLUMN_SET_2_TEAM_A), resultScores[2]), 5);
-        JTextField set2TeamBField = new JTextField(firstNonBlank(editValues.set2TeamB(), gameRow.set2TeamB(), tableValue(tableModel, modelRow, COLUMN_SET_2_TEAM_B), resultScores[3]), 5);
-        JTextField set3TeamAField = new JTextField(firstNonBlank(editValues.set3TeamA(), gameRow.set3TeamA(), tableValue(tableModel, modelRow, COLUMN_SET_3_TEAM_A), resultScores[4]), 5);
-        JTextField set3TeamBField = new JTextField(firstNonBlank(editValues.set3TeamB(), gameRow.set3TeamB(), tableValue(tableModel, modelRow, COLUMN_SET_3_TEAM_B), resultScores[5]), 5);
-
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.insets = new Insets(5, 5, 5, 5);
-        constraints.anchor = GridBagConstraints.WEST;
-
-        addEditField(panel, constraints, 0, "Spiel", createGameTeamsPanel(gameRow));
-        addEditField(panel, constraints, 1, "Court", courtField);
-        addEditField(panel, constraints, 2, "Spielwertung", ratingComboBox);
-
-        constraints.gridx = 0;
-        constraints.gridy = 3;
-        panel.add(new JLabel("Satzpunkte"), constraints);
-        JPanel scorePanel = new JPanel(new GridBagLayout());
-        GridBagConstraints scoreConstraints = new GridBagConstraints();
-        scoreConstraints.insets = new Insets(3, 4, 3, 4);
-        scoreConstraints.anchor = GridBagConstraints.WEST;
-        addScoreHeader(scorePanel, scoreConstraints);
-        addScoreField(scorePanel, scoreConstraints, 1, "1. Satz", set1TeamAField, set1TeamBField);
-        addScoreField(scorePanel, scoreConstraints, 2, "2. Satz", set2TeamAField, set2TeamBField);
-        addScoreField(scorePanel, scoreConstraints, 3, "3. Satz", set3TeamAField, set3TeamBField);
-        constraints.gridx = 1;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(scorePanel, constraints);
-
-        int result = JOptionPane.showConfirmDialog(parent, panel, "Spiel bearbeiten", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION) {
-            return;
-        }
-
-        String rating = selectedValue(ratingComboBox);
-        if (rating.isBlank() && hasAnySetScore(
-                set1TeamAField.getText(), set1TeamBField.getText(),
-                set2TeamAField.getText(), set2TeamBField.getText(),
-                set3TeamAField.getText(), set3TeamBField.getText())) {
-            rating = DEFAULT_GAME_RATING;
-        }
-
-        tableModel.setValueAt(courtField.getText().trim(), modelRow, COLUMN_COURT);
-        tableModel.setValueAt(rating, modelRow, COLUMN_GAME_RATING);
-        tableModel.setValueAt(set1TeamAField.getText().trim(), modelRow, COLUMN_SET_1_TEAM_A);
-        tableModel.setValueAt(set1TeamBField.getText().trim(), modelRow, COLUMN_SET_1_TEAM_B);
-        tableModel.setValueAt(set2TeamAField.getText().trim(), modelRow, COLUMN_SET_2_TEAM_A);
-        tableModel.setValueAt(set2TeamBField.getText().trim(), modelRow, COLUMN_SET_2_TEAM_B);
-        tableModel.setValueAt(set3TeamAField.getText().trim(), modelRow, COLUMN_SET_3_TEAM_A);
-        tableModel.setValueAt(set3TeamBField.getText().trim(), modelRow, COLUMN_SET_3_TEAM_B);
-
-        RowSelection previous = rows.get(modelRow);
-        RowSelection updated = new RowSelection(previous.sectionHeading(), updatedGameRow(previous.gameRow(), tableModel, modelRow));
-        updated.setDirty(true);
-        rows.set(modelRow, updated);
-        tableModel.setValueAt("Geändert", modelRow, COLUMN_SAVE_STATUS);
-    }
-
-    private void addEditField(JPanel panel, GridBagConstraints constraints, int row, String label, Component field) {
-        constraints.gridx = 0;
-        constraints.gridy = row;
-        constraints.fill = GridBagConstraints.NONE;
-        constraints.weightx = 0;
-        panel.add(new JLabel(label + ":"), constraints);
-        constraints.gridx = 1;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.weightx = 1;
-        panel.add(field, constraints);
-    }
-
-    private JPanel createGameTeamsPanel(GameRow gameRow) {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.insets = new Insets(0, 0, 2, 0);
-        constraints.anchor = GridBagConstraints.WEST;
-        constraints.gridx = 0;
-        constraints.gridy = 0;
-        constraints.gridwidth = 2;
-        panel.add(new JLabel("Nr.: " + gameRow.number()), constraints);
-
-        constraints.gridy = 1;
-        constraints.gridwidth = 1;
-        constraints.insets = new Insets(0, 0, 2, 0);
-        panel.add(new JLabel("Team A: " + gameRow.teamA()), constraints);
-
-        constraints.gridy = 2;
-        panel.add(new JLabel("Team B: " + gameRow.teamB()), constraints);
-        return panel;
-    }
-
-    private void addScoreHeader(JPanel panel, GridBagConstraints constraints) {
-        JLabel teamALabel = new JLabel("Team A");
-        JLabel teamBLabel = new JLabel("Team B");
-        teamALabel.setFont(teamALabel.getFont().deriveFont(Font.BOLD));
-        teamBLabel.setFont(teamBLabel.getFont().deriveFont(Font.BOLD));
-
-        constraints.gridy = 0;
-        constraints.gridx = 1;
-        panel.add(teamALabel, constraints);
-        constraints.gridx = 2;
-        panel.add(teamBLabel, constraints);
-    }
-
-    private void addScoreField(JPanel panel, GridBagConstraints constraints, int row, String label, JTextField teamAField, JTextField teamBField) {
-        constraints.gridy = row;
-        constraints.gridx = 0;
-        panel.add(new JLabel(label), constraints);
-        constraints.gridx = 1;
-        panel.add(teamAField, constraints);
-        constraints.gridx = 2;
-        panel.add(teamBField, constraints);
-    }
-
-    private String selectedValue(JComboBox<String> comboBox) {
-        Object selectedItem = comboBox.getSelectedItem();
-        return selectedItem == null ? "" : selectedItem.toString().trim();
-    }
-
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (value != null && !value.trim().isBlank()) {
-                return value.trim();
-            }
-        }
-        return "";
-    }
-
-    private String[] setScoresFromResult(String result) {
-        String[] scores = {"", "", "", "", "", ""};
-        if (result == null || result.isBlank()) {
-            return scores;
-        }
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("(\\d{1,2})\\s*[:\\-]\\s*(\\d{1,2})")
-                .matcher(result);
-        int index = 0;
-        while (matcher.find() && index < scores.length) {
-            scores[index++] = matcher.group(1);
-            scores[index++] = matcher.group(2);
-        }
-        return scores;
-    }
-
-    private boolean hasAnySetScore(String... values) {
-        for (String value : values) {
-            if (value != null && !value.trim().isBlank()) {
-                return true;
-            }
-        }
-        return false;
+        ApplicationWindowGameSupport.showGameEditDialog(
+                rows, tableModel, modelRow, parent, editValues, GAME_RATING_OPTIONS, DEFAULT_GAME_RATING,
+                COLUMN_COURT, COLUMN_GAME_RATING, COLUMN_SET_1_TEAM_A, COLUMN_SET_1_TEAM_B,
+                COLUMN_SET_2_TEAM_A, COLUMN_SET_2_TEAM_B, COLUMN_SET_3_TEAM_A, COLUMN_SET_3_TEAM_B, COLUMN_SAVE_STATUS);
     }
 
     private void markQuickEditChange(List<RowSelection> rows, DefaultTableModel tableModel, TableModelEvent event) {
-        if (event.getType() != TableModelEvent.UPDATE || event.getFirstRow() < 0) {
-            return;
-        }
-        int column = event.getColumn();
-        if (!isQuickEditColumn(column)) {
-            return;
-        }
-        for (int row = event.getFirstRow(); row <= event.getLastRow() && row < rows.size(); row++) {
-            if (isSetScoreColumn(column)
-                    && tableValue(tableModel, row, COLUMN_GAME_RATING).isBlank()
-                    && hasAnySetScore(tableModel, row)) {
-                tableModel.setValueAt(DEFAULT_GAME_RATING, row, COLUMN_GAME_RATING);
-            }
-            rows.get(row).setDirty(true);
-            tableModel.setValueAt("Geändert", row, COLUMN_SAVE_STATUS);
-        }
-    }
-
-    private boolean isSetScoreColumn(int column) {
-        return column == COLUMN_SET_1_TEAM_A
-                || column == COLUMN_SET_1_TEAM_B
-                || column == COLUMN_SET_2_TEAM_A
-                || column == COLUMN_SET_2_TEAM_B
-                || column == COLUMN_SET_3_TEAM_A
-                || column == COLUMN_SET_3_TEAM_B;
-    }
-
-    private boolean hasAnySetScore(DefaultTableModel tableModel, int row) {
-        return !tableValue(tableModel, row, COLUMN_SET_1_TEAM_A).isBlank()
-                || !tableValue(tableModel, row, COLUMN_SET_1_TEAM_B).isBlank()
-                || !tableValue(tableModel, row, COLUMN_SET_2_TEAM_A).isBlank()
-                || !tableValue(tableModel, row, COLUMN_SET_2_TEAM_B).isBlank()
-                || !tableValue(tableModel, row, COLUMN_SET_3_TEAM_A).isBlank()
-                || !tableValue(tableModel, row, COLUMN_SET_3_TEAM_B).isBlank();
+        ApplicationWindowGameSupport.markQuickEditChange(
+                rows, tableModel, event, DEFAULT_GAME_RATING, COLUMN_GAME_RATING, COLUMN_SAVE_STATUS,
+                COLUMN_COURT, COLUMN_SET_1_TEAM_A, COLUMN_SET_1_TEAM_B, COLUMN_SET_2_TEAM_A,
+                COLUMN_SET_2_TEAM_B, COLUMN_SET_3_TEAM_A, COLUMN_SET_3_TEAM_B);
     }
 
     private void saveQuickEdits(List<RowSelection> rows, DefaultTableModel tableModel, TableRowSorter<DefaultTableModel> sorter, SelectionControls controls, Component parent) {
@@ -1142,64 +914,23 @@ public class ApplicationWindow extends JFrame {
     }
 
     private GameEditUpdate gameEditUpdate(GameRow original, DefaultTableModel tableModel, int rowIndex) {
-        return new GameEditUpdate(
-                original.editUrl(),
-                original.editMethod(),
-                original.editData(),
-                tableValue(tableModel, rowIndex, COLUMN_COURT),
-                tableValue(tableModel, rowIndex, COLUMN_GAME_RATING),
-                tableValue(tableModel, rowIndex, COLUMN_SET_1_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_1_TEAM_B),
-                tableValue(tableModel, rowIndex, COLUMN_SET_2_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_2_TEAM_B),
-                tableValue(tableModel, rowIndex, COLUMN_SET_3_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_3_TEAM_B));
+        return ApplicationWindowGameSupport.gameEditUpdate(original, tableModel, rowIndex, COLUMN_COURT, COLUMN_GAME_RATING, COLUMN_SET_1_TEAM_A, COLUMN_SET_1_TEAM_B, COLUMN_SET_2_TEAM_A, COLUMN_SET_2_TEAM_B, COLUMN_SET_3_TEAM_A, COLUMN_SET_3_TEAM_B);
     }
 
     private GameRow updatedGameRow(GameRow original, DefaultTableModel tableModel, int rowIndex) {
-        return new GameRow(
-                original.number(),
-                original.round(),
-                original.date(),
-                tableValue(tableModel, rowIndex, COLUMN_COURT),
-                original.teamA(),
-                original.teamB(),
-                original.referee(),
-                original.result(),
-                original.winnerTeam(),
-                original.editUrl(),
-                original.editMethod(),
-                original.editData(),
-                tableValue(tableModel, rowIndex, COLUMN_GAME_RATING),
-                tableValue(tableModel, rowIndex, COLUMN_SET_1_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_1_TEAM_B),
-                tableValue(tableModel, rowIndex, COLUMN_SET_2_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_2_TEAM_B),
-                tableValue(tableModel, rowIndex, COLUMN_SET_3_TEAM_A),
-                tableValue(tableModel, rowIndex, COLUMN_SET_3_TEAM_B));
+        return ApplicationWindowGameSupport.updatedGameRow(original, tableModel, rowIndex, COLUMN_COURT, COLUMN_GAME_RATING, COLUMN_SET_1_TEAM_A, COLUMN_SET_1_TEAM_B, COLUMN_SET_2_TEAM_A, COLUMN_SET_2_TEAM_B, COLUMN_SET_3_TEAM_A, COLUMN_SET_3_TEAM_B);
     }
 
     private String tableValue(DefaultTableModel tableModel, int rowIndex, int columnIndex) {
-        Object value = tableModel.getValueAt(rowIndex, columnIndex);
-        return value == null ? "" : value.toString().trim();
+        return ApplicationWindowGameSupport.tableValue(tableModel, rowIndex, columnIndex);
     }
 
     private List<GameRow> gameRows(List<RowSelection> rows) {
-        List<GameRow> gameRows = new ArrayList<>();
-        for (RowSelection row : rows) {
-            gameRows.add(row.gameRow());
-        }
-        return gameRows;
+        return ApplicationWindowGameSupport.gameRows(rows);
     }
 
     private List<GameRow> gameRows(ScrapedPage scrapedPage) {
-        List<GameRow> gameRows = new ArrayList<>();
-        for (PageSection section : scrapedPage.sections()) {
-            for (String paragraph : section.paragraphs()) {
-                gameRows.add(GameRow.fromParagraph(paragraph));
-            }
-        }
-        return gameRows;
+        return ApplicationWindowGameSupport.gameRows(scrapedPage);
     }
 
     private void openInBrowser(Path file) throws IOException {
