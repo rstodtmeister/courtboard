@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getPublicTournament, listPublicGames } from "./dataApi";
 import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, resultFromCompletedSetScores, scoreForSet } from "./scoreLogic";
 import type { Game, GameDraft, Tournament } from "./types";
@@ -112,6 +112,9 @@ function DisplayViewport({ orientation, children }: { orientation: DisplayOrient
 }
 
 function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string }) {
+  const pageRef = useRef<HTMLElement>(null);
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
+  const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
@@ -120,9 +123,52 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   const embedUrl = youtubeEmbedUrl(streamUrl);
   const completedSets = currentGame ? completedPreviousSetNumbers(currentGame) : [];
   const timeout = currentGame ? activeTimeoutInfo(currentGame) : null;
+  const fullscreenActive = nativeFullscreen || fallbackFullscreen;
+
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      const fullscreenDocument = document as FullscreenDocument;
+      setNativeFullscreen((document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement) === pageRef.current);
+    };
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", updateFullscreenState);
+    };
+  }, []);
+
+  async function toggleCourtFullscreen() {
+    const fullscreenDocument = document as FullscreenDocument;
+    const fullscreenElement = document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement;
+    if (fullscreenElement || fallbackFullscreen) {
+      setFallbackFullscreen(false);
+      if (fullscreenElement) {
+        const exitFullscreen = document.exitFullscreen?.bind(document) ?? fullscreenDocument.webkitExitFullscreen?.bind(document);
+        await exitFullscreen?.();
+      }
+      return;
+    }
+
+    const page = pageRef.current as FullscreenElement | null;
+    const requestFullscreen = page?.requestFullscreen?.bind(page) ?? page?.webkitRequestFullscreen?.bind(page);
+    if (!requestFullscreen) {
+      setFallbackFullscreen(true);
+      return;
+    }
+    try {
+      await requestFullscreen();
+    } catch {
+      setFallbackFullscreen(true);
+    }
+  }
+
   return (
-    <main className={embedUrl ? "single-court-page with-stream" : "single-court-page"}>
+    <main ref={pageRef} className={["single-court-page", embedUrl ? "with-stream" : "", fallbackFullscreen ? "court-fallback-fullscreen" : ""].filter(Boolean).join(" ")}>
       <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
+      <button type="button" className="single-court-fullscreen" onClick={toggleCourtFullscreen} aria-label={fullscreenActive ? "Court-Vollbild verlassen" : "Court im Vollbild anzeigen"} title={fullscreenActive ? "Vollbild verlassen" : "Court-Vollbild"}>
+        {fullscreenActive ? "✕" : "⛶"}
+      </button>
       <header className="single-court-meta">
         <h1>Court {court}</h1>
         {currentGame && <div>{[`Spiel ${currentGame.number}`.trim(), status].filter(Boolean).join(" · ")}</div>}
@@ -200,6 +246,15 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
     </main>
   );
 }
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
 
 function singleCourtGameStatus(game: Game, scoreState: ReturnType<typeof gameScoreState>) {
   if (hasStartedScore(scoreState)) {
