@@ -113,6 +113,7 @@ function DisplayViewport({ orientation, children }: { orientation: DisplayOrient
 
 function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string }) {
   const pageRef = useRef<HTMLElement>(null);
+  const fullscreenCheckRef = useRef<number | null>(null);
   const [nativeFullscreen, setNativeFullscreen] = useState(false);
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
   const currentGame = games[0] ?? null;
@@ -128,13 +129,21 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   useEffect(() => {
     const updateFullscreenState = () => {
       const fullscreenDocument = document as FullscreenDocument;
-      setNativeFullscreen((document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement) === pageRef.current);
+      const courtIsFullscreen = (document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement) === pageRef.current;
+      if (courtIsFullscreen && fullscreenCheckRef.current !== null) {
+        window.clearTimeout(fullscreenCheckRef.current);
+        fullscreenCheckRef.current = null;
+      }
+      setNativeFullscreen(courtIsFullscreen);
     };
     document.addEventListener("fullscreenchange", updateFullscreenState);
     document.addEventListener("webkitfullscreenchange", updateFullscreenState);
     return () => {
       document.removeEventListener("fullscreenchange", updateFullscreenState);
       document.removeEventListener("webkitfullscreenchange", updateFullscreenState);
+      if (fullscreenCheckRef.current !== null) {
+        window.clearTimeout(fullscreenCheckRef.current);
+      }
     };
   }, []);
 
@@ -156,9 +165,21 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
       setFallbackFullscreen(true);
       return;
     }
+    fullscreenCheckRef.current = window.setTimeout(() => {
+      fullscreenCheckRef.current = null;
+      const currentFullscreenElement = document.fullscreenElement
+        ?? (document as FullscreenDocument).webkitFullscreenElement;
+      if (currentFullscreenElement !== pageRef.current) {
+        setFallbackFullscreen(true);
+      }
+    }, 500);
     try {
-      await requestFullscreen();
+      await Promise.resolve(requestFullscreen());
     } catch {
+      if (fullscreenCheckRef.current !== null) {
+        window.clearTimeout(fullscreenCheckRef.current);
+        fullscreenCheckRef.current = null;
+      }
       setFallbackFullscreen(true);
     }
   }
