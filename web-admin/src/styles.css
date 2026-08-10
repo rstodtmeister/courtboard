@@ -5491,9 +5491,15 @@ tbody tr:nth-child(even) {
   }
 
   @supports (-webkit-touch-callout: none) {
+    body:has(.single-court-page.with-stream) #root {
+      min-height: calc(100dvh + 120px);
+    }
+
     .single-court-page.with-stream {
-      /* Give iPhone Safari a real document scroll so its browser chrome can collapse. */
-      height: calc(100svh + 1px);
+      /* Keep the court visible while iPhone Safari gets enough page scroll to collapse its chrome. */
+      position: sticky;
+      top: 0;
+      height: 100dvh;
     }
   }
 
