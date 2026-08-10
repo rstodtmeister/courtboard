@@ -404,6 +404,11 @@ export function ScoreEntryApp({ token }: { token: string }) {
     if (!previous) {
       return;
     }
+    const previousTotalPoints = previous.setScore.A + previous.setScore.B;
+    const restoredSideChangeAck = previous.sideChangeAck
+      ?? (sideChangeInterval && previousTotalPoints > 0 && previousTotalPoints % sideChangeInterval === 0
+        ? previousTotalPoints
+        : null);
     const shouldAnimateSideUndo = previous.leftTeam !== leftTeam;
     setPointHistory((current) => current.slice(0, -1));
     setDraft(previous.draft);
@@ -412,11 +417,11 @@ export function ScoreEntryApp({ token }: { token: string }) {
     setServerIndex(previous.serverIndex);
     setServeCounts(previous.serveCounts);
     setLastPointTeam(null);
+    setSideChangeAck(restoredSideChangeAck);
     if (shouldAnimateSideUndo) {
       setIsSwappingSides(true);
       const switchTimeout = window.setTimeout(() => {
         setLeftTeam(previous.leftTeam);
-        setSideChangeAck(previous.sideChangeAck);
       }, 1260);
       const doneTimeout = window.setTimeout(() => {
         setIsSwappingSides(false);
@@ -425,7 +430,6 @@ export function ScoreEntryApp({ token }: { token: string }) {
       sideSwapTimeouts.current = [switchTimeout, doneTimeout];
     } else {
       setLeftTeam(previous.leftTeam);
-      setSideChangeAck(previous.sideChangeAck);
     }
     void persistLiveDraft(previous.draft);
   }
