@@ -80,6 +80,7 @@ export async function createTournament(params: Omit<Tournament, "id">): Promise<
       location: params.location ?? null,
       token_base_url: params.token_base_url,
       courts: params.courts,
+      court_streams: params.court_streams,
     })
     .select(tournamentSelect)
     .single();
@@ -115,6 +116,7 @@ export async function saveTournament(tournament: Tournament): Promise<Tournament
       location: tournament.location ?? null,
       token_base_url: tournament.token_base_url,
       courts: tournament.courts,
+      court_streams: tournament.court_streams,
     })
     .eq("id", tournament.id)
     .select(tournamentSelect)

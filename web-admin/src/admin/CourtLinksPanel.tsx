@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { QrCode } from "../QrCode";
 import type { Game, ScoreLink } from "../types";
 import { CompactLink, displayUrl, scoreUrl } from "./shared";
@@ -12,6 +12,8 @@ export function CourtLinksPanel({
   onCreateCourtLink,
   onReplaceCourtLink,
   onUnlockCourt,
+  courtStreams,
+  onSaveCourtStream,
 }: {
   courts: Array<{ court: string; tournamentId: string }>;
   games: Game[];
@@ -20,9 +22,24 @@ export function CourtLinksPanel({
   onCreateCourtLink: (court: string, tournamentId: string) => Promise<void>;
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
   onUnlockCourt: (court: string) => Promise<void>;
+  courtStreams: Record<string, string>;
+  onSaveCourtStream: (court: string, value: string) => Promise<void>;
 }) {
   const sortedGames = sortGames(games);
   const [displayOrientation, setDisplayOrientation] = useState<"normal" | "landscape">("normal");
+  const [streamDrafts, setStreamDrafts] = useState<Record<string, string>>(courtStreams);
+  const [savingStreamCourt, setSavingStreamCourt] = useState("");
+
+  useEffect(() => setStreamDrafts(courtStreams), [courtStreams]);
+
+  async function saveStream(court: string) {
+    setSavingStreamCourt(court);
+    try {
+      await onSaveCourtStream(court, streamDrafts[court] ?? "");
+    } finally {
+      setSavingStreamCourt("");
+    }
+  }
 
   return (
     <section className="court-link-panel">
@@ -60,6 +77,20 @@ export function CourtLinksPanel({
                 ) : (
                   <span>Kein offenes Spiel</span>
                 )}
+              </div>
+              <div className="court-stream-control">
+                <label htmlFor={`court-stream-${entry.court}`}>YouTube-Livestream</label>
+                <input
+                  id={`court-stream-${entry.court}`}
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  value={streamDrafts[entry.court] ?? ""}
+                  onChange={(event) => setStreamDrafts((current) => ({ ...current, [entry.court]: event.target.value }))}
+                />
+                <button type="button" className="secondary" onClick={() => saveStream(entry.court)} disabled={savingStreamCourt === entry.court}>
+                  {savingStreamCourt === entry.court ? "Speichert…" : streamDrafts[entry.court] ? "Stream speichern" : "Stream entfernen"}
+                </button>
               </div>
               {value ? (
                 <div className="court-link-qr">

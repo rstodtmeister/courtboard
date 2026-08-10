@@ -30,6 +30,7 @@ import type { AdminTab } from "../workflowTypes";
 import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournamentDialog, sortHvvTournamentsByDate, TournamentPanel, AdminUsersPanel } from "./dashboardSections";
 import { GamesEditor, hasActiveScoreDeviceBlock, isAssignedCourt, isCompleted, resolvedReferee, sortGames } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
+import { normalizeYouTubeUrl } from "../youtube";
 
 type PendingHvvAction = "sync" | "selectTournament" | "importTournament" | "pushDirtyGames" | null;
 
@@ -261,6 +262,29 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     await unlockGame(lockedGame.id);
   }
 
+  async function saveCourtStream(court: string, value: string) {
+    if (!tournament) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      const normalizedUrl = normalizeYouTubeUrl(value);
+      const courtStreams = { ...(tournament.court_streams ?? {}) };
+      if (normalizedUrl) {
+        courtStreams[court] = normalizedUrl;
+      } else {
+        delete courtStreams[court];
+      }
+      const saved = await saveTournament({ ...tournament, court_streams: courtStreams });
+      setTournament(saved);
+      setTournaments((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setMessage(normalizedUrl ? `Livestream für Court ${court} gespeichert.` : `Livestream für Court ${court} entfernt.`);
+    } catch (streamError) {
+      setError(streamError instanceof Error ? streamError.message : "Livestream konnte nicht gespeichert werden.");
+    }
+  }
+
   async function syncGames(overwriteCourts: boolean) {
     setShowSyncDialog(false);
     if (!selectedTournamentId) {
@@ -373,6 +397,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
       location: option.location || null,
       token_base_url: null,
       courts: tournament?.courts ?? [],
+      court_streams: tournament?.court_streams ?? {},
     };
 
     if (hvvTournamentSelectionMode === "create" || !tournament) {
@@ -656,6 +681,8 @@ export function AdminDashboard({ session }: { session: AppSession }) {
                 onCreateCourtLink={createCourtLink}
                 onReplaceCourtLink={replaceCourtLink}
                 onUnlockCourt={unlockCourt}
+                courtStreams={tournament?.court_streams ?? {}}
+                onSaveCourtStream={saveCourtStream}
               />
             ) : (
               <div className="empty">Noch keine numerischen Courts konfiguriert.</div>

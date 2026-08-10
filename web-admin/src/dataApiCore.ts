@@ -4,7 +4,7 @@ import type { AdminRole, AdminUser, AppSession, Game, ScoreLink, Tournament } fr
 export const gameSelect =
   "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 export const tournamentSelect =
-  "id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts";
+  "id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts,court_streams";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -287,6 +287,7 @@ function seedStore(): LocalStore {
     location: null,
     token_base_url: "",
     courts: ["1", "2", "3", "4"],
+    court_streams: {},
   };
   return {
     session: { user: { email: "admin@local.test", role: "superadmin" } },
@@ -340,6 +341,7 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
       tournament_date: tournament.tournament_date ?? null,
       location: tournament.location ?? null,
       token_base_url: tournament.token_base_url ?? "",
+      court_streams: tournament.court_streams ?? {},
     })),
     games: (store.games ?? seeded.games).map((game) => ({ ...game, display_order: game.display_order ?? null, completed: game.completed ?? false })),
     links: (store.links ?? []).map((link) => ({

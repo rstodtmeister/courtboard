@@ -4,6 +4,7 @@ import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, par
 import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
+import { youtubeEmbedUrl } from "./youtube";
 
 type GroupStanding = {
   team: string;
@@ -67,7 +68,7 @@ export function CourtDisplayApp({
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
     return (
       <DisplayViewport orientation={orientation}>
-        <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} orientation={orientation} />
+        <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} orientation={orientation} streamUrl={tournament?.court_streams?.[String(selectedCourt)]} />
       </DisplayViewport>
     );
   }
@@ -79,7 +80,7 @@ export function CourtDisplayApp({
       <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
         <section className="court-board" aria-label="Court Anzeige">
           {courts.map((court) => (
-            <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} />
+            <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} hasStream={Boolean(youtubeEmbedUrl(tournament?.court_streams?.[String(court)]))} />
           ))}
         </section>
         <aside className="display-side-panel">
@@ -110,12 +111,13 @@ function DisplayViewport({ orientation, children }: { orientation: DisplayOrient
     : <>{children}</>;
 }
 
-function SingleCourtDisplay({ court, tournamentId, games, orientation }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation }) {
+function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
   const status = currentGame && scoreState ? singleCourtGameStatus(currentGame, scoreState) : "";
   const started = scoreState ? hasStartedScore(scoreState) : false;
+  const embedUrl = youtubeEmbedUrl(streamUrl);
   return (
     <main className="single-court-page">
       <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
@@ -123,6 +125,13 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation }: { court
         <h1>Court {court}</h1>
         {currentGame && <div>{[`Spiel ${currentGame.number}`.trim(), status].filter(Boolean).join(" · ")}</div>}
       </header>
+      <div className={embedUrl ? "single-court-content with-stream" : "single-court-content"}>
+      {embedUrl && (
+        <section className="single-court-stream">
+          <iframe src={embedUrl} title={`YouTube-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+          <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf YouTube öffnen</a>
+        </section>
+      )}
       <section className="single-court-card">
         {currentGame ? (
           <>
@@ -152,6 +161,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation }: { court
           <div className="single-court-empty">Kein aktuelles Spiel</div>
         )}
       </section>
+      </div>
     </main>
   );
 }
@@ -260,12 +270,13 @@ function SingleCourtSetHistory({ game }: { game: Game }) {
   );
 }
 
-function CourtPanel({ court, tournamentId, games, orientation }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation }) {
+function CourtPanel({ court, tournamentId, games, orientation, hasStream }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; hasStream: boolean }) {
   const courtUrl = singleCourtUrl(court, tournamentId, orientation);
   return (
     <a className="display-court-section" href={courtUrl} aria-label={`Court ${court} Einzelansicht oeffnen`} title="Einzelansicht oeffnen">
       <div className="display-court-heading">
         <h2>Court {court}</h2>
+        {hasStream && <span className="display-court-live">LIVE</span>}
         <span className="display-court-open" aria-hidden="true">↗</span>
       </div>
       {games.length === 0 ? (

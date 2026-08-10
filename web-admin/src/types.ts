@@ -46,6 +46,7 @@ export type Tournament = {
   location?: string | null;
   token_base_url: string | null;
   courts: string[];
+  court_streams: Record<string, string>;
 };
 
 export type ScoreLinkResponse = {
