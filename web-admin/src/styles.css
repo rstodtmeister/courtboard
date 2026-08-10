@@ -5490,6 +5490,13 @@ tbody tr:nth-child(even) {
     overflow: hidden;
   }
 
+  @supports (-webkit-touch-callout: none) {
+    .single-court-page.with-stream {
+      /* Give iPhone Safari a real document scroll so its browser chrome can collapse. */
+      height: calc(100svh + 1px);
+    }
+  }
+
   .single-court-content.with-stream,
   .single-court-stream,
   .single-court-video {
