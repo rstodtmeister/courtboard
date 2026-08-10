@@ -12,14 +12,12 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -93,9 +91,9 @@ public class LocalApiServer {
                     games.add(new GameState(row));
                 }
             }
-            writeJson(exchange, 200, syncResponse(page, rows));
+            writeJson(exchange, 200, LocalApiPayloads.syncResponse(page, rows));
         } catch (Exception exception) {
-            writeJson(exchange, 500, "{\"error\":" + jsonString(exception.getMessage()) + "}");
+            writeJson(exchange, 500, "{\"error\":" + LocalApiJson.jsonString(exception.getMessage()) + "}");
         }
     }
 
@@ -134,7 +132,7 @@ public class LocalApiServer {
             writeJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
             return;
         }
-        writeJson(exchange, 200, "{\"games\":" + gamesJson(allGames()) + "}");
+        writeJson(exchange, 200, "{\"games\":" + LocalApiPayloads.gamesJson(allGames()) + "}");
     }
 
     private void handleUpdateGame(HttpExchange exchange) throws IOException {
@@ -146,14 +144,14 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        String gameId = jsonField(body, "gameId");
+        String gameId = LocalApiJson.jsonField(body, "gameId");
         GameState game = findGame(gameId);
         if (game == null) {
             writeJson(exchange, 404, "{\"error\":\"game not found\"}");
             return;
         }
-        updateGameFromBody(game, body);
-        writeJson(exchange, 200, "{\"game\":" + gameJson(game) + "}");
+        LocalApiGameUpdates.updateGameFromBody(game, body);
+        writeJson(exchange, 200, "{\"game\":" + LocalApiPayloads.gameJson(game) + "}");
     }
 
     private void handleReorderGames(HttpExchange exchange) throws IOException {
@@ -174,7 +172,7 @@ public class LocalApiServer {
                 updated.add(game);
             }
         }
-        writeJson(exchange, 200, "{\"games\":" + gamesJson(updated) + "}");
+        writeJson(exchange, 200, "{\"games\":" + LocalApiPayloads.gamesJson(updated) + "}");
     }
 
     private void handleScoreLinks(HttpExchange exchange) throws IOException {
@@ -182,7 +180,7 @@ public class LocalApiServer {
             return;
         }
         if ("GET".equals(exchange.getRequestMethod())) {
-            writeJson(exchange, 200, "{\"links\":" + linksJson() + "}");
+            writeJson(exchange, 200, "{\"links\":" + LocalApiPayloads.linksJson(allLinks()) + "}");
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -190,11 +188,11 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        LinkState link = new LinkState(jsonField(body, "tournamentId"), jsonField(body, "gameId"), jsonField(body, "court"));
+        LinkState link = new LinkState(LocalApiJson.jsonField(body, "tournamentId"), LocalApiJson.jsonField(body, "gameId"), LocalApiJson.jsonField(body, "court"));
         synchronized (links) {
             links.add(link);
         }
-        writeJson(exchange, 200, "{\"id\":" + jsonString(link.id) + ",\"token\":" + jsonString(link.token) + "}");
+        writeJson(exchange, 200, "{\"id\":" + LocalApiJson.jsonString(link.id) + ",\"token\":" + LocalApiJson.jsonString(link.token) + "}");
     }
 
     private void handleDisableScoreLink(HttpExchange exchange) throws IOException {
@@ -206,7 +204,7 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        String linkId = jsonField(body, "linkId");
+        String linkId = LocalApiJson.jsonField(body, "linkId");
         synchronized (links) {
             for (LinkState link : links) {
                 if (link.id.equals(linkId)) {
@@ -227,18 +225,18 @@ public class LocalApiServer {
             writeJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
             return;
         }
-        LinkState link = findActiveLink(queryParam(exchange.getRequestURI().getRawQuery(), "token"));
+        LinkState link = findActiveLink(LocalApiJson.queryParam(exchange.getRequestURI().getRawQuery(), "token"));
         if (link == null) {
             writeJson(exchange, 404, "{\"error\":\"Ungueltiger Token\"}");
             return;
         }
-        String deviceId = queryParam(exchange.getRequestURI().getRawQuery(), "deviceId");
+        String deviceId = LocalApiJson.queryParam(exchange.getRequestURI().getRawQuery(), "deviceId");
         LockedGamesResult result = lockedGamesForDevice(link, deviceId);
         if (!result.error.isBlank()) {
-            writeJson(exchange, result.status, "{\"error\":" + jsonString(result.error) + "}");
+            writeJson(exchange, result.status, "{\"error\":" + LocalApiJson.jsonString(result.error) + "}");
             return;
         }
-        writeJson(exchange, 200, "{\"link\":" + linkJson(link) + ",\"games\":" + gamesJson(result.games) + ",\"allTeams\":" + jsonArray(allTeamNames()) + "}");
+        writeJson(exchange, 200, "{\"link\":" + LocalApiPayloads.linkJson(link) + ",\"games\":" + LocalApiPayloads.gamesJson(result.games) + ",\"allTeams\":" + LocalApiJson.jsonArray(allTeamNames()) + "}");
     }
 
     private void handleUnlockScoreEntry(HttpExchange exchange) throws IOException {
@@ -250,7 +248,7 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        GameState game = findGame(jsonField(body, "gameId"));
+        GameState game = findGame(LocalApiJson.jsonField(body, "gameId"));
         if (game == null) {
             writeJson(exchange, 404, "{\"error\":\"Spiel nicht gefunden\"}");
             return;
@@ -275,17 +273,17 @@ public class LocalApiServer {
             return;
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        LinkState link = findActiveLink(jsonField(body, "token"));
+        LinkState link = findActiveLink(LocalApiJson.jsonField(body, "token"));
         if (link == null) {
             writeJson(exchange, 404, "{\"error\":\"Ungueltiger Token\"}");
             return;
         }
-        GameState game = findGame(jsonField(body, "gameId"));
+        GameState game = findGame(LocalApiJson.jsonField(body, "gameId"));
         if (game == null || !isAllowed(link, game)) {
             writeJson(exchange, 403, "{\"error\":\"Spiel ist fuer diesen Token nicht freigegeben\"}");
             return;
         }
-        String deviceId = jsonField(body, "deviceId");
+        String deviceId = LocalApiJson.jsonField(body, "deviceId");
         synchronized (game) {
             if (deviceId.isBlank()) {
                 writeJson(exchange, 403, "{\"error\":\"Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen.\"}");
@@ -304,7 +302,7 @@ public class LocalApiServer {
                 game.scoreLockedAt = java.time.Instant.now().toString();
             }
         }
-        updateGameFromBody(game, body);
+        LocalApiGameUpdates.updateGameFromBody(game, body);
         link.usedAt = java.time.Instant.now().toString();
         writeJson(exchange, 200, "{\"ok\":true}");
     }
@@ -318,7 +316,7 @@ public class LocalApiServer {
             return;
         }
 
-        String value = queryParam(exchange.getRequestURI().getRawQuery(), "value");
+        String value = LocalApiJson.queryParam(exchange.getRequestURI().getRawQuery(), "value");
         if (value.isBlank()) {
             writeJson(exchange, 400, "{\"error\":\"value is required\"}");
             return;
@@ -354,30 +352,15 @@ public class LocalApiServer {
         return rows;
     }
 
-    private String syncResponse(ScrapedPage page, List<GameRow> rows) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("{\"source\":")
-                .append(jsonString(page.sourceUrl()))
-                .append(",\"title\":")
-                .append(jsonString(page.title()))
-                .append(",\"scrapedAt\":")
-                .append(jsonString(page.scrapedAt().toString()))
-                .append(",\"imported\":")
-                .append(rows.size())
-                .append(",\"games\":[");
-        for (int index = 0; index < rows.size(); index++) {
-            if (index > 0) {
-                builder.append(',');
-            }
-            appendGame(builder, rows.get(index));
-        }
-        builder.append("]}");
-        return builder.toString();
-    }
-
     private List<GameState> allGames() {
         synchronized (games) {
             return new ArrayList<>(games);
+        }
+    }
+
+    private List<LinkState> allLinks() {
+        synchronized (links) {
+            return new ArrayList<>(links);
         }
     }
 
@@ -526,218 +509,6 @@ public class LocalApiServer {
         return null;
     }
 
-    private void updateGameFromBody(GameState game, String body) {
-        String nextSet1TeamA = jsonField(body, "set1TeamA");
-        String nextSet1TeamB = jsonField(body, "set1TeamB");
-        String nextSet2TeamA = jsonField(body, "set2TeamA");
-        String nextSet2TeamB = jsonField(body, "set2TeamB");
-        String nextSet3TeamA = jsonField(body, "set3TeamA");
-        String nextSet3TeamB = jsonField(body, "set3TeamB");
-        String nextPointHistory = jsonField(body, "pointHistory");
-        if (nextPointHistory.isBlank()) {
-            nextPointHistory = inferredPointHistory(game, nextSet1TeamA, nextSet1TeamB, nextSet2TeamA, nextSet2TeamB, nextSet3TeamA, nextSet3TeamB);
-        }
-
-        String courtValue = jsonField(body, "court");
-        if (!courtValue.isBlank() || body.contains("\"court\"")) {
-            game.court = courtValue;
-        }
-        String refereeValue = jsonField(body, "referee");
-        if (!refereeValue.isBlank() || body.contains("\"referee\"")) {
-            game.referee = refereeValue;
-        }
-        game.result = jsonField(body, "result");
-        game.winnerTeam = jsonField(body, "winnerTeam");
-        game.gameRating = jsonField(body, "gameRating");
-        game.set1TeamA = nextSet1TeamA;
-        game.set1TeamB = nextSet1TeamB;
-        game.set2TeamA = nextSet2TeamA;
-        game.set2TeamB = nextSet2TeamB;
-        game.set3TeamA = nextSet3TeamA;
-        game.set3TeamB = nextSet3TeamB;
-        game.pointHistory = nextPointHistory;
-        game.printed = "true".equals(jsonField(body, "printed"));
-        game.completed = "true".equals(jsonField(body, "completed"));
-        if (game.completed) {
-            game.scoreLockedByDevice = "";
-            game.scoreLockedAt = "";
-        }
-        String dirtyValue = jsonField(body, "dirty");
-        game.dirty = dirtyValue.isBlank() || "true".equals(dirtyValue);
-    }
-
-    private String inferredPointHistory(GameState game, String set1A, String set1B, String set2A, String set2B, String set3A, String set3B) {
-        String updated = inferPointForSet(game.pointHistory, 1, game.set1TeamA, game.set1TeamB, set1A, set1B);
-        if (!updated.equals(game.pointHistory)) {
-            return updated;
-        }
-        updated = inferPointForSet(game.pointHistory, 2, game.set2TeamA, game.set2TeamB, set2A, set2B);
-        if (!updated.equals(game.pointHistory)) {
-            return updated;
-        }
-        return inferPointForSet(game.pointHistory, 3, game.set3TeamA, game.set3TeamB, set3A, set3B);
-    }
-
-    private String inferPointForSet(String pointHistory, int set, String oldAValue, String oldBValue, String newAValue, String newBValue) {
-        int oldA = parseScore(oldAValue);
-        int oldB = parseScore(oldBValue);
-        int newA = parseScore(newAValue);
-        int newB = parseScore(newBValue);
-        if (newA == oldA + 1 && newB == oldB) {
-            return appendPointHistory(pointHistory, set, "A", newA, newB);
-        }
-        if (newB == oldB + 1 && newA == oldA) {
-            return appendPointHistory(pointHistory, set, "B", newA, newB);
-        }
-        return pointHistory;
-    }
-
-    private int parseScore(String value) {
-        if (value == null || value.isBlank()) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException exception) {
-            return 0;
-        }
-    }
-
-    private String appendPointHistory(String pointHistory, int set, String team, int scoreA, int scoreB) {
-        String entry = "{\"set\":" + set + ",\"team\":\"" + team + "\",\"scoreA\":" + scoreA + ",\"scoreB\":" + scoreB + "}";
-        if (pointHistory == null || pointHistory.isBlank() || "[]".equals(pointHistory.trim())) {
-            return "[" + entry + "]";
-        }
-        String trimmed = pointHistory.trim();
-        if (trimmed.endsWith("]")) {
-            return trimmed.substring(0, trimmed.length() - 1) + "," + entry + "]";
-        }
-        return "[" + entry + "]";
-    }
-
-    private String firstNonBlank(String first, String second) {
-        return first == null || first.isBlank() ? second : first;
-    }
-
-    private String gamesJson(List<GameState> values) {
-        StringBuilder builder = new StringBuilder("[");
-        for (int index = 0; index < values.size(); index++) {
-            if (index > 0) {
-                builder.append(',');
-            }
-            builder.append(gameJson(values.get(index)));
-        }
-        return builder.append(']').toString();
-    }
-
-    private String gameJson(GameState game) {
-        return new StringBuilder()
-                .append('{')
-                .append("\"id\":").append(jsonString(game.id)).append(',')
-                .append("\"tournament_id\":").append(jsonString(game.tournamentId)).append(',')
-                .append("\"number\":").append(jsonString(game.number)).append(',')
-                .append("\"round\":").append(jsonString(game.round)).append(',')
-                .append("\"game_date\":").append(jsonString(game.date)).append(',')
-                .append("\"court\":").append(jsonString(game.court)).append(',')
-                .append("\"display_order\":").append(jsonInteger(game.displayOrder)).append(',')
-                .append("\"team_a\":").append(jsonString(game.teamA)).append(',')
-                .append("\"team_b\":").append(jsonString(game.teamB)).append(',')
-                .append("\"team_a_players\":").append(jsonArray(game.teamAPlayers)).append(',')
-                .append("\"team_b_players\":").append(jsonArray(game.teamBPlayers)).append(',')
-                .append("\"referee\":").append(jsonString(game.referee)).append(',')
-                .append("\"result\":").append(jsonString(game.result)).append(',')
-                .append("\"winner_team\":").append(jsonString(game.winnerTeam)).append(',')
-                .append("\"edit_url\":").append(jsonString(game.editUrl)).append(',')
-                .append("\"edit_method\":").append(jsonString(game.editMethod)).append(',')
-                .append("\"edit_data\":").append(jsonString(game.editData)).append(',')
-                .append("\"game_rating\":").append(jsonString(game.gameRating)).append(',')
-                .append("\"set1_team_a\":").append(jsonString(game.set1TeamA)).append(',')
-                .append("\"set1_team_b\":").append(jsonString(game.set1TeamB)).append(',')
-                .append("\"set2_team_a\":").append(jsonString(game.set2TeamA)).append(',')
-                .append("\"set2_team_b\":").append(jsonString(game.set2TeamB)).append(',')
-                .append("\"set3_team_a\":").append(jsonString(game.set3TeamA)).append(',')
-                .append("\"set3_team_b\":").append(jsonString(game.set3TeamB)).append(',')
-                .append("\"printed\":").append(game.printed).append(',')
-                .append("\"dirty\":").append(game.dirty).append(',')
-                .append("\"completed\":").append(game.completed).append(',')
-                .append("\"point_history\":").append(jsonString(game.pointHistory.isBlank() ? null : game.pointHistory)).append(',')
-                .append("\"score_locked_by_device\":").append(jsonString(game.scoreLockedByDevice.isBlank() ? null : game.scoreLockedByDevice)).append(',')
-                .append("\"score_locked_at\":").append(jsonString(game.scoreLockedAt.isBlank() ? null : game.scoreLockedAt))
-                .append('}')
-                .toString();
-    }
-
-    private String linksJson() {
-        StringBuilder builder = new StringBuilder("[");
-        synchronized (links) {
-            for (int index = 0; index < links.size(); index++) {
-                if (index > 0) {
-                    builder.append(',');
-                }
-                builder.append(linkJson(links.get(index)));
-            }
-        }
-        return builder.append(']').toString();
-    }
-
-    private String jsonArray(List<String> values) {
-        StringBuilder builder = new StringBuilder("[");
-        for (int index = 0; index < values.size(); index++) {
-            if (index > 0) {
-                builder.append(',');
-            }
-            builder.append(jsonString(values.get(index)));
-        }
-        return builder.append(']').toString();
-    }
-
-    private String jsonInteger(int value) {
-        return value > 0 ? String.valueOf(value) : "null";
-    }
-
-    private String linkJson(LinkState link) {
-        return new StringBuilder()
-                .append('{')
-                .append("\"id\":").append(jsonString(link.id)).append(',')
-                .append("\"tournament_id\":").append(jsonString(link.tournamentId)).append(',')
-                .append("\"game_id\":").append(jsonString(link.gameId.isBlank() ? null : link.gameId)).append(',')
-                .append("\"court\":").append(jsonString(link.court.isBlank() ? null : link.court)).append(',')
-                .append("\"token\":").append(jsonString(link.token)).append(',')
-                .append("\"expires_at\":null,")
-                .append("\"used_at\":").append(jsonString(link.usedAt.isBlank() ? null : link.usedAt)).append(',')
-                .append("\"disabled_at\":").append(jsonString(link.disabledAt.isBlank() ? null : link.disabledAt)).append(',')
-                .append("\"created_at\":").append(jsonString(link.createdAt))
-                .append('}')
-                .toString();
-    }
-
-    private void appendGame(StringBuilder builder, GameRow game) {
-        builder.append('{')
-                .append("\"number\":").append(jsonString(game.number())).append(',')
-                .append("\"round\":").append(jsonString(game.round())).append(',')
-                .append("\"game_date\":").append(jsonString(game.date())).append(',')
-                .append("\"court\":").append(jsonString(game.court())).append(',')
-                .append("\"team_a\":").append(jsonString(game.teamA())).append(',')
-                .append("\"team_b\":").append(jsonString(game.teamB())).append(',')
-                .append("\"team_a_players\":").append(jsonArray(GameState.defaultPlayers(game.teamA()))).append(',')
-                .append("\"team_b_players\":").append(jsonArray(GameState.defaultPlayers(game.teamB()))).append(',')
-                .append("\"referee\":").append(jsonString(game.referee())).append(',')
-                .append("\"result\":").append(jsonString(game.result())).append(',')
-                .append("\"winner_team\":").append(jsonString(game.winnerTeam() == 0 ? "" : String.valueOf(game.winnerTeam()))).append(',')
-                .append("\"edit_url\":").append(jsonString(game.editUrl())).append(',')
-                .append("\"edit_method\":").append(jsonString(game.editMethod())).append(',')
-                .append("\"edit_data\":").append(jsonString(game.editData())).append(',')
-                .append("\"game_rating\":").append(jsonString(game.gameRating())).append(',')
-                .append("\"set1_team_a\":").append(jsonString(game.set1TeamA())).append(',')
-                .append("\"set1_team_b\":").append(jsonString(game.set1TeamB())).append(',')
-                .append("\"set2_team_a\":").append(jsonString(game.set2TeamA())).append(',')
-                .append("\"set2_team_b\":").append(jsonString(game.set2TeamB())).append(',')
-                .append("\"set3_team_a\":").append(jsonString(game.set3TeamA())).append(',')
-                .append("\"set3_team_b\":").append(jsonString(game.set3TeamB())).append(',')
-                .append("\"completed\":false")
-                .append('}');
-    }
-
     private void writeJson(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -780,61 +551,6 @@ public class LocalApiServer {
         return svg.toString();
     }
 
-    private String queryParam(String rawQuery, String name) {
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return "";
-        }
-        for (String part : rawQuery.split("&")) {
-            String[] field = part.split("=", 2);
-            if (field.length == 2 && name.equals(URLDecoder.decode(field[0], StandardCharsets.UTF_8))) {
-                return URLDecoder.decode(field[1], StandardCharsets.UTF_8);
-            }
-        }
-        return "";
-    }
-
-    private static String jsonField(String json, String name) {
-        String marker = "\"" + name + "\"";
-        int keyIndex = json.indexOf(marker);
-        if (keyIndex < 0) {
-            return "";
-        }
-        int colonIndex = json.indexOf(':', keyIndex + marker.length());
-        if (colonIndex < 0) {
-            return "";
-        }
-        int cursor = colonIndex + 1;
-        while (cursor < json.length() && Character.isWhitespace(json.charAt(cursor))) {
-            cursor++;
-        }
-        if (json.startsWith("true", cursor)) {
-            return "true";
-        }
-        if (json.startsWith("false", cursor)) {
-            return "false";
-        }
-        if (cursor >= json.length() || json.charAt(cursor) != '"') {
-            return "";
-        }
-
-        StringBuilder value = new StringBuilder();
-        boolean escaping = false;
-        for (int index = cursor + 1; index < json.length(); index++) {
-            char character = json.charAt(index);
-            if (escaping) {
-                value.append(character);
-                escaping = false;
-            } else if (character == '\\') {
-                escaping = true;
-            } else if (character == '"') {
-                return value.toString();
-            } else {
-                value.append(character);
-            }
-        }
-        return "";
-    }
-
     private void seedGames() {
         synchronized (games) {
             games.add(new GameState(new GameRow("1", "", "1", "Dettbarn - Fröhlich (1)", "(Freilos)", "Jourdan - Zeising (3)")));
@@ -868,69 +584,6 @@ public class LocalApiServer {
             games.add(new GameState(new GameRow("29", "", "2", "Hamm - Hoppe (9)", "Rebmann - Zander (2)", "")));
             games.add(new GameState(new GameRow("30", "", "1", "Dettbarn - Fröhlich (1)", "Fröhlich - Schempp (10)", "")));
         }
-    }
-
-    private String jsonString(String value) {
-        if (value == null) {
-            return "null";
-        }
-        StringBuilder builder = new StringBuilder("\"");
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (character == '"' || character == '\\') {
-                builder.append('\\').append(character);
-            } else if (character == '\n') {
-                builder.append("\\n");
-            } else if (character == '\r') {
-                builder.append("\\r");
-            } else if (character == '\t') {
-                builder.append("\\t");
-            } else if (character < 0x20) {
-                builder.append(String.format("\\u%04x", (int) character));
-            } else {
-                builder.append(character);
-            }
-        }
-        return builder.append('"').toString();
-    }
-
-    private static class SyncRequest {
-        private final String url;
-        private final String username;
-        private final String password;
-        private final boolean ignoreResults;
-
-        private SyncRequest(String url, String username, String password, boolean ignoreResults) {
-            this.url = url;
-            this.username = username;
-            this.password = password;
-            this.ignoreResults = ignoreResults;
-        }
-
-        private String url() {
-            return url;
-        }
-
-        private String username() {
-            return username;
-        }
-
-        private String password() {
-            return password;
-        }
-
-        private boolean ignoreResults() {
-            return ignoreResults;
-        }
-
-        private static SyncRequest fromJson(String json) {
-            return new SyncRequest(
-                    jsonField(json, "url"),
-                    jsonField(json, "username"),
-                    jsonField(json, "password"),
-                    "true".equals(jsonField(json, "ignoreResults")));
-        }
-
     }
 
 }
