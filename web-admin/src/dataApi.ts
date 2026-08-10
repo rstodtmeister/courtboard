@@ -155,6 +155,17 @@ export async function completeAuthRedirect(): Promise<{ email?: string; error?: 
   return { email };
 }
 
+export async function requestPasswordReset(email: string): Promise<{ error?: string }> {
+  if (dataMode === "local") {
+    return { error: "Passwort-Reset ist im lokalen Modus nicht verfuegbar." };
+  }
+
+  const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
+    redirectTo: `${loginUrl()}?auth=recover`,
+  });
+  return error ? { error: error.message } : {};
+}
+
 export async function setAdminPassword(password: string): Promise<{ error?: string }> {
   if (dataMode === "local") {
     return {};
@@ -172,6 +183,13 @@ export async function setAdminPassword(password: string): Promise<{ error?: stri
 
   await getSupabase().auth.signOut();
   return {};
+}
+
+function loginUrl() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  return url.toString();
 }
 
 export function onSessionChange(callback: (session: AppSession | null) => void) {

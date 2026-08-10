@@ -117,6 +117,12 @@ button:disabled {
   color: #656d78;
 }
 
+.login-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+
 .wide-panel {
   max-width: 1500px;
 }

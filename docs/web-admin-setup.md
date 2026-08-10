@@ -58,10 +58,11 @@ supabase secrets set ADMIN_APP_URL=https://<github-user>.github.io/<repo>/
 supabase functions deploy manage-admins
 ```
 
-Dieselbe URL muss in Supabase Auth als erlaubte Redirect URL eingetragen sein, inklusive Auth-Parameter:
+Dieselbe URL muss in Supabase Auth als erlaubte Redirect URL eingetragen sein, inklusive Auth-Parameter fuer Einladung und Passwort-Reset:
 
 ```text
 https://<github-user>.github.io/<repo>/?auth=confirmed
+https://<github-user>.github.io/<repo>/?auth=recover
 ```
 
 Lokal wurde die Supabase-Struktur bereits initialisiert. Fuer die lokale Entwicklung:

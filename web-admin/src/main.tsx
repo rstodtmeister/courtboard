@@ -21,6 +21,7 @@ import {
   loadScoreEntry,
   onSessionChange,
   pushDirtyGamesToHvv,
+  requestPasswordReset,
   saveGame as saveGameData,
   setAdminPassword,
   saveTournament,
@@ -75,8 +76,8 @@ function App() {
   const tournamentId = params.get("tournamentId") ?? "";
   const orientation = params.get("orientation") === "landscape" ? "landscape" : "normal";
 
-  if (auth === "confirmed") {
-    return <AuthConfirmedApp />;
+  if (auth === "confirmed" || auth === "recover") {
+    return <AuthCredentialApp mode={auth === "recover" ? "recover" : "invite"} />;
   }
 
   if (token) {
@@ -94,7 +95,7 @@ function App() {
   return <AdminApp />;
 }
 
-function AuthConfirmedApp() {
+function AuthCredentialApp({ mode }: { mode: "invite" | "recover" }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
@@ -106,9 +107,9 @@ function AuthConfirmedApp() {
   useEffect(() => {
     completeAuthRedirect().then((result) => {
       if (result.error) {
-        setError(result.error);
-      } else {
-        setEmail(result.email ?? "");
+      setError(result.error);
+    } else {
+      setEmail(result.email ?? "");
       }
       setLoading(false);
       const url = new URL(window.location.href);
@@ -148,14 +149,26 @@ function AuthConfirmedApp() {
       <section className="panel login-panel">
         <h2>{complete ? "Passwort gespeichert" : "Passwort festlegen"}</h2>
         {loading ? (
-          <div className="status">Bestaetigung wird abgeschlossen...</div>
+          <div className="status">{mode === "recover" ? "Reset-Link wird geprueft..." : "Bestaetigung wird abgeschlossen..."}</div>
         ) : error && !email ? (
           <div className="error">{error}</div>
         ) : complete ? (
-          <p className="login-hint">Dein Admin-Zugang ist eingerichtet. Du kannst dich jetzt anmelden.</p>
+          <p className="login-hint">
+            {mode === "recover"
+              ? "Dein neues Passwort ist gespeichert. Du kannst dich jetzt wieder anmelden."
+              : "Dein Admin-Zugang ist eingerichtet. Du kannst dich jetzt anmelden."}
+          </p>
         ) : (
           <>
-            <p className="login-hint">{email ? `Lege das Passwort fuer ${email} fest.` : "Lege dein Admin-Passwort fest."}</p>
+            <p className="login-hint">
+              {email
+                ? mode === "recover"
+                  ? `Lege ein neues Passwort fuer ${email} fest.`
+                  : `Lege das Passwort fuer ${email} fest.`
+                : mode === "recover"
+                  ? "Lege dein neues Admin-Passwort fest."
+                  : "Lege dein Admin-Passwort fest."}
+            </p>
             <form onSubmit={submit} className="form-grid">
               <label>
                 Neues Passwort
@@ -217,12 +230,15 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setResetMessage("");
 
     const { error: signInError } = await signIn(email, password);
 
@@ -230,6 +246,25 @@ function LoginForm() {
     if (signInError) {
       setError(signInError);
     }
+  }
+
+  async function resetPassword() {
+    if (!email.trim()) {
+      setError("Bitte zuerst die E-Mail-Adresse eingeben.");
+      setResetMessage("");
+      return;
+    }
+
+    setResetBusy(true);
+    setError("");
+    setResetMessage("");
+    const { error: resetError } = await requestPasswordReset(email.trim());
+    setResetBusy(false);
+    if (resetError) {
+      setError(resetError);
+      return;
+    }
+    setResetMessage(`Wenn ${email.trim()} als Admin hinterlegt ist, wurde eine Reset-E-Mail versendet.`);
   }
 
   return (
@@ -246,8 +281,14 @@ function LoginForm() {
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         </label>
         {error && <div className="error">{error}</div>}
+        {resetMessage && <div className="success">{resetMessage}</div>}
         <button type="submit" disabled={busy}>{busy ? "Anmelden..." : "Anmelden"}</button>
       </form>
+      <div className="login-actions">
+        <button type="button" className="secondary" onClick={() => void resetPassword()} disabled={busy || resetBusy}>
+          {resetBusy ? "Sendet..." : "Passwort vergessen?"}
+        </button>
+      </div>
     </section>
   );
 }
