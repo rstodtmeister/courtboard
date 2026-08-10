@@ -118,6 +118,8 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   const status = currentGame && scoreState ? singleCourtGameStatus(currentGame, scoreState) : "";
   const started = scoreState ? hasStartedScore(scoreState) : false;
   const embedUrl = youtubeEmbedUrl(streamUrl);
+  const completedSets = currentGame ? completedPreviousSetNumbers(currentGame) : [];
+  const timeout = currentGame ? activeTimeoutInfo(currentGame) : null;
   return (
     <main className="single-court-page">
       <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
@@ -128,11 +130,44 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
       <div className={embedUrl ? "single-court-content with-stream" : "single-court-content"}>
       {embedUrl && (
         <section className="single-court-stream">
-          <iframe src={embedUrl} title={`YouTube-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+          <div className="single-court-video">
+            <iframe src={embedUrl} title={`YouTube-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+            {currentGame && (
+              <div className="stream-score-overlay" aria-live="polite">
+                <div className="stream-score-meta">
+                  <span>LIVE</span>
+                  <strong>Spiel {currentGame.number}</strong>
+                  {timeout && <em>Auszeit: {timeout.teamName} · {timeout.remaining}s</em>}
+                </div>
+                <div className="stream-score-main">
+                  <div className="stream-score-team left">
+                    <span>{currentGame.team_a || "Team A offen"}</span>
+                    <strong>{started ? result?.pointsA ?? "0" : "–"}</strong>
+                  </div>
+                  <div className="stream-score-sets">
+                    <span>Sätze</span>
+                    <strong>{started ? result?.sets ?? "0:0" : "0:0"}</strong>
+                  </div>
+                  <div className="stream-score-team right">
+                    <strong>{started ? result?.pointsB ?? "0" : "–"}</strong>
+                    <span>{currentGame.team_b || "Team B offen"}</span>
+                  </div>
+                </div>
+                {completedSets.length > 0 && (
+                  <div className="stream-score-history">
+                    {completedSets.map((setNumber) => {
+                      const score = scoreForSet(draftFromGame(currentGame), setNumber);
+                      return <span key={setNumber}>Satz {setNumber}: {score.A}:{score.B}</span>;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf YouTube öffnen</a>
         </section>
       )}
-      <section className="single-court-card">
+      {!embedUrl && <section className="single-court-card">
         {currentGame ? (
           <>
             <div className={started ? "single-court-match" : "single-court-match not-started"}>
@@ -160,7 +195,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
         ) : (
           <div className="single-court-empty">Kein aktuelles Spiel</div>
         )}
-      </section>
+      </section>}
       </div>
     </main>
   );
