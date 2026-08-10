@@ -751,7 +751,7 @@ export function FinalReviewStep({
   );
 }
 
-export function ThankYouStep({ game, draft }: { game: Game; draft: GameDraft }) {
+export function ThankYouStep({ game, draft, onNextGame }: { game: Game; draft: GameDraft; onNextGame?: () => void }) {
   const completedGame = { ...game, ...draft };
   const result = completedResultParts(completedGame);
   const winnerSide = completedWinnerSide(completedGame);
@@ -778,6 +778,11 @@ export function ThankYouStep({ game, draft }: { game: Game; draft: GameDraft }) 
           </div>
         </div>
       </div>
+      {onNextGame && (
+        <div className="score-flow-actions">
+          <button type="button" onClick={onNextGame}>Nächstes Spiel laden</button>
+        </div>
+      )}
     </section>
   );
 }

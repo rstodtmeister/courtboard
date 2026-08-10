@@ -52,32 +52,33 @@ export function ScoreEntryApp({ token }: { token: string }) {
     setLockedMessage("");
 
     try {
+      const entryData = await loadScoreEntry(token);
       const savedCompletedState = loadCompletedScoreEntry(token);
-      if (savedCompletedState) {
+      const stillShowsCompletedGame = savedCompletedState
+        && (entryData.games.length === 0 || entryData.games.some((game) => game.id === savedCompletedState.game.id));
+      if (savedCompletedState && stillShowsCompletedGame) {
         setSelectedGameId(savedCompletedState.game.id);
         setDraft(savedCompletedState.draft);
-        setData({
-          link: {
-            id: "",
-            game_id: savedCompletedState.game.id,
-            court: savedCompletedState.game.court,
-            expires_at: null,
-            used_at: null,
-          },
-          games: [savedCompletedState.game],
-          allTeams: [],
-        });
+        setData(entryData.games.length > 0 ? entryData : { ...entryData, games: [savedCompletedState.game] });
         setCompletedState(savedCompletedState);
         setWorkflowStep("done");
         return;
       }
 
-      const entryData = await loadScoreEntry(token);
+      if (savedCompletedState) {
+        clearCompletedScoreEntry(token);
+      }
+      setCompletedState(null);
+      setResumeState(null);
+      setWorkflowStep("confirm");
       setData(entryData);
       const firstGame = entryData.games[0];
       if (firstGame) {
         setSelectedGameId(firstGame.id);
         setDraft(draftFromGame(firstGame));
+      } else {
+        setSelectedGameId("");
+        setDraft(null);
       }
       const savedState = loadScoreEntryResume(token);
       if (savedState && entryData.games.some((game) => game.id === savedState.gameId && !game.completed)) {
@@ -585,6 +586,12 @@ export function ScoreEntryApp({ token }: { token: string }) {
     }
   }
 
+  async function loadNextCourtGame() {
+    clearCompletedScoreEntry(token);
+    setCompletedState(null);
+    await loadEntry();
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft) {
@@ -765,6 +772,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
               <ThankYouStep
                 game={completedState?.game ?? selectedGame}
                 draft={completedState?.draft ?? draft}
+                onNextGame={data?.link.court && !data.link.game_id ? loadNextCourtGame : undefined}
               />
             )}
           </div>
