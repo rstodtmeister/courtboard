@@ -117,55 +117,38 @@ Deno.serve(async (req) => {
       hvvVeranstaltungId: tournament.hvv_veranstaltung_id ?? "",
     });
     const importedGames = parseBeachGames(page.html, page.url, tournament.id);
+    if (importedGames.length === 0) {
+      return jsonResponse({
+        error: "Im HVV-Spielplan wurden keine Spiele erkannt. Vorhandene Spiele und Ergebnislinks bleiben unveraendert.",
+      }, 422);
+    }
 
-    if (page.metadata) {
-      const { error: updateTournamentError } = await adminClient
-        .from("tournaments")
-        .update({
-          name: page.metadata.name || tournament.name,
-          hvv_turnier_id: page.metadata.hvv_turnier_id || null,
-          hvv_veranstaltung_id: page.metadata.hvv_veranstaltung_id || null,
-          hvv_type: page.metadata.hvv_type || null,
-          hvv_gender: page.metadata.hvv_gender || null,
-          tournament_date: page.metadata.tournament_date || null,
-          location: page.metadata.location || null,
-          hvv_public_url: page.metadata.hvv_veranstaltung_id
-            ? new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${page.metadata.hvv_veranstaltung_id}`, page.url).toString()
-            : tournament.hvv_public_url,
-        })
-        .eq("id", tournament.id);
-
-      if (updateTournamentError) {
-        return jsonResponse({ error: updateTournamentError.message }, 500);
+    const tournamentPatch = page.metadata
+      ? {
+        name: page.metadata.name || tournament.name,
+        hvv_turnier_id: page.metadata.hvv_turnier_id || null,
+        hvv_veranstaltung_id: page.metadata.hvv_veranstaltung_id || null,
+        hvv_type: page.metadata.hvv_type || null,
+        hvv_gender: page.metadata.hvv_gender || null,
+        tournament_date: page.metadata.tournament_date || null,
+        location: page.metadata.location || null,
+        hvv_public_url: page.metadata.hvv_veranstaltung_id
+          ? new URL(`beach_beach_veranstaltung_spiele!browse.action?veranstaltungid=${page.metadata.hvv_veranstaltung_id}`, page.url).toString()
+          : tournament.hvv_public_url,
       }
+      : {};
+
+    const { data: insertedCount, error: replaceError } = await adminClient.rpc("replace_tournament_games", {
+      p_tournament_id: tournament.id,
+      p_games: importedGames,
+      p_tournament_patch: tournamentPatch,
+    });
+
+    if (replaceError) {
+      return jsonResponse({ error: replaceError.message }, 500);
     }
-
-    const { error: linksDeleteError } = await adminClient
-      .from("score_entry_links")
-      .delete()
-      .eq("tournament_id", tournament.id);
-
-    if (linksDeleteError) {
-      return jsonResponse({ error: linksDeleteError.message }, 500);
-    }
-
-    const { error: gamesDeleteError } = await adminClient
-      .from("games")
-      .delete()
-      .eq("tournament_id", tournament.id);
-
-    if (gamesDeleteError) {
-      return jsonResponse({ error: gamesDeleteError.message }, 500);
-    }
-
-    if (importedGames.length > 0) {
-      const { error: insertError } = await adminClient
-        .from("games")
-        .insert(importedGames);
-
-      if (insertError) {
-        return jsonResponse({ error: insertError.message }, 500);
-      }
+    if (insertedCount !== importedGames.length) {
+      return jsonResponse({ error: `Import unvollstaendig: ${insertedCount ?? 0} von ${importedGames.length} Spielen gespeichert.` }, 500);
     }
 
     return jsonResponse({
