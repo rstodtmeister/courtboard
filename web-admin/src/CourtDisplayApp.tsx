@@ -121,7 +121,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   const completedSets = currentGame ? completedPreviousSetNumbers(currentGame) : [];
   const timeout = currentGame ? activeTimeoutInfo(currentGame) : null;
   return (
-    <main className="single-court-page">
+    <main className={embedUrl ? "single-court-page with-stream" : "single-court-page"}>
       <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
       <header className="single-court-meta">
         <h1>Court {court}</h1>
