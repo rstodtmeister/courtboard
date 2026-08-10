@@ -545,6 +545,9 @@ export function LiveSetStep({
   const shouldChangeSides = totalSetPoints > 0 && totalSetPoints % sideChangeInterval === 0 && sideChangeAck !== totalSetPoints;
   const sideChangeBlocking = shouldChangeSides && !isSwappingSides;
   const canFinishSet = isPlausibleSetResult(setScore);
+  const setWinnerName = setScore.A > setScore.B
+    ? game.team_a || "Team A"
+    : game.team_b || "Team B";
   const activeTimeoutTeamName = activeTimeoutTeam === "A"
     ? game.team_a || "Team A"
     : activeTimeoutTeam === "B"
@@ -652,11 +655,16 @@ export function LiveSetStep({
       {confirmFinishSet && (
         <div className="modal-backdrop" role="presentation">
           <section className="finish-set-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-set-title">
-            <h3 id="finish-set-title">Satz {activeSet} abschließen?</h3>
-            <p>{setScore.A}:{setScore.B}</p>
+            <h3 id="finish-set-title">Satz {activeSet} beendet</h3>
+            <p><strong>{setWinnerName}</strong> gewinnt {setScore.A}:{setScore.B}</p>
             <div className="finish-set-actions">
-              <button type="button" className="secondary" onClick={() => setConfirmFinishSet(false)}>Abbrechen</button>
-              <button type="button" onClick={() => { setConfirmFinishSet(false); onFinishSet(); }}>Satz abschließen</button>
+              <button type="button" className="secondary" onClick={() => {
+                setConfirmFinishSet(false);
+                if (!correctionMode) {
+                  onToggleCorrection();
+                }
+              }}>Ergebnis korrigieren</button>
+              <button type="button" onClick={() => { setConfirmFinishSet(false); onFinishSet(); }}>Satz bestätigen</button>
             </div>
           </section>
         </div>
