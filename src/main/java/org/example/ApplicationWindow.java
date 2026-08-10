@@ -19,7 +19,6 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.RowSorterEvent;
@@ -142,7 +141,7 @@ public class ApplicationWindow extends JFrame {
     private final JProgressBar progressBar = new JProgressBar();
     private final WebPageScraper webPageScraper = new WebPageScraper();
     private final Set<String> printedGameKeys = new HashSet<>();
-    private CourtDisplayUpdater courtDisplayUpdater;
+    private ApplicationWindowRefreshSupport.CourtDisplayUpdater courtDisplayUpdater;
     private String lastLoadedUrl = "";
     private String lastLoadedHvvScheduleUrl = "";
     private String lastLoadedUsername = "";
@@ -688,99 +687,52 @@ public class ApplicationWindow extends JFrame {
     }
 
     private void startCourtDisplay(ScrapedPage scrapedPage, List<RowSelection> rows, DefaultTableModel tableModel, TableRowSorter<DefaultTableModel> sorter, SelectionControls controls, Component parent) {
-        stopCourtDisplayUpdater();
+        ApplicationWindowRefreshSupport.startCourtDisplay(
+                scrapedPage, rows, tableModel, sorter, controls, parent,
+                COURT_DISPLAY_FILE, COURT_DISPLAY_REFRESH_MILLIS,
+                lastLoadedHvvScheduleUrl, lastLoadedUsername, lastLoadedPassword, webPageScraper,
+                this::stopCourtDisplayUpdater,
+                updater -> courtDisplayUpdater = updater,
+                this::replaceRows,
+                this::rowSelections,
+                new ApplicationWindowRefreshSupport.GameRowsHandler() {
+                    @Override
+                    public List<GameRow> fromRows(List<RowSelection> rows) {
+                        return gameRows(rows);
+                    }
 
-        List<GameRow> initialRows = gameRows(rows);
-        if (initialRows.isEmpty()) {
-            JOptionPane.showMessageDialog(parent, "Es wurden keine Spiele für die HTML-Anzeige gefunden.", "Keine Spiele", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        controls.setCourtDisplayBusy(true);
-        controls.setStatus("HTML-Anzeige wird erzeugt...");
-        SwingWorker<Path, Void> worker = new SwingWorker<>() {
-            @Override
-            protected Path doInBackground() throws Exception {
-                return new CourtDisplayWriter().write(initialRows, COURT_DISPLAY_FILE, lastLoadedHvvScheduleUrl, java.time.Instant.now(), true);
-            }
-
-            @Override
-            protected void done() {
-                controls.setCourtDisplayBusy(false);
-                try {
-                    Path displayFile = get();
-                    openInBrowser(displayFile);
-                    courtDisplayUpdater = new CourtDisplayUpdater(
-                            scrapedPage.sourceUrl(),
-                            lastLoadedUsername,
-                            lastLoadedPassword,
-                            rows,
-                            tableModel,
-                            sorter,
-                            controls);
-                    courtDisplayUpdater.start();
-                    controls.setCourtDisplayStarted();
-                    controls.setStatus("HTML-Anzeige läuft: " + displayFile);
-                } catch (Exception exception) {
-                    String message = userFriendlyMessage(Task.WRITE_HTML, exception);
-                    controls.setStatus("Fehler: " + message);
-                    showErrorDialog(parent, "Fehler beim Erzeugen der HTML-Anzeige", message, exception);
-                }
-            }
-        };
-        worker.execute();
+                    @Override
+                    public List<GameRow> fromPage(ScrapedPage scrapedPage) {
+                        return gameRows(scrapedPage);
+                    }
+                },
+                statusLabel::setText,
+                this::showErrorDialog,
+                this::openInBrowser,
+                this::userFriendlyMessage,
+                controls::updateRefreshMode);
     }
 
     private void refreshGames(List<RowSelection> rows, DefaultTableModel tableModel, TableRowSorter<DefaultTableModel> sorter, SelectionControls controls, Component parent) {
         String url = lastLoadedUrl.isBlank() ? urlField.getText().trim() : lastLoadedUrl;
-        String username = lastLoadedUsername;
-        String password = lastLoadedPassword;
-
-        if (url.isBlank()) {
-            JOptionPane.showMessageDialog(parent, "Bitte URL angeben.", "Eingabe fehlt", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        controls.setBusy(true);
-        controls.setStatus("Daten werden neu geladen...");
-        SwingWorker<ManualRefreshResult, Void> worker = new SwingWorker<>() {
-            @Override
-            protected ManualRefreshResult doInBackground() throws Exception {
-                WebPageScraper.ScrapeResult result = webPageScraper.scrapeWithStatus(url, username, password);
-                Path displayFile = null;
-                if (courtDisplayUpdater != null) {
-                    displayFile = new CourtDisplayWriter().write(gameRows(result.page()), COURT_DISPLAY_FILE, lastLoadedHvvScheduleUrl, java.time.Instant.now(), true);
-                }
-                return new ManualRefreshResult(result, displayFile);
-            }
-
-            @Override
-            protected void done() {
-                controls.setBusy(false);
-                try {
-                    ManualRefreshResult manualRefreshResult = get();
-                    WebPageScraper.ScrapeResult result = manualRefreshResult.scrapeResult();
-                    ScrapedPage refreshedPage = result.page();
-                    List<RowSelection> refreshedRows = rowSelections(refreshedPage);
-                    if (refreshedRows.isEmpty()) {
-                        controls.setStatus("Keine Spiele gefunden");
-                        JOptionPane.showMessageDialog(parent, "Es wurden keine Spiele gefunden.", "Keine Spiele", JOptionPane.WARNING_MESSAGE);
-                        return;
+        ApplicationWindowRefreshSupport.refreshGames(
+                rows, tableModel, sorter, controls, parent,
+                url, lastLoadedUsername, lastLoadedPassword, COURT_DISPLAY_FILE, lastLoadedHvvScheduleUrl, courtDisplayUpdater != null,
+                webPageScraper, this::replaceRows, this::rowSelections,
+                new ApplicationWindowRefreshSupport.GameRowsHandler() {
+                    @Override
+                    public List<GameRow> fromRows(List<RowSelection> rows) {
+                        return gameRows(rows);
                     }
 
-                    replaceRows(rows, tableModel, sorter, refreshedRows);
-                    statusLabel.setText("Spiele neu geladen");
-                    String htmlStatus = manualRefreshResult.displayFile() == null ? "" : " HTML aktualisiert: " + manualRefreshResult.displayFile() + ".";
-                    controls.setStatus("Daten neu geladen: " + rows.size() + " Spiele." + htmlStatus + " " + loginStatusText(result.loginStatus()));
-                } catch (Exception exception) {
-                    statusLabel.setText("Fehler");
-                    String message = userFriendlyMessage(Task.LOAD_GAMES, exception);
-                    controls.setStatus("Fehler: " + message);
-                    showErrorDialog(parent, "Fehler beim Neuladen der Spiele", message, exception);
-                }
-            }
-        };
-        worker.execute();
+                    @Override
+                    public List<GameRow> fromPage(ScrapedPage scrapedPage) {
+                        return gameRows(scrapedPage);
+                    }
+                },
+                statusLabel::setText,
+                this::showErrorDialog,
+                this::userFriendlyMessage);
     }
 
     private void replaceRows(List<RowSelection> rows, DefaultTableModel tableModel, TableRowSorter<DefaultTableModel> sorter, List<RowSelection> refreshedRows) {
@@ -792,11 +744,7 @@ public class ApplicationWindow extends JFrame {
     }
 
     private String loginStatusText(WebPageScraper.LoginStatus loginStatus) {
-        return switch (loginStatus) {
-            case LOGIN_PERFORMED -> "Login wurde neu durchgeführt.";
-            case SESSION_REUSED -> "Bestehende Session wurde verwendet.";
-            case NOT_REQUIRED -> "Kein Login erforderlich.";
-        };
+        return ApplicationWindowRefreshSupport.loginStatusText(loginStatus);
     }
 
     private Object[] tableRow(GameRow gameRow) {
@@ -1446,108 +1394,6 @@ public class ApplicationWindow extends JFrame {
             cause = cause.getCause();
         }
         return cause;
-    }
-
-    private class CourtDisplayUpdater {
-        private final String sourceUrl;
-        private final String username;
-        private final String password;
-        private final List<RowSelection> rows;
-        private final DefaultTableModel tableModel;
-        private final TableRowSorter<DefaultTableModel> sorter;
-        private final SelectionControls controls;
-        private final Timer timer;
-        private boolean updateRunning;
-        private int secondsUntilRefresh = COURT_DISPLAY_REFRESH_MILLIS / 1000;
-
-        private CourtDisplayUpdater(
-                String sourceUrl,
-                String username,
-                String password,
-                List<RowSelection> rows,
-                DefaultTableModel tableModel,
-                TableRowSorter<DefaultTableModel> sorter,
-                SelectionControls controls) {
-            this.sourceUrl = sourceUrl;
-            this.username = username;
-            this.password = password;
-            this.rows = rows;
-            this.tableModel = tableModel;
-            this.sorter = sorter;
-            this.controls = controls;
-            this.timer = new Timer(1_000, event -> tick());
-            this.timer.setInitialDelay(0);
-        }
-
-        private void start() {
-            updateCountdownLabel();
-            timer.start();
-        }
-
-        private void stop() {
-            timer.stop();
-            controls.setRefreshCountdown("");
-        }
-
-        private void tick() {
-            if (!controls.isAutomaticRefreshEnabled()) {
-                secondsUntilRefresh = COURT_DISPLAY_REFRESH_MILLIS / 1000;
-                controls.setRefreshCountdown("Automatische Aktualisierung aus");
-                return;
-            }
-            if (updateRunning) {
-                controls.setRefreshCountdown("Aktualisierung läuft...");
-                return;
-            }
-            if (secondsUntilRefresh <= 0) {
-                update();
-                return;
-            }
-            updateCountdownLabel();
-            secondsUntilRefresh--;
-        }
-
-        private void updateCountdownLabel() {
-            controls.setRefreshCountdown("Aktualisierung in " + secondsUntilRefresh + " Sekunden");
-        }
-
-        private void update() {
-            if (updateRunning) {
-                return;
-            }
-            updateRunning = true;
-            controls.setRefreshCountdown("Aktualisierung läuft...");
-
-            SwingWorker<CourtDisplayRefreshResult, Void> worker = new SwingWorker<>() {
-                @Override
-                protected CourtDisplayRefreshResult doInBackground() throws Exception {
-                    WebPageScraper.ScrapeResult result = webPageScraper.scrapeWithStatus(sourceUrl, username, password);
-                    ScrapedPage scrapedPage = result.page();
-                    List<RowSelection> refreshedRows = rowSelections(scrapedPage);
-                    Path displayFile = new CourtDisplayWriter().write(gameRows(scrapedPage), COURT_DISPLAY_FILE, lastLoadedHvvScheduleUrl, java.time.Instant.now(), true);
-                    return new CourtDisplayRefreshResult(displayFile, refreshedRows, result.loginStatus());
-                }
-
-                @Override
-                protected void done() {
-                    updateRunning = false;
-                    secondsUntilRefresh = COURT_DISPLAY_REFRESH_MILLIS / 1000;
-                    try {
-                        CourtDisplayRefreshResult result = get();
-                        replaceRows(rows, tableModel, sorter, result.rows());
-                        statusLabel.setText("Spiele automatisch aktualisiert");
-                        controls.setStatus("Automatisch aktualisiert: " + rows.size()
-                                + " Spiele. HTML aktualisiert: " + result.displayFile()
-                                + ". " + loginStatusText(result.loginStatus()));
-                    } catch (Exception exception) {
-                        controls.setStatus("HTML-Aktualisierung fehlgeschlagen: "
-                                + userFriendlyMessage(Task.LOAD_GAMES, exception));
-                    }
-                    updateCountdownLabel();
-                }
-            };
-            worker.execute();
-        }
     }
 
 }
