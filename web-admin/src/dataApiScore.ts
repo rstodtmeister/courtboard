@@ -1,10 +1,10 @@
-import { dataMode, getSupabase, LocalLinksResponse, localJson, scoreDeviceId, supabaseFunctionErrorMessage } from "./dataApiCore";
+import { dataMode, getSupabase, LocalLinksResponse, localAdminJson, localJson, scoreDeviceId, supabaseFunctionErrorMessage } from "./dataApiCore";
 import type { Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse } from "./types";
 import { getPrimaryTournament } from "./dataApiTournaments";
 
 export async function createScoreLink(params: { tournamentId: string; gameId?: string; court?: string }): Promise<ScoreLinkResponse> {
   if (dataMode === "local") {
-    return localJson<ScoreLinkResponse>("/api/score-links", {
+    return localAdminJson<ScoreLinkResponse>("/api/score-links", {
       method: "POST",
       body: JSON.stringify({
         tournamentId: params.tournamentId,
@@ -50,7 +50,7 @@ export async function loadScoreEntry(token: string): Promise<ScoreEntryData> {
 
 export async function listScoreLinks(tournamentId?: string): Promise<ScoreLink[]> {
   if (dataMode === "local") {
-    const data = await localJson<LocalLinksResponse>("/api/score-links");
+    const data = await localAdminJson<LocalLinksResponse>("/api/score-links");
     return data.links
       .filter((link) => !tournamentId || link.tournament_id === tournamentId)
       .sort((left, right) => right.created_at.localeCompare(left.created_at));
@@ -72,7 +72,7 @@ export async function listScoreLinks(tournamentId?: string): Promise<ScoreLink[]
 
 export async function disableScoreLink(linkId: string): Promise<void> {
   if (dataMode === "local") {
-    await localJson<{ ok: boolean }>("/api/score-links/disable", {
+    await localAdminJson<{ ok: boolean }>("/api/score-links/disable", {
       method: "POST",
       body: JSON.stringify({ linkId }),
     });
@@ -91,7 +91,7 @@ export async function disableScoreLink(linkId: string): Promise<void> {
 
 export async function unlockScoreGame(gameId: string): Promise<void> {
   if (dataMode === "local") {
-    await localJson<{ ok: boolean }>("/api/score-entry/unlock", {
+    await localAdminJson<{ ok: boolean }>("/api/score-entry/unlock", {
       method: "POST",
       body: JSON.stringify({ gameId }),
     });

@@ -1,11 +1,11 @@
-import { createId, dataMode, gameSelect, getHvvCredentialsStatus, getSupabase, ImportedGame, LocalGamesResponse, LocalSyncResponse, localJson, PushHvvResult, readStore, requireHvvCredentials, supabaseFunctionErrorMessage, SyncGamesResult, writeStore } from "./dataApiCore";
+import { createId, dataMode, gameSelect, getHvvCredentialsStatus, getSupabase, ImportedGame, LocalGamesResponse, LocalSyncResponse, localAdminJson, localJson, PushHvvResult, readStore, requireHvvCredentials, supabaseFunctionErrorMessage, SyncGamesResult, writeStore } from "./dataApiCore";
 import type { Game, GameDraft, Tournament } from "./types";
 import type { HvvTournamentOption } from "./dataApiCore";
-import { getPrimaryTournament, getTournament } from "./dataApiTournaments";
+import { getPrimaryTournament, getPublicTournament, getTournament } from "./dataApiTournaments";
 
 export async function listGames(tournamentId?: string): Promise<Game[]> {
   if (dataMode === "local") {
-    const data = await localJson<LocalGamesResponse>("/api/games");
+    const data = await localAdminJson<LocalGamesResponse>("/api/admin/games");
     return [...data.games]
       .filter((game) => !tournamentId || game.tournament_id === tournamentId)
       .sort((left, right) => left.number.localeCompare(right.number, "de", { numeric: true }));
@@ -25,6 +25,28 @@ export async function listGames(tournamentId?: string): Promise<Game[]> {
   return data ?? [];
 }
 
+export async function listPublicGames(tournamentId?: string): Promise<Game[]> {
+  if (dataMode === "local") {
+    const data = await localJson<LocalGamesResponse>("/api/games");
+    return [...data.games]
+      .filter((game) => !tournamentId || game.tournament_id === tournamentId)
+      .sort((left, right) => left.number.localeCompare(right.number, "de", { numeric: true }));
+  }
+
+  const tournament = tournamentId ? { id: tournamentId } : await getPublicTournament();
+  const { data, error } = await getSupabase()
+    .from("public_games")
+    .select(gameSelect)
+    .eq("tournament_id", tournament.id)
+    .order("number", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
 export async function syncGamesFromHvv(options: { tournamentId: string; overwriteCourts: boolean }): Promise<SyncGamesResult> {
   const tournament = await getTournament(options.tournamentId);
   const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
@@ -33,21 +55,14 @@ export async function syncGamesFromHvv(options: { tournamentId: string; overwrit
     const store = readStore();
     const credentials = requireHvvCredentials();
     try {
-      const response = await fetch(`${import.meta.env.VITE_LOCAL_API_URL || "http://127.0.0.1:8787"}/api/games/sync`, {
+      const syncResponse = await localAdminJson<LocalSyncResponse>("/api/games/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: source,
           username: credentials.username,
           password: credentials.password,
         }),
       });
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(body.error ?? "HVV-Sync fehlgeschlagen.");
-      }
-
-      const syncResponse = body as LocalSyncResponse;
       const importedGames = syncResponse.games.map((game) => importedGame(tournament.id, game));
       writeStore({
         ...store,
@@ -125,7 +140,7 @@ export async function pushDirtyGamesToHvv(tournamentId: string): Promise<PushHvv
 export async function saveGame(game: Game, draft: GameDraft): Promise<Game> {
   if (dataMode === "local") {
     const store = readStore();
-    const data = await localJson<{ game: Game }>("/api/games/update", {
+    const data = await localAdminJson<{ game: Game }>("/api/games/update", {
       method: "POST",
       body: JSON.stringify({
         gameId: game.id,
@@ -174,7 +189,7 @@ export async function updateGameDisplayOrders(updates: Array<{ gameId: string; d
 
   if (dataMode === "local") {
     const store = readStore();
-    const data = await localJson<{ games: Game[] }>("/api/games/reorder", {
+    const data = await localAdminJson<{ games: Game[] }>("/api/games/reorder", {
       method: "POST",
       body: JSON.stringify({ orders: updates }),
     });

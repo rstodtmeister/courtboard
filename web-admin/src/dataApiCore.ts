@@ -10,6 +10,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const requestedMode = import.meta.env.VITE_DATA_MODE;
 export const localApiUrl = import.meta.env.VITE_LOCAL_API_URL || "http://127.0.0.1:8787";
+export const localAdminApiUrl = import.meta.env.VITE_LOCAL_ADMIN_API_URL || "http://127.0.0.1:8787";
 
 export const dataMode: "local" | "supabase" =
   requestedMode === "supabase" && supabaseUrl && supabaseAnonKey && !supabaseAnonKey.startsWith("<")
@@ -92,6 +93,7 @@ const storeKey = "courtboard.localData.v1";
 const deviceIdKey = "courtboard.deviceId.v1";
 let supabaseClient: SupabaseClient | null = null;
 let hvvCredentials: HvvCredentials | null = null;
+let localAdminSessionPromise: Promise<string> | null = null;
 const hvvCredentialsTtlMs = 60 * 60 * 1000;
 
 export function getSupabase() {
@@ -193,18 +195,60 @@ export function readStore(): LocalStore {
 }
 
 export async function localJson<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${localApiUrl}${path}`, {
+  return requestJson<T>(`${localApiUrl}${path}`, options);
+}
+
+export async function localAdminJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let key = await localAdminSessionKey();
+  let response = await fetch(`${localAdminApiUrl}${path}`, jsonRequest(options, {
+    "X-CourtBoard-Admin-Key": key,
+  }));
+
+  if (response.status === 401) {
+    localAdminSessionPromise = null;
+    key = await localAdminSessionKey();
+    response = await fetch(`${localAdminApiUrl}${path}`, jsonRequest(options, {
+      "X-CourtBoard-Admin-Key": key,
+    }));
+  }
+
+  return parseJsonResponse<T>(response);
+}
+
+async function localAdminSessionKey() {
+  if (!localAdminSessionPromise) {
+    localAdminSessionPromise = requestJson<{ key: string }>(`${localAdminApiUrl}/api/admin-session`)
+      .then((data) => data.key)
+      .catch((error) => {
+        localAdminSessionPromise = null;
+        throw error;
+      });
+  }
+  return localAdminSessionPromise;
+}
+
+async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(url, jsonRequest(options));
+  return parseJsonResponse<T>(response);
+}
+
+function jsonRequest(options: RequestInit, extraHeaders: Record<string, string> = {}): RequestInit {
+  return {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
+      ...extraHeaders,
     },
-  });
-  const data = await response.json();
+  };
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const data = await response.json() as { error?: string } & T;
   if (!response.ok) {
     throw new Error(data.error ?? "Lokale API-Anfrage fehlgeschlagen.");
   }
-  return data as T;
+  return data;
 }
 
 export function updateStore(patch: Partial<LocalStore>) {

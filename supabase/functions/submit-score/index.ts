@@ -2,6 +2,7 @@ import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { sha256Hex } from "../_shared/token.ts";
 import { hvvCredentialsFromEnv, refreshTournamentGamesFromHvv, submitGameToHvv } from "../_shared/hvv.ts";
+import { ScoreValidationError, validateScoreSubmission } from "../_shared/score-validation.ts";
 
 type SubmitScoreRequest = {
   token: string;
@@ -35,12 +36,39 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const body = req.method === "POST" ? await req.json() as SubmitScoreRequest : null;
-  const token = body?.token ?? url.searchParams.get("token") ?? "";
-  const deviceId = body?.deviceId ?? url.searchParams.get("deviceId") ?? "";
+  let body: SubmitScoreRequest | null = null;
+  if (req.method === "POST") {
+    const contentLength = Number.parseInt(req.headers.get("content-length") ?? "0", 10);
+    if (contentLength > 64_000) {
+      return jsonResponse({ error: "Request body is too large" }, 413);
+    }
+    try {
+      const rawBody = await req.text();
+      if (rawBody.length > 64_000) {
+        return jsonResponse({ error: "Request body is too large" }, 413);
+      }
+      const parsedBody = JSON.parse(rawBody) as unknown;
+      if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+        return jsonResponse({ error: "Request body must be a JSON object" }, 400);
+      }
+      body = parsedBody as SubmitScoreRequest;
+    } catch {
+      return jsonResponse({ error: "Request body must be valid JSON" }, 400);
+    }
+  }
+  const tokenValue: unknown = body?.token ?? url.searchParams.get("token") ?? "";
+  const deviceIdValue: unknown = body?.deviceId ?? url.searchParams.get("deviceId") ?? "";
 
-  if (!token) {
+  if (typeof tokenValue !== "string" || !tokenValue) {
     return jsonResponse({ error: "token is required" }, 400);
+  }
+  if (typeof deviceIdValue !== "string") {
+    return jsonResponse({ error: "Invalid deviceId" }, 400);
+  }
+  const token = tokenValue;
+  const deviceId = deviceIdValue;
+  if (token.length > 256 || deviceId.length > 160) {
+    return jsonResponse({ error: "Invalid token or deviceId" }, 400);
   }
 
   const adminClient = createAdminClient();
@@ -138,14 +166,18 @@ Deno.serve(async (req) => {
     });
   }
 
-  const gameId = body?.gameId ?? link.game_id;
-  if (!gameId) {
+  const gameIdValue: unknown = body?.gameId ?? link.game_id;
+  if (typeof gameIdValue !== "string" || !gameIdValue) {
     return jsonResponse({ error: "gameId is required for court links" }, 400);
   }
+  if (gameIdValue.length > 128) {
+    return jsonResponse({ error: "Invalid gameId" }, 400);
+  }
+  const gameId = gameIdValue;
 
   const { data: game, error: gameError } = await adminClient
     .from("games")
-    .select("id, tournament_id, court, score_locked_by_device")
+    .select("id, tournament_id, court, team_a, team_b, completed, score_locked_by_device")
     .eq("id", gameId)
     .maybeSingle();
 
@@ -157,6 +189,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Game is not allowed for this token" }, 403);
   }
 
+  if (game.completed) {
+    return jsonResponse({ error: "Das Spiel ist bereits abgeschlossen." }, 409);
+  }
+
   if (!deviceId) {
     return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
   }
@@ -165,25 +201,35 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Dieses Spiel wird bereits auf einem anderen Geraet erfasst." }, 423);
   }
 
-  const completed = body?.completed ?? false;
+  let validated;
+  try {
+    validated = validateScoreSubmission(body ?? {}, game);
+  } catch (error) {
+    if (error instanceof ScoreValidationError) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+    throw error;
+  }
+
+  const completed = validated.completed;
 
   const { data: updatedGame, error: updateError } = await adminClient
     .from("games")
     .update({
       score_locked_by_device: completed ? null : deviceId,
       score_locked_at: completed ? null : new Date().toISOString(),
-      referee: body?.referee ?? "",
-      result: body?.result ?? "",
-      winner_team: body?.winnerTeam ?? "",
-      game_rating: body?.gameRating ?? "Normal",
-      set1_team_a: body?.set1TeamA ?? "",
-      set1_team_b: body?.set1TeamB ?? "",
-      set2_team_a: body?.set2TeamA ?? "",
-      set2_team_b: body?.set2TeamB ?? "",
-      set3_team_a: body?.set3TeamA ?? "",
-      set3_team_b: body?.set3TeamB ?? "",
+      referee: validated.referee,
+      result: validated.result,
+      winner_team: validated.winnerTeam,
+      game_rating: validated.gameRating,
+      set1_team_a: validated.set1TeamA,
+      set1_team_b: validated.set1TeamB,
+      set2_team_a: validated.set2TeamA,
+      set2_team_b: validated.set2TeamB,
+      set3_team_a: validated.set3TeamA,
+      set3_team_b: validated.set3TeamB,
       completed,
-      point_history: body?.pointHistory ?? null,
+      point_history: validated.pointHistory,
       dirty: true,
     })
     .eq("id", game.id)

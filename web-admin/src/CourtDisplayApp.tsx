@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getTournament, listGames } from "./dataApi";
+import { getPublicTournament, listPublicGames } from "./dataApi";
 import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, resultFromCompletedSetScores, scoreForSet } from "./scoreLogic";
 import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
@@ -34,7 +34,7 @@ export function CourtDisplayApp({
   const [loading, setLoading] = useState(true);
 
   async function loadDisplay() {
-    const [gameData, tournamentData] = await Promise.all([listGames(tournamentId), getTournament(tournamentId)]);
+    const [gameData, tournamentData] = await Promise.all([listPublicGames(tournamentId), getPublicTournament(tournamentId)]);
     setGames(gameData);
     setTournament(tournamentData);
     setLoading(false);

@@ -39,6 +39,25 @@ export async function getTournament(tournamentId?: string): Promise<Tournament> 
   return { ...data, courts };
 }
 
+export async function getPublicTournament(tournamentId?: string): Promise<Tournament> {
+  if (dataMode === "local") {
+    return getTournament(tournamentId);
+  }
+
+  let query = getSupabase()
+    .from("public_tournaments")
+    .select(tournamentSelect);
+  query = tournamentId
+    ? query.eq("id", tournamentId)
+    : query.order("created_at", { ascending: true }).limit(1);
+
+  const { data, error } = await query.single();
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+}
+
 export async function createTournament(params: Omit<Tournament, "id">): Promise<Tournament> {
   if (dataMode === "local") {
     const store = readStore();

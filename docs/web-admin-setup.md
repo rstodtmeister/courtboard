@@ -191,6 +191,14 @@ Request:
 
 Die Web-App liest die API-URL aus `VITE_LOCAL_API_URL`.
 
+Administrative Zugriffe verwenden getrennt davon ausschließlich die Loopback-URL aus:
+
+```text
+VITE_LOCAL_ADMIN_API_URL=http://127.0.0.1:8787
+```
+
+Die Java-API gibt dafür nur an lokale Browser einen zufälligen, flüchtigen Admin-Sitzungsschlüssel aus. Administrative Endpunkte akzeptieren keine fremden Web-Origins. Deshalb die Admin-Oberfläche lokal über `http://127.0.0.1:5173` oder `http://localhost:5173` öffnen. `VITE_LOCAL_API_URL` darf weiterhin auf die LAN-IP zeigen, damit öffentliche Court-Anzeigen und Ergebnislinks auf Handys funktionieren.
+
 ## Handy-Zugriff lokal
 
 Der Vite-Dev-Server wird mit LAN-Bindung gestartet:

@@ -13,9 +13,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -24,19 +27,23 @@ import java.util.regex.Pattern;
 public class LocalApiServer {
     private final WebPageScraper scraper;
     private final int port;
+    private final String adminSessionKey;
     private final List<GameState> games = new ArrayList<>();
     private final List<LinkState> links = new ArrayList<>();
 
     public LocalApiServer(int port) {
         this.port = port;
         this.scraper = new WebPageScraper();
+        this.adminSessionKey = createAdminSessionKey();
         seedGames();
     }
 
     public void start() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/api/admin-session", this::handleAdminSession);
         server.createContext("/api/health", this::handleHealth);
         server.createContext("/api/games", this::handleGames);
+        server.createContext("/api/admin/games", this::handleAdminGames);
         server.createContext("/api/games/update", this::handleUpdateGame);
         server.createContext("/api/games/reorder", this::handleReorderGames);
         server.createContext("/api/games/sync", this::handleSyncGames);
@@ -53,7 +60,7 @@ public class LocalApiServer {
     }
 
     private void handleHealth(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (handlePublicCors(exchange)) {
             return;
         }
         if (!"GET".equals(exchange.getRequestMethod())) {
@@ -64,7 +71,7 @@ public class LocalApiServer {
     }
 
     private void handleSyncGames(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -125,7 +132,18 @@ public class LocalApiServer {
     }
 
     private void handleGames(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (handlePublicCors(exchange)) {
+            return;
+        }
+        if (!"GET".equals(exchange.getRequestMethod())) {
+            writeJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+            return;
+        }
+        writeJson(exchange, 200, "{\"games\":" + LocalApiPayloads.publicGamesJson(allGames()) + "}");
+    }
+
+    private void handleAdminGames(HttpExchange exchange) throws IOException {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"GET".equals(exchange.getRequestMethod())) {
@@ -136,7 +154,7 @@ public class LocalApiServer {
     }
 
     private void handleUpdateGame(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -155,7 +173,7 @@ public class LocalApiServer {
     }
 
     private void handleReorderGames(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -176,7 +194,7 @@ public class LocalApiServer {
     }
 
     private void handleScoreLinks(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if ("GET".equals(exchange.getRequestMethod())) {
@@ -196,7 +214,7 @@ public class LocalApiServer {
     }
 
     private void handleDisableScoreLink(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -218,7 +236,7 @@ public class LocalApiServer {
     }
 
     private void handleScoreEntry(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (handlePublicCors(exchange)) {
             return;
         }
         if (!"GET".equals(exchange.getRequestMethod())) {
@@ -236,11 +254,11 @@ public class LocalApiServer {
             writeJson(exchange, result.status, "{\"error\":" + LocalApiJson.jsonString(result.error) + "}");
             return;
         }
-        writeJson(exchange, 200, "{\"link\":" + LocalApiPayloads.linkJson(link) + ",\"games\":" + LocalApiPayloads.gamesJson(result.games) + ",\"allTeams\":" + LocalApiJson.jsonArray(allTeamNames()) + "}");
+        writeJson(exchange, 200, "{\"link\":" + LocalApiPayloads.scoreEntryLinkJson(link) + ",\"games\":" + LocalApiPayloads.publicGamesJson(result.games) + ",\"allTeams\":" + LocalApiJson.jsonArray(allTeamNames()) + "}");
     }
 
     private void handleUnlockScoreEntry(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (!authorizeAdmin(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -265,7 +283,7 @@ public class LocalApiServer {
     }
 
     private void handleSubmitScore(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (handlePublicCors(exchange)) {
             return;
         }
         if (!"POST".equals(exchange.getRequestMethod())) {
@@ -283,6 +301,10 @@ public class LocalApiServer {
             writeJson(exchange, 403, "{\"error\":\"Spiel ist fuer diesen Token nicht freigegeben\"}");
             return;
         }
+        if (game.completed) {
+            writeJson(exchange, 409, "{\"error\":\"Das Spiel ist bereits abgeschlossen.\"}");
+            return;
+        }
         String deviceId = LocalApiJson.jsonField(body, "deviceId");
         synchronized (game) {
             if (deviceId.isBlank()) {
@@ -297,18 +319,23 @@ public class LocalApiServer {
                 writeJson(exchange, 423, "{\"error\":\"Dieses Spiel wird bereits auf einem anderen Geraet erfasst.\"}");
                 return;
             }
-            if (game.scoreLockedByDevice.isBlank()) {
+            try {
+                ScoreSubmissionValidator.validateAndApply(game, body);
+            } catch (IllegalArgumentException exception) {
+                writeJson(exchange, 400, "{\"error\":" + LocalApiJson.jsonString(exception.getMessage()) + "}");
+                return;
+            }
+            if (game.scoreLockedByDevice.isBlank() && !game.completed) {
                 game.scoreLockedByDevice = deviceId;
                 game.scoreLockedAt = java.time.Instant.now().toString();
             }
         }
-        LocalApiGameUpdates.updateGameFromBody(game, body);
         link.usedAt = java.time.Instant.now().toString();
         writeJson(exchange, 200, "{\"ok\":true}");
     }
 
     private void handleQr(HttpExchange exchange) throws IOException {
-        if (handleCors(exchange)) {
+        if (handlePublicCors(exchange)) {
             return;
         }
         if (!"GET".equals(exchange.getRequestMethod())) {
@@ -329,17 +356,96 @@ public class LocalApiServer {
         }
     }
 
-    private boolean handleCors(HttpExchange exchange) throws IOException {
+    private void handleAdminSession(HttpExchange exchange) throws IOException {
+        if (handleAdminCors(exchange)) {
+            return;
+        }
+        if (!"GET".equals(exchange.getRequestMethod())) {
+            writeJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+            return;
+        }
+        if (!exchange.getRemoteAddress().getAddress().isLoopbackAddress()) {
+            writeJson(exchange, 403, "{\"error\":\"Admin session is only available on this computer\"}");
+            return;
+        }
+        writeJson(exchange, 200, "{\"key\":" + LocalApiJson.jsonString(adminSessionKey) + "}");
+    }
+
+    private boolean authorizeAdmin(HttpExchange exchange) throws IOException {
+        if (handleAdminCors(exchange)) {
+            return false;
+        }
+        String suppliedKey = exchange.getRequestHeaders().getFirst("X-CourtBoard-Admin-Key");
+        if (!secureEquals(adminSessionKey, suppliedKey)) {
+            writeJson(exchange, 401, "{\"error\":\"Lokale Admin-Sitzung fehlt oder ist abgelaufen\"}");
+            return false;
+        }
+        return true;
+    }
+
+    private boolean handlePublicCors(HttpExchange exchange) throws IOException {
         Headers headers = exchange.getResponseHeaders();
-        headers.add("Access-Control-Allow-Origin", "*");
-        headers.add("Access-Control-Allow-Headers", "content-type");
-        headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        headers.set("Access-Control-Allow-Origin", "*");
+        headers.set("Access-Control-Allow-Headers", "content-type");
+        headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
         if ("OPTIONS".equals(exchange.getRequestMethod())) {
             exchange.sendResponseHeaders(204, -1);
             exchange.close();
             return true;
         }
         return false;
+    }
+
+    private boolean handleAdminCors(HttpExchange exchange) throws IOException {
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin != null && !origin.isBlank()) {
+            if (!isTrustedLocalOrigin(origin)) {
+                writeJson(exchange, 403, "{\"error\":\"Origin is not allowed for local admin access\"}");
+                return true;
+            }
+            Headers headers = exchange.getResponseHeaders();
+            headers.set("Access-Control-Allow-Origin", origin);
+            headers.set("Vary", "Origin");
+            headers.set("Access-Control-Allow-Headers", "content-type,x-courtboard-admin-key");
+            headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        }
+        if ("OPTIONS".equals(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isTrustedLocalOrigin(String origin) {
+        try {
+            java.net.URI uri = java.net.URI.create(origin);
+            if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
+                return false;
+            }
+            String host = uri.getHost();
+            if (host == null) {
+                return false;
+            }
+            return "localhost".equalsIgnoreCase(host) || "::1".equals(host) || host.startsWith("127.");
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private static String createAdminSessionKey() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private static boolean secureEquals(String expected, String supplied) {
+        if (supplied == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                supplied.getBytes(StandardCharsets.UTF_8));
     }
 
     private List<GameRow> gameRows(ScrapedPage page) {
