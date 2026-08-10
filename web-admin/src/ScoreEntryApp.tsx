@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions } from "./appConfig";
 import { loadScoreEntry, submitScore } from "./dataApi";
-import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
+import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import { clearCompletedScoreEntry, clearScoreEntryResume, type CompletedScoreEntryState, loadCompletedScoreEntry, loadScoreEntryResume, saveCompletedScoreEntry, saveScoreEntryResume } from "./scoreEntryStorage";
 import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
 import type { Game, GameDraft, ScoreEntryData } from "./types";
@@ -152,6 +152,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
       timeoutScore,
       activeTimeoutTeam,
       timeoutRemaining,
+      pointHistory,
     });
   }, [
     resumeReady,
@@ -176,6 +177,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
     timeoutScore,
     activeTimeoutTeam,
     timeoutRemaining,
+    pointHistory,
   ]);
 
   useEffect(() => {
@@ -240,7 +242,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
     setSetScore(resumeState.setScore);
     setServerIndex(resumeState.serverIndex);
     setServeCounts(resumeState.serveCounts);
-    setPointHistory([]);
+    setPointHistory(resumeState.pointHistory.length > 0 ? resumeState.pointHistory : rebuildUndoHistory(resumeState));
     setCorrectionMode(resumeState.correctionMode);
     setLastPointTeam(null);
     setSideChangeAck(resumeState.sideChangeAck);

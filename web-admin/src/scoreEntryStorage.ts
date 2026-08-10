@@ -86,6 +86,7 @@ export function loadScoreEntryResume(token: string): ScoreEntryResumeState | nul
       timeoutScore: normalizeTeamStringRecord(parsed.timeoutScore),
       activeTimeoutTeam: isTeamKey(parsed.activeTimeoutTeam) ? parsed.activeTimeoutTeam : null,
       timeoutRemaining: typeof parsed.timeoutRemaining === "number" ? Math.max(0, Math.min(30, parsed.timeoutRemaining)) : 0,
+      pointHistory: normalizeLiveSnapshots(parsed.pointHistory),
     };
   } catch {
     return null;
@@ -146,4 +147,23 @@ function normalizeTeamStringRecord(value: unknown): Record<TeamKey, string | nul
     A: typeof record.A === "string" ? record.A : null,
     B: typeof record.B === "string" ? record.B : null,
   };
+}
+
+function normalizeLiveSnapshots(value: unknown): ScoreEntryResumeState["pointHistory"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((snapshot): snapshot is ScoreEntryResumeState["pointHistory"][number] => {
+    if (!snapshot || typeof snapshot !== "object") {
+      return false;
+    }
+    const candidate = snapshot as Record<string, unknown>;
+    return Boolean(candidate.draft && typeof candidate.draft === "object")
+      && isTeamKey(candidate.leftTeam)
+      && isTeamKey(candidate.servingTeam)
+      && Boolean(candidate.setScore && typeof candidate.setScore === "object")
+      && Boolean(candidate.serverIndex && typeof candidate.serverIndex === "object")
+      && Boolean(candidate.serveCounts && typeof candidate.serveCounts === "object")
+      && (candidate.sideChangeAck === null || typeof candidate.sideChangeAck === "number");
+  }).slice(-120) as ScoreEntryResumeState["pointHistory"];
 }

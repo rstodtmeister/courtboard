@@ -52,4 +52,5 @@ export type ScoreEntryResumeState = {
   timeoutScore: Record<TeamKey, string | null>;
   activeTimeoutTeam: TeamKey | null;
   timeoutRemaining: number;
+  pointHistory: LiveSnapshot[];
 };

@@ -1,5 +1,5 @@
 import type { Game, GameDraft } from "./types";
-import type { PointHistoryEntry, TeamKey, TimeoutHistoryEntry } from "./workflowTypes";
+import type { LiveSnapshot, PointHistoryEntry, ScoreEntryResumeState, TeamKey, TimeoutHistoryEntry } from "./workflowTypes";
 
 export function serviceOrder(players: string[], firstServer: string) {
   if (!firstServer) {
@@ -153,6 +153,29 @@ export function parseTimeoutHistory(value: string | null | undefined): TimeoutHi
 
 export function serializePointHistory(entries: Array<PointHistoryEntry | TimeoutHistoryEntry>) {
   return JSON.stringify(entries.slice(-120));
+}
+
+export function rebuildUndoHistory(state: ScoreEntryResumeState): LiveSnapshot[] {
+  const entries = parsePointHistory(state.draft.point_history)
+    .filter((entry) => entry.set === state.activeSet);
+  return entries.map((entry, index) => {
+    const previousScore = {
+      A: Math.max(0, entry.scoreA - (entry.team === "A" ? 1 : 0)),
+      B: Math.max(0, entry.scoreB - (entry.team === "B" ? 1 : 0)),
+    };
+    return {
+      draft: {
+        ...draftWithSetScore(state.draft, state.activeSet, previousScore),
+        point_history: serializePointHistory(entries.slice(0, index)),
+      },
+      leftTeam: state.leftTeam,
+      setScore: previousScore,
+      servingTeam: state.servingTeam,
+      serverIndex: state.serverIndex,
+      serveCounts: state.serveCounts,
+      sideChangeAck: null,
+    };
+  });
 }
 
 export function resultFromCompletedSetScores(game: Game) {
