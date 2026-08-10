@@ -25,6 +25,8 @@ type SubmitScoreRequest = {
 const gameSelect =
   "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at";
 
+const scoreLockTimeout = "30 minutes";
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) {
@@ -118,26 +120,16 @@ Deno.serve(async (req) => {
       if (!deviceId) {
         return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
       }
-      if (lockGame.score_locked_by_device && lockGame.score_locked_by_device !== deviceId) {
-        return jsonResponse({ error: "Dieses Spiel wird bereits auf einem anderen Geraet erfasst." }, 423);
+      const { data: acquiredGame, error: lockError } = await adminClient.rpc("acquire_score_game_lock", {
+        p_game_id: lockGame.id,
+        p_tournament_id: link.tournament_id,
+        p_device_id: deviceId,
+        p_stale_after: scoreLockTimeout,
+      });
+      if (lockError) {
+        return scoreDatabaseError(lockError.message);
       }
-      if (!lockGame.score_locked_by_device) {
-        const lockedAt = new Date().toISOString();
-        const { error: lockError } = await adminClient
-          .from("games")
-          .update({
-            score_locked_by_device: deviceId,
-            score_locked_at: lockedAt,
-          })
-          .eq("id", lockGame.id);
-
-        if (lockError) {
-          return jsonResponse({ error: lockError.message }, 500);
-        }
-
-        lockGame.score_locked_by_device = deviceId;
-        lockGame.score_locked_at = lockedAt;
-      }
+      Object.assign(lockGame, acquiredGame);
     }
 
     const { data: teamRows, error: teamsError } = await adminClient
@@ -189,16 +181,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Game is not allowed for this token" }, 403);
   }
 
-  if (game.completed) {
-    return jsonResponse({ error: "Das Spiel ist bereits abgeschlossen." }, 409);
-  }
-
   if (!deviceId) {
     return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
-  }
-
-  if (game.score_locked_by_device && game.score_locked_by_device !== deviceId) {
-    return jsonResponse({ error: "Dieses Spiel wird bereits auf einem anderen Geraet erfasst." }, 423);
   }
 
   let validated;
@@ -213,31 +197,31 @@ Deno.serve(async (req) => {
 
   const completed = validated.completed;
 
-  const { data: updatedGame, error: updateError } = await adminClient
-    .from("games")
-    .update({
-      score_locked_by_device: completed ? null : deviceId,
-      score_locked_at: completed ? null : new Date().toISOString(),
+  const { data: updatedGame, error: updateError } = await adminClient.rpc("save_score_game", {
+    p_game_id: game.id,
+    p_tournament_id: link.tournament_id,
+    p_link_game_id: link.game_id,
+    p_link_court: link.court,
+    p_device_id: deviceId,
+    p_stale_after: scoreLockTimeout,
+    p_score: {
       referee: validated.referee,
       result: validated.result,
-      winner_team: validated.winnerTeam,
-      game_rating: validated.gameRating,
-      set1_team_a: validated.set1TeamA,
-      set1_team_b: validated.set1TeamB,
-      set2_team_a: validated.set2TeamA,
-      set2_team_b: validated.set2TeamB,
-      set3_team_a: validated.set3TeamA,
-      set3_team_b: validated.set3TeamB,
+      winnerTeam: validated.winnerTeam,
+      gameRating: validated.gameRating,
+      set1TeamA: validated.set1TeamA,
+      set1TeamB: validated.set1TeamB,
+      set2TeamA: validated.set2TeamA,
+      set2TeamB: validated.set2TeamB,
+      set3TeamA: validated.set3TeamA,
+      set3TeamB: validated.set3TeamB,
       completed,
-      point_history: validated.pointHistory,
-      dirty: true,
-    })
-    .eq("id", game.id)
-    .select("id,tournament_id,number,round,edit_url,edit_method,edit_data,court,referee,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b")
-    .single();
+      pointHistory: validated.pointHistory,
+    },
+  });
 
   if (updateError) {
-    return jsonResponse({ error: updateError.message }, 500);
+    return scoreDatabaseError(updateError.message);
   }
 
   let hvvSynced = false;
@@ -283,4 +267,20 @@ function gameOrderSortKey(game: { number: string | null; display_order?: number 
 function gameNumberSortKey(number: string | null) {
   const match = (number ?? "").match(/\d+/);
   return match ? Number.parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
+}
+
+function scoreDatabaseError(message: string) {
+  if (message.includes("score_lock_conflict")) {
+    return jsonResponse({ error: "Dieses Spiel wird bereits auf einem anderen Geraet erfasst." }, 423);
+  }
+  if (message.includes("score_game_completed")) {
+    return jsonResponse({ error: "Das Spiel ist bereits abgeschlossen." }, 409);
+  }
+  if (message.includes("score_game_not_allowed") || message.includes("score_game_not_found")) {
+    return jsonResponse({ error: "Game is not allowed for this token" }, 403);
+  }
+  if (message.includes("score_device_required")) {
+    return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
+  }
+  return jsonResponse({ error: message }, 500);
 }
