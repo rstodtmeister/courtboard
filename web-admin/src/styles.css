@@ -4032,7 +4032,7 @@ tbody tr:nth-child(even) {
   z-index: 2;
   left: clamp(12px, 2.5vw, 38px);
   right: clamp(12px, 2.5vw, 38px);
-  bottom: clamp(54px, 8vh, 86px);
+  bottom: clamp(10px, 1.5vh, 18px);
   display: grid;
   gap: clamp(5px, .8vmin, 10px);
   padding: clamp(10px, 1.5vmin, 18px) clamp(14px, 2.2vw, 32px);
@@ -4172,7 +4172,7 @@ tbody tr:nth-child(even) {
   }
 
   .stream-score-overlay {
-    bottom: 42px;
+    bottom: 6px;
     padding: 8px 10px;
     border-radius: 8px;
   }
