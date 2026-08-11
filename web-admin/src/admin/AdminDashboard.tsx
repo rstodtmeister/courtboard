@@ -13,6 +13,7 @@ import {
   listHvvTournaments,
   listAdminUsers,
   listScoreLinks,
+  listCourtLocks,
   pushDirtyGamesToHvv,
   saveGame as saveGameData,
   saveTournament,
@@ -26,10 +27,10 @@ import {
 import type { HvvTournamentOption } from "../dataApi";
 import { draftFromGame } from "../scoreLogic";
 import type { PdfSheetType } from "../pdfExport";
-import type { AdminRole, AdminUser, AppSession, Game, GameDraft, ScoreLink, Tournament } from "../types";
+import type { AdminRole, AdminUser, AppSession, CourtLock, Game, GameDraft, ScoreLink, Tournament } from "../types";
 import type { AdminTab } from "../workflowTypes";
 import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournamentDialog, sortHvvTournamentsByDate, TournamentPanel, AdminUsersPanel } from "./dashboardSections";
-import { GamesEditor, hasActiveScoreDeviceBlock, isAssignedCourt, isCompleted, resolvedReferee, sortGames } from "./GamesEditor";
+import { GamesEditor, isAssignedCourt, isCompleted, resolvedReferee } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
 import { normalizeYouTubeUrl } from "../youtube";
 
@@ -52,6 +53,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scoreLinks, setScoreLinks] = useState<ScoreLink[]>([]);
+  const [courtLocks, setCourtLocks] = useState<CourtLock[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -98,19 +100,22 @@ export function AdminDashboard({ session }: { session: AppSession }) {
         setGames([]);
         setTournament(null);
         setScoreLinks([]);
+        setCourtLocks([]);
         setAdminUsers(isSuperadmin ? await listAdminUsers() : []);
         return;
       }
 
-      const [gameData, tournamentData, linkData, adminsData] = await Promise.all([
+      const [gameData, tournamentData, linkData, lockData, adminsData] = await Promise.all([
         listGames(selectedId),
         getTournament(selectedId),
         listScoreLinks(selectedId),
+        listCourtLocks(selectedId),
         isSuperadmin ? listAdminUsers() : Promise.resolve([]),
       ]);
       setGames(gameData);
       setTournament(tournamentData);
       setScoreLinks(linkData);
+      setCourtLocks(lockData);
       setAdminUsers(adminsData);
       setLastSyncedAt(formatSyncTime(new Date()));
     } catch (gamesError) {
@@ -224,10 +229,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
 
     try {
       await disableScoreLink(linkId);
-      const lockedGame = sortGames(games).find((game) => game.court === court && !isCompleted(game) && (game.score_locked_by_device || hasActiveScoreDeviceBlock(game)));
-      if (lockedGame) {
-        await unlockScoreGame(lockedGame.id);
-      }
+      await unlockScoreCourt(tournamentId, court);
       await createScoreLinkData({ tournamentId, court });
       setScoreLinks(await listScoreLinks(tournamentId));
       setGames(await listGames(tournamentId));
@@ -259,7 +261,9 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     setMessage("");
     try {
       await unlockScoreCourt(selectedTournamentId, court);
-      setGames(await listGames(selectedTournamentId));
+      const [gameData, lockData] = await Promise.all([listGames(selectedTournamentId), listCourtLocks(selectedTournamentId)]);
+      setGames(gameData);
+      setCourtLocks(lockData);
       setMessage(`Court ${court} wurde entsperrt.`);
     } catch (unlockError) {
       setError(unlockError instanceof Error ? unlockError.message : "Court konnte nicht entsperrt werden.");
@@ -681,6 +685,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
                 courts={courts}
                 games={games}
                 links={courtLinks}
+                courtLocks={courtLocks}
                 tournamentId={selectedTournamentId}
                 onCreateCourtLink={createCourtLink}
                 onReplaceCourtLink={replaceCourtLink}

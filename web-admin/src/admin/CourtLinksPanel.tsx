@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { QrCode } from "../QrCode";
-import type { Game, ScoreLink } from "../types";
+import type { CourtLock, Game, ScoreLink } from "../types";
 import { CompactLink, displayUrl, scoreUrl } from "./shared";
-import { hasActiveScoreDeviceBlock, isCompleted, sortGames } from "./GamesEditor";
+import { isCompleted, sortGames } from "./GamesEditor";
 
 export function CourtLinksPanel({
   courts,
   games,
   links,
+  courtLocks,
   tournamentId,
   onCreateCourtLink,
   onReplaceCourtLink,
@@ -18,6 +19,7 @@ export function CourtLinksPanel({
   courts: Array<{ court: string; tournamentId: string }>;
   games: Game[];
   links: ScoreLink[];
+  courtLocks: CourtLock[];
   tournamentId: string;
   onCreateCourtLink: (court: string, tournamentId: string) => Promise<void>;
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
@@ -60,13 +62,15 @@ export function CourtLinksPanel({
         {courts.map((entry) => {
           const link = links.find((item) => item.court === entry.court);
           const currentGame = sortedGames.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game));
-          const lockedGame = sortedGames.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game) && (game.score_locked_by_device || hasActiveScoreDeviceBlock(game)));
+          const courtLock = courtLocks.find((lock) => lock.tournament_id === entry.tournamentId && lock.court === entry.court);
+          const activeLock = Boolean(courtLock?.active_device_id && courtLock.locked_at && Date.parse(courtLock.locked_at) >= Date.now() - 30 * 60 * 1000);
+          const blockedLock = Boolean(courtLock?.blocked_device_id && courtLock.blocked_until && Date.parse(courtLock.blocked_until) > Date.now());
           const value = link?.token ? scoreUrl(link.token) : "";
           return (
             <div className="court-link-card" key={entry.court}>
               <div className="court-link-card-head">
                 <strong>Court {entry.court}</strong>
-                <span className={lockedGame ? "badge" : "badge active"}>{lockedGame ? (lockedGame.score_locked_by_device ? "Geraet aktiv" : "Geraet gesperrt") : "frei"}</span>
+                <span className={activeLock || blockedLock ? "badge" : "badge active"}>{activeLock ? "Geraet aktiv" : blockedLock ? "Geraet gesperrt" : "frei"}</span>
               </div>
               <div className="court-link-current">
                 {currentGame ? (

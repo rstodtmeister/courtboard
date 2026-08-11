@@ -6,6 +6,7 @@ import { ScoreValidationError, validateScoreSubmission } from "../_shared/score-
 
 type SubmitScoreRequest = {
   token: string;
+  action?: "heartbeat";
   deviceId?: string;
   gameId?: string;
   referee?: string;
@@ -201,6 +202,19 @@ Deno.serve(async (req) => {
 
   if (!deviceId) {
     return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
+  }
+
+  if (body?.action === "heartbeat") {
+    const { error: heartbeatError } = await adminClient.rpc("heartbeat_score_court_lock", {
+      p_game_id: game.id,
+      p_tournament_id: link.tournament_id,
+      p_device_id: deviceId,
+      p_stale_after: scoreLockTimeout,
+    });
+    if (heartbeatError) {
+      return scoreDatabaseError(heartbeatError.message);
+    }
+    return jsonResponse({ ok: true });
   }
 
   let validated;

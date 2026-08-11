@@ -326,6 +326,11 @@ public class LocalApiServer {
                 writeJson(exchange, 423, "{\"error\":" + LocalApiJson.jsonString(courtError) + "}");
                 return;
             }
+            if ("heartbeat".equals(LocalApiJson.jsonField(body, "action"))) {
+                link.usedAt = java.time.Instant.now().toString();
+                writeJson(exchange, 200, "{\"ok\":true}");
+                return;
+            }
             if (!game.scoreLockedByDevice.isBlank() && !game.scoreLockedByDevice.equals(deviceId)) {
                 writeJson(exchange, 423, "{\"error\":\"Dieses Spiel wird bereits auf einem anderen Geraet erfasst.\"}");
                 return;

@@ -81,6 +81,16 @@ export type ScoreEntryData = {
   allTeams?: string[];
 };
 
+export type CourtLock = {
+  tournament_id: string;
+  court: string;
+  active_game_id: string | null;
+  active_device_id: string | null;
+  locked_at: string | null;
+  blocked_device_id: string | null;
+  blocked_until: string | null;
+};
+
 export type AppSession = {
   user: {
     email: string;

@@ -1,5 +1,5 @@
 import { dataMode, getSupabase, LocalLinksResponse, localAdminJson, localJson, scoreDeviceId, supabaseFunctionErrorMessage } from "./dataApiCore";
-import type { Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse } from "./types";
+import type { CourtLock, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse } from "./types";
 import { getPrimaryTournament } from "./dataApiTournaments";
 
 export async function createScoreLink(params: { tournamentId: string; gameId?: string; court?: string }): Promise<ScoreLinkResponse> {
@@ -68,6 +68,26 @@ export async function listScoreLinks(tournamentId?: string): Promise<ScoreLink[]
   }
 
   return (data ?? []).map((link) => ({ ...link, token: link.token ?? null, disabled_at: null }));
+}
+
+export async function listCourtLocks(tournamentId: string): Promise<CourtLock[]> {
+  if (dataMode === "local") {
+    const games = (await localAdminJson<{ games: Game[] }>("/api/admin/games")).games;
+    return games.filter((game) => game.tournament_id === tournamentId && game.court && (game.score_locked_by_device || game.score_blocked_device)).map((game) => ({
+      tournament_id: tournamentId,
+      court: game.court!,
+      active_game_id: game.score_locked_by_device ? game.id : null,
+      active_device_id: game.score_locked_by_device ?? null,
+      locked_at: game.score_locked_at ?? null,
+      blocked_device_id: game.score_blocked_device ?? null,
+      blocked_until: game.score_blocked_until ?? null,
+    }));
+  }
+  const { data, error } = await getSupabase().from("score_court_locks")
+    .select("tournament_id,court,active_game_id,active_device_id,locked_at,blocked_device_id,blocked_until")
+    .eq("tournament_id", tournamentId);
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 export async function disableScoreLink(linkId: string): Promise<void> {
@@ -173,5 +193,22 @@ export async function submitScore(token: string, game: Game, draft: GameDraft): 
 
   if (error) {
     throw new Error(await supabaseFunctionErrorMessage(error, "Ergebnis konnte nicht gespeichert werden."));
+  }
+}
+
+export async function heartbeatScoreEntry(token: string, gameId: string): Promise<void> {
+  if (dataMode === "local") {
+    await localJson<{ ok: boolean }>("/api/submit-score", {
+      method: "POST",
+      body: JSON.stringify({ token, deviceId: scoreDeviceId(), gameId, action: "heartbeat" }),
+    });
+    return;
+  }
+
+  const { error } = await getSupabase().functions.invoke("submit-score", {
+    body: { token, deviceId: scoreDeviceId(), gameId, action: "heartbeat" },
+  });
+  if (error) {
+    throw new Error(await supabaseFunctionErrorMessage(error, "Court-Sperre konnte nicht verlaengert werden."));
   }
 }

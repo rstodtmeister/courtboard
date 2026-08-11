@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions } from "./appConfig";
-import { loadScoreEntry, submitScore } from "./dataApi";
+import { heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
 import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import { clearCompletedScoreEntry, clearScoreEntryResume, type CompletedScoreEntryState, loadCompletedScoreEntry, loadScoreEntryResume, saveCompletedScoreEntry, saveScoreEntryResume } from "./scoreEntryStorage";
 import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
@@ -106,6 +106,32 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }, [token]);
 
   const selectedGame = data?.games.find((game) => game.id === selectedGameId) ?? null;
+
+  useEffect(() => {
+    if (!selectedGameId || workflowStep === "done" || completedState) {
+      return;
+    }
+    let stopped = false;
+    const heartbeat = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        await heartbeatScoreEntry(token, selectedGameId);
+      } catch (heartbeatError) {
+        if (stopped) return;
+        const text = heartbeatError instanceof Error ? heartbeatError.message : "Court-Sperre konnte nicht verlaengert werden.";
+        if (text.includes("anderen Geraet") || text.includes("bereits")) setLockedMessage(text);
+        else setLiveError(text);
+      }
+    };
+    const interval = window.setInterval(heartbeat, 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void heartbeat(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [token, selectedGameId, workflowStep, completedState]);
 
   useEffect(() => {
     if (!activeTimeoutTeam) {
