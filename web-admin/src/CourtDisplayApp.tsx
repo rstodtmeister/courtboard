@@ -4,7 +4,7 @@ import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, par
 import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
-import { youtubeEmbedUrl } from "./youtube";
+import { streamEmbed } from "./stream";
 
 type GroupStanding = {
   team: string;
@@ -80,7 +80,7 @@ export function CourtDisplayApp({
       <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
         <section className="court-board" aria-label="Court Anzeige">
           {courts.map((court) => (
-            <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} hasStream={Boolean(youtubeEmbedUrl(tournament?.court_streams?.[String(court)]))} />
+            <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} hasStream={Boolean(streamEmbed(tournament?.court_streams?.[String(court)]))} />
           ))}
         </section>
         <aside className="display-side-panel">
@@ -117,7 +117,9 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
   const status = currentGame && scoreState ? singleCourtGameStatus(currentGame, scoreState) : "";
   const started = scoreState ? hasStartedScore(scoreState) : false;
-  const embedUrl = youtubeEmbedUrl(streamUrl);
+  const embed = streamEmbed(streamUrl);
+  const embedUrl = embed?.url ?? "";
+  const providerName = embed?.provider === "twitch" ? "Twitch" : "YouTube";
   const completedSets = currentGame ? completedPreviousSetNumbers(currentGame) : [];
   const timeout = currentGame ? activeTimeoutInfo(currentGame) : null;
   return (
@@ -131,7 +133,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
       {embedUrl && (
         <section className="single-court-stream">
           <div className="single-court-video">
-            <iframe src={embedUrl} title={`YouTube-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+            <iframe src={embedUrl} title={`${providerName}-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
             {currentGame && (
               <div className="stream-score-overlay" aria-live="polite">
                 <div className="stream-score-meta">
@@ -164,7 +166,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
               </div>
             )}
           </div>
-          <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf YouTube öffnen</a>
+          <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf {providerName} öffnen</a>
         </section>
       )}
       {!embedUrl && <section className="single-court-card">

@@ -32,7 +32,7 @@ import type { AdminTab } from "../workflowTypes";
 import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournamentDialog, sortHvvTournamentsByDate, TournamentPanel, AdminUsersPanel } from "./dashboardSections";
 import { GamesEditor, isAssignedCourt, isCompleted, resolvedReferee } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
-import { normalizeYouTubeUrl } from "../youtube";
+import { normalizeStreamUrl } from "../stream";
 
 type PendingHvvAction = "sync" | "selectTournament" | "importTournament" | "pushDirtyGames" | null;
 
@@ -277,7 +277,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     setError("");
     setMessage("");
     try {
-      const normalizedUrl = normalizeYouTubeUrl(value);
+      const normalizedUrl = normalizeStreamUrl(value);
       const courtStreams = { ...(tournament.court_streams ?? {}) };
       if (normalizedUrl) {
         courtStreams[court] = normalizedUrl;

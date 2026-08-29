@@ -83,12 +83,12 @@ export function CourtLinksPanel({
                 )}
               </div>
               <div className="court-stream-control">
-                <label htmlFor={`court-stream-${entry.court}`}>YouTube-Livestream</label>
+                <label htmlFor={`court-stream-${entry.court}`}>YouTube- oder Twitch-Livestream</label>
                 <input
                   id={`court-stream-${entry.court}`}
                   type="url"
                   inputMode="url"
-                  placeholder="https://www.youtube.com/watch?v=…"
+                  placeholder="YouTube- oder Twitch-Link"
                   value={streamDrafts[entry.court] ?? ""}
                   onChange={(event) => setStreamDrafts((current) => ({ ...current, [entry.court]: event.target.value }))}
                 />
