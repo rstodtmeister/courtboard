@@ -30,6 +30,7 @@ type AppRoute =
   | { kind: "score"; token: string }
   | { kind: "courts"; court: string; tournamentId: string; orientation: "landscape" | "normal" }
   | { kind: "groups"; tournamentId: string; orientation: "landscape" | "normal" }
+  | { kind: "overlay"; court: string; tournamentId: string }
   | { kind: "admin" };
 
 function readRoute(): AppRoute {
@@ -49,6 +50,10 @@ function readRoute(): AppRoute {
     return { kind: "score", token };
   }
 
+  if (view === "overlay") {
+    return { kind: "overlay", court, tournamentId };
+  }
+
   if (view === "courts") {
     return { kind: "courts", court, tournamentId, orientation };
   }
@@ -64,7 +69,8 @@ export function AppRouter() {
   const route = readRoute();
 
   return (
-    <Suspense fallback={<div className="status">Ansicht wird geladen...</div>}>
+    <Suspense fallback={route.kind === "overlay" ? null : <div className="status">Ansicht wird geladen...</div>}>
+      {route.kind === "overlay" && <CourtDisplayApp court={route.court} tournamentId={route.tournamentId} overlay />}
       {route.kind === "auth" && <AuthCredentialApp mode={route.mode} />}
       {route.kind === "score" && <ScoreEntryApp token={route.token} />}
       {route.kind === "courts" && <CourtDisplayApp court={route.court} tournamentId={route.tournamentId} orientation={route.orientation} />}

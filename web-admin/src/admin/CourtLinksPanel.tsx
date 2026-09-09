@@ -65,6 +65,9 @@ export function CourtLinksPanel({
           const courtLock = courtLocks.find((lock) => lock.tournament_id === entry.tournamentId && lock.court === entry.court);
           const activeLock = Boolean(courtLock?.active_device_id && courtLock.locked_at && Date.parse(courtLock.locked_at) >= Date.now() - 30 * 60 * 1000);
           const blockedLock = Boolean(courtLock?.blocked_device_id && courtLock.blocked_until && Date.parse(courtLock.blocked_until) > Date.now());
+          const overlayUrl = new URL(displayUrl(entry.tournamentId));
+          overlayUrl.searchParams.set("view", "overlay");
+          overlayUrl.searchParams.set("court", entry.court);
           const value = link?.token ? scoreUrl(link.token) : "";
           return (
             <div className="court-link-card" key={entry.court}>
@@ -95,6 +98,11 @@ export function CourtLinksPanel({
                 <button type="button" className="secondary" onClick={() => saveStream(entry.court)} disabled={savingStreamCourt === entry.court}>
                   {savingStreamCourt === entry.court ? "Speichert…" : streamDrafts[entry.court] ? "Stream speichern" : "Stream entfernen"}
                 </button>
+              </div>
+              <div className="court-stream-control">
+                <strong>Spielstand-Overlay für PRISM</strong>
+                <span>Als Web-Quelle einbinden. Transparenter Hintergrund, automatische Aktualisierung.</span>
+                <CompactLink value={overlayUrl.toString()} hideQr />
               </div>
               {value ? (
                 <div className="court-link-qr">

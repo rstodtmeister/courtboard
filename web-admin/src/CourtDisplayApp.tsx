@@ -24,11 +24,13 @@ export function CourtDisplayApp({
   tournamentId,
   mode = "courts",
   orientation = "normal",
+  overlay = false,
 }: {
   court: string;
   tournamentId?: string;
   mode?: "courts" | "groups";
   orientation?: DisplayOrientation;
+  overlay?: boolean;
 }) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -47,6 +49,8 @@ export function CourtDisplayApp({
     return () => window.clearInterval(interval);
   }, [tournamentId]);
 
+  if (loading && overlay) return null;
+
   if (loading) {
     return <DisplayViewport orientation={orientation}><main className="court-display-loading">Anzeige wird geladen...</main></DisplayViewport>;
   }
@@ -56,6 +60,11 @@ export function CourtDisplayApp({
   const sortedGames = sortGames(games);
   const openGames = sortedGames.filter((game) => !isCompleted(game));
   const completedGames = sortedGames.filter(isCompleted);
+
+  if (overlay) {
+    const currentGame = openGames.find((game) => courtNumber(game.court) === selectedCourt);
+    return <main className="court-overlay-page">{currentGame && <StreamScoreOverlay game={currentGame} />}</main>;
+  }
 
   if (mode === "groups") {
     return (
@@ -111,6 +120,44 @@ function DisplayViewport({ orientation, children }: { orientation: DisplayOrient
     : <>{children}</>;
 }
 
+function StreamScoreOverlay({ game: currentGame }: { game: Game }) {
+  const result = liveScoreParts(currentGame);
+  const started = hasStartedScore(gameScoreState(currentGame));
+  const completedSets = completedPreviousSetNumbers(currentGame);
+  const timeout = activeTimeoutInfo(currentGame);
+  return (
+    <div className="stream-score-overlay" aria-live="polite">
+      <div className="stream-score-meta">
+        <span>LIVE</span>
+        <strong>Spiel {currentGame.number}</strong>
+        {timeout && <em>Auszeit: {timeout.teamName} · {timeout.remaining}s</em>}
+      </div>
+      <div className="stream-score-main">
+        <div className="stream-score-team left">
+          <span>{currentGame.team_a || "Team A offen"}</span>
+          <strong>{started ? result?.pointsA ?? "0" : "–"}</strong>
+        </div>
+        <div className="stream-score-sets">
+          <span>Sätze</span>
+          <strong>{started ? result?.sets ?? "0:0" : "0:0"}</strong>
+        </div>
+        <div className="stream-score-team right">
+          <strong>{started ? result?.pointsB ?? "0" : "–"}</strong>
+          <span>{currentGame.team_b || "Team B offen"}</span>
+        </div>
+      </div>
+      {completedSets.length > 0 && (
+        <div className="stream-score-history">
+          {completedSets.map((setNumber) => {
+            const score = scoreForSet(draftFromGame(currentGame), setNumber);
+            return <span key={setNumber}>Satz {setNumber}: {score.A}:{score.B}</span>;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
@@ -120,8 +167,6 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
   const embed = streamEmbed(streamUrl);
   const embedUrl = embed?.url ?? "";
   const providerName = embed?.provider === "twitch" ? "Twitch" : "YouTube";
-  const completedSets = currentGame ? completedPreviousSetNumbers(currentGame) : [];
-  const timeout = currentGame ? activeTimeoutInfo(currentGame) : null;
   return (
     <main className={["single-court-page", embedUrl ? "with-stream" : ""].filter(Boolean).join(" ")}>
       <a className="single-court-back" href={displayUrl(tournamentId, orientation)}>Alle Courts</a>
@@ -135,35 +180,7 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
           <div className="single-court-video">
             <iframe src={embedUrl} title={`${providerName}-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
             {currentGame && (
-              <div className="stream-score-overlay" aria-live="polite">
-                <div className="stream-score-meta">
-                  <span>LIVE</span>
-                  <strong>Spiel {currentGame.number}</strong>
-                  {timeout && <em>Auszeit: {timeout.teamName} · {timeout.remaining}s</em>}
-                </div>
-                <div className="stream-score-main">
-                  <div className="stream-score-team left">
-                    <span>{currentGame.team_a || "Team A offen"}</span>
-                    <strong>{started ? result?.pointsA ?? "0" : "–"}</strong>
-                  </div>
-                  <div className="stream-score-sets">
-                    <span>Sätze</span>
-                    <strong>{started ? result?.sets ?? "0:0" : "0:0"}</strong>
-                  </div>
-                  <div className="stream-score-team right">
-                    <strong>{started ? result?.pointsB ?? "0" : "–"}</strong>
-                    <span>{currentGame.team_b || "Team B offen"}</span>
-                  </div>
-                </div>
-                {completedSets.length > 0 && (
-                  <div className="stream-score-history">
-                    {completedSets.map((setNumber) => {
-                      const score = scoreForSet(draftFromGame(currentGame), setNumber);
-                      return <span key={setNumber}>Satz {setNumber}: {score.A}:{score.B}</span>;
-                    })}
-                  </div>
-                )}
-              </div>
+              <StreamScoreOverlay game={currentGame} />
             )}
           </div>
           <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf {providerName} öffnen</a>
