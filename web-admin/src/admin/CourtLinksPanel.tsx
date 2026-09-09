@@ -100,7 +100,7 @@ export function CourtLinksPanel({
                 </button>
               </div>
               <div className="court-stream-control">
-                <strong>Spielstand-Overlay für PRISM</strong>
+                <strong>Spielstand für Streaming</strong>
                 <span>Als Web-Quelle einbinden. Transparenter Hintergrund, automatische Aktualisierung.</span>
                 <CompactLink value={overlayUrl.toString()} hideQr />
               </div>

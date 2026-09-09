@@ -44,7 +44,9 @@ function courtEntries(games: Game[], tournament: Tournament | null) {
     .filter((game) => isAssignedCourt(game.court) && game.tournament_id)
     .map((game) => ({ court: game.court!, tournamentId: game.tournament_id }));
   const entries = [...configuredCourts, ...gameCourts];
-  return entries.filter((entry, index) => entries.findIndex((item) => item.court === entry.court) === index);
+  return entries
+    .filter((entry, index) => entries.findIndex((item) => item.court === entry.court) === index)
+    .sort((left, right) => Number(left.court) - Number(right.court));
 }
 
 export function AdminDashboard({ session }: { session: AppSession }) {
