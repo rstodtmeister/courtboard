@@ -179,9 +179,6 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
         <section className="single-court-stream">
           <div className="single-court-video">
             <iframe src={embedUrl} title={`${providerName}-Livestream Court ${court}`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
-            {currentGame && (
-              <StreamScoreOverlay game={currentGame} />
-            )}
           </div>
           <a href={streamUrl} target="_blank" rel="noreferrer">Livestream auf {providerName} öffnen</a>
         </section>
