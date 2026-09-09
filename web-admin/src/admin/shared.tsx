@@ -57,7 +57,7 @@ export function LinkOutput({ value }: { value: string }) {
   );
 }
 
-export function CompactLink({ value, hideQr = false }: { value: string; hideQr?: boolean }) {
+export function CompactLink({ value, hideQr = false, mobileCompact = false }: { value: string; hideQr?: boolean; mobileCompact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -70,9 +70,9 @@ export function CompactLink({ value, hideQr = false }: { value: string; hideQr?:
 
   return (
     <div className={hideQr ? "token-link-cell no-qr" : "token-link-cell"}>
-      <div className="compact-link">
+      <div className={mobileCompact ? "compact-link mobile-compact-link" : "compact-link"}>
         <input ref={inputRef} value={value} readOnly />
-        <button type="button" className="secondary" onClick={copy}>{copied ? "Kopiert" : "Kopieren"}</button>
+        <button type="button" className="secondary" onClick={copy}>{copied ? "Kopiert" : mobileCompact ? "Link kopieren" : "Kopieren"}</button>
       </div>
       {!hideQr && <QrCode value={value} compact />}
     </div>
