@@ -52,7 +52,8 @@ function summarize(rows) {
   return { requests: rows.length, errors: rows.filter((r) => !r.ok).length, medianMs: percentile(rows.map((r) => r.ms), .5), p95Ms: percentile(rows.map((r) => r.ms), .95), maxMs: rows.length ? Math.max(...rows.map((r) => r.ms)) : null, decodedBytes: rows.reduce((sum,r) => sum+r.decodedBytes,0) };
 }
 const stages = [];
-for (const [users, seconds] of [[1,15], [10,30], [25,30], [50,120]]) {
+const plan = process.env.LOAD_TEST_50_ONLY === "1" ? [[50,120]] : [[1,15], [10,30], [25,30], [50,120]];
+for (const [users, seconds] of plan) {
   if (halted) break;
   activeStage = `${users} viewers`;
   const start = performance.now();

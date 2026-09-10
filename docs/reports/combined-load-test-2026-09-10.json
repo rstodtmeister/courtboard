@@ -1,0 +1,91 @@
+{
+  "writers": {
+    "measuredAt": "2026-09-10T13:47:11.296Z",
+    "scenario": "Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion",
+    "baseline": {
+      "requests": 61,
+      "errors": 0,
+      "medianMs": 383.11118799999895,
+      "p95Ms": 1386.3061940000007,
+      "maxMs": 2715.7165399999976
+    },
+    "combined": {
+      "requests": 240,
+      "errors": 0,
+      "medianMs": 364.97650700001395,
+      "p95Ms": 491.5053919999991,
+      "maxMs": 875.5415939999948
+    },
+    "heartbeats": {
+      "requests": 8,
+      "errors": 0,
+      "medianMs": 315.1041140000016,
+      "p95Ms": 535.0931010000058,
+      "maxMs": 535.0931010000058
+    },
+    "checks": [
+      {
+        "court": "1",
+        "moves": 75,
+        "score": "31:30",
+        "historyEntries": 61,
+        "matches": true
+      },
+      {
+        "court": "2",
+        "moves": 75,
+        "score": "31:30",
+        "historyEntries": 61,
+        "matches": true
+      },
+      {
+        "court": "3",
+        "moves": 76,
+        "score": "31:31",
+        "historyEntries": 62,
+        "matches": true
+      },
+      {
+        "court": "4",
+        "moves": 75,
+        "score": "31:30",
+        "historyEntries": 61,
+        "matches": true
+      }
+    ],
+    "viewerCode": 0
+  },
+  "viewers": {
+    "measuredAt": "2026-09-10T13:47:11.197Z",
+    "scenario": "Public courts overview; five seconds after completion, tournament cache 60 seconds; HTTP clients, no browser rendering or writes",
+    "fixture": {
+      "games": 18,
+      "openGames": 18,
+      "liveHistoryGames": 4
+    },
+    "halted": false,
+    "stages": [
+      {
+        "users": 50,
+        "elapsedSeconds": 120.111129373,
+        "requests": 2500,
+        "errors": 0,
+        "medianMs": 62.40167400000064,
+        "p95Ms": 174.00052800000412,
+        "maxMs": 633.2088739999963,
+        "decodedBytes": 20341729,
+        "requestsPerSecond": 20.814057889975846,
+        "cycleP95Ms": 304.7648689999987,
+        "cycles": 1200
+      }
+    ]
+  },
+  "cleanup": [
+    {
+      "tournaments": 0,
+      "games": 0,
+      "links": 0,
+      "locks": 0
+    }
+  ]
+}
