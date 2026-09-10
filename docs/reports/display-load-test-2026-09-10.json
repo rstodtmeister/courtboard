@@ -1,0 +1,64 @@
+{
+  "measuredAt": "2026-09-10T13:39:59.051Z",
+  "scenario": "Public courts overview; five seconds after completion, tournament cache 60 seconds; HTTP clients, no browser rendering or writes",
+  "fixture": {
+    "games": 18,
+    "openGames": 18,
+    "liveHistoryGames": 0
+  },
+  "halted": false,
+  "stages": [
+    {
+      "users": 1,
+      "elapsedSeconds": 15.001608268,
+      "requests": 4,
+      "errors": 0,
+      "medianMs": 67.51119099999994,
+      "p95Ms": 211.60267899999963,
+      "maxMs": 211.60267899999963,
+      "decodedBytes": 25459,
+      "requestsPerSecond": 0.26663807830073916,
+      "cycleP95Ms": 211.73649599999953,
+      "cycles": 3
+    },
+    {
+      "users": 10,
+      "elapsedSeconds": 30.052428995,
+      "requests": 71,
+      "errors": 0,
+      "medianMs": 75.38456700000097,
+      "p95Ms": 168.4510969999974,
+      "maxMs": 195.5889709999974,
+      "decodedBytes": 513347,
+      "requestsPerSecond": 2.3625378172197893,
+      "cycleP95Ms": 195.63102599999547,
+      "cycles": 61
+    },
+    {
+      "users": 25,
+      "elapsedSeconds": 30.000595731999994,
+      "requests": 175,
+      "errors": 0,
+      "medianMs": 64.54018999999971,
+      "p95Ms": 230.15262200000143,
+      "maxMs": 464.77277300000424,
+      "decodedBytes": 1262500,
+      "requestsPerSecond": 5.833217498855767,
+      "cycleP95Ms": 334.02536500000133,
+      "cycles": 150
+    },
+    {
+      "users": 50,
+      "elapsedSeconds": 120.000930415,
+      "requests": 1300,
+      "errors": 0,
+      "medianMs": 123.76801700002397,
+      "p95Ms": 183.19204900000477,
+      "maxMs": 1650.9225129999977,
+      "decodedBytes": 10058200,
+      "requestsPerSecond": 10.833249338185976,
+      "cycleP95Ms": 202.73478700002306,
+      "cycles": 1200
+    }
+  ]
+}
