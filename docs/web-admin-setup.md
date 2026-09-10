@@ -312,3 +312,24 @@ nach Abmeldung. Auf einer migrierten lokalen Testdatenbank mit
 ausfuehren; alle Testdaten werden zurueckgerollt.
 Die Frontend-Regressionstests laufen mit `cd web-admin && npm run test:auth`
 und sind auch in `npm run check` enthalten.
+
+### Abfragen der öffentlichen Anzeigen
+
+Court-Übersicht, Einzelcourt, Gruppenansicht und Stream-Overlay warten nach jedem
+abgeschlossenen Abruf fünf Sekunden bis zum nächsten. Ausgeblendete Tabs starten
+keine neuen Abrufe; beim Zurückwechseln wird sofort aktualisiert. Laufende Abrufe
+werden nicht überlappt. Fehler werden beim nächsten Abruf erneut versucht.
+Turnierdaten werden pro Anzeige eine Minute zwischengespeichert. Auszeit-Countdowns
+laufen unabhängig davon sekündlich im Browser weiter.
+
+Im Supabase-Betrieb laden Anzeigen reduzierte Spielfelder. Einzelcourt und Overlay
+filtern bereits auf dem Server nach dem Court. Gruppentabellen laden keine
+Punkteverläufe; die Übersicht lädt sie nur für offene Spiele mit angemeldetem
+Schiedsgericht, die Einzelansicht für offene Spiele ihres Courts. Abgeschlossene
+Spiele bleiben für Ergebnisse und Tabellen in der Übersicht enthalten.
+Die lokale Java-API liefert weiterhin ihre vollständige öffentliche Spieleantwort;
+Abfragepausen und Turniercache gelten auch dort.
+
+`npm run test:display` prüft Abfragepausen, Wiederaufnahme, Fehlerwiederholung,
+Überlappungsschutz und die reduzierte Supabase-Datenauswahl. Ein Lasttest mit
+50 Zuschauern ist damit noch nicht durchgeführt.

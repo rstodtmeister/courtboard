@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { getPublicTournament, listPublicGames } from "./dataApi";
+import { getPublicTournament, listDisplayGames } from "./dataApi";
 import { draftFromGame, isPlausibleSetResult, parsePointHistory, parseScore, parseTimeoutHistory, resultFromCompletedSetScores, scoreForSet } from "./scoreLogic";
 import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
 import { streamEmbed } from "./stream";
+import { startDisplayPolling } from "./displayPolling";
 
 type GroupStanding = {
   team: string;
@@ -36,23 +37,49 @@ export function CourtDisplayApp({
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function loadDisplay() {
-    const [gameData, tournamentData] = await Promise.all([listPublicGames(tournamentId), getPublicTournament(tournamentId)]);
-    setGames(gameData);
-    setTournament(tournamentData);
-    setLoading(false);
-  }
+  const [loadError, setLoadError] = useState("");
+  const [, tick] = useState(0);
+  // Keep timeout countdowns smooth without additional network requests.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "hidden") tick((value) => value + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    loadDisplay();
-    const interval = window.setInterval(loadDisplay, 1000);
-    return () => window.clearInterval(interval);
-  }, [tournamentId]);
+    let disposed = false;
+    let cachedTournament: Tournament | null = null;
+    let tournamentLoadedAt = 0;
+    setLoading(true);
+    setLoadError("");
+    const stop = startDisplayPolling(async () => {
+      if (!cachedTournament || Date.now() - tournamentLoadedAt >= 60_000) {
+        cachedTournament = await getPublicTournament(tournamentId);
+        tournamentLoadedAt = Date.now();
+      }
+      if (disposed) return;
+      const selected = Number.parseInt(court, 10);
+      const singleCourt = (overlay || mode !== "groups") && Number.isFinite(selected) && selected > 0;
+      const courtLabels = singleCourt
+        ? [...new Set([String(selected), ...cachedTournament.courts.filter((label) => courtNumber(label) === selected)])]
+        : undefined;
+      const gameData = await listDisplayGames(cachedTournament.id, courtLabels, mode === "groups" && !overlay);
+      if (disposed) return;
+      setGames(gameData);
+      setTournament(cachedTournament);
+      setLoadError("");
+      setLoading(false);
+    }, () => {
+      if (!disposed) setLoadError("Anzeige konnte nicht aktualisiert werden. Neuer Versuch erfolgt automatisch.");
+    });
+    return () => { disposed = true; stop(); };
+  }, [tournamentId, court, mode, overlay]);
 
   if (loading && overlay) return null;
 
   if (loading) {
-    return <DisplayViewport orientation={orientation}><main className="court-display-loading">Anzeige wird geladen...</main></DisplayViewport>;
+    return <DisplayViewport orientation={orientation}><main className="court-display-loading">{loadError || "Anzeige wird geladen..."}</main></DisplayViewport>;
   }
 
   const courts = displayCourts(tournament, games);

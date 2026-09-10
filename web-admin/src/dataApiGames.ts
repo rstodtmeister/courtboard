@@ -47,6 +47,33 @@ export async function listPublicGames(tournamentId?: string): Promise<Game[]> {
   return data ?? [];
 }
 
+// Histories are loaded only where the display needs live detail.
+export async function listDisplayGames(tournamentId: string, courts?: string[], groupsOnly = false): Promise<Game[]> {
+  if (dataMode === "local") {
+    const games = await listPublicGames(tournamentId);
+    return games.filter((game) => !courts || courts.includes((game.court ?? "").trim()));
+  }
+  let query = getSupabase().from("public_games")
+    .select("id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,completed,score_locked_by_device")
+    .eq("tournament_id", tournamentId);
+  if (courts) query = query.in("court", courts);
+  const { data, error } = await query.order("number", { ascending: true });
+  if (error) throw new Error(error.message);
+  const games: Game[] = (data ?? []).map((game) => ({ ...game, printed: false, dirty: false }));
+  const historyIds = groupsOnly ? [] : games.filter((game) =>
+    !game.completed && (!(game.game_rating ?? "").trim() || game.game_rating?.trim() === "Normal")
+    && (courts || game.score_locked_by_device)
+  ).map((game) => game.id);
+  if (historyIds.length) {
+    const { data: histories, error: historyError } = await getSupabase().from("public_games")
+      .select("id,point_history").eq("tournament_id", tournamentId).in("id", historyIds);
+    if (historyError) throw new Error(historyError.message);
+    const byId = new Map((histories ?? []).map((game) => [game.id, game.point_history]));
+    return games.map((game) => ({ ...game, point_history: byId.get(game.id) ?? null }));
+  }
+  return games;
+}
+
 export async function syncGamesFromHvv(options: { tournamentId: string; overwriteCourts: boolean }): Promise<SyncGamesResult> {
   const tournament = await getTournament(options.tournamentId);
   const source = tournament.hvv_edit_url || tournament.hvv_public_url || "";
