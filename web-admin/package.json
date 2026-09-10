@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc -b",
+    "test:auth": "node --test tests/auth-session.test.mjs",
     "build": "tsc -b && vite build",
-    "check": "npm run typecheck && npm run build",
+    "check": "npm run test:auth && npm run typecheck && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

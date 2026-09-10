@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
   }
 
   const adminClient = createAdminClient();
-  const { data: adminUser, error: adminError } = await adminClient
+  const { data: adminUser, error: adminError } = await userClient
     .from("admin_users")
     .select("user_id,role")
     .eq("user_id", userData.user.id)

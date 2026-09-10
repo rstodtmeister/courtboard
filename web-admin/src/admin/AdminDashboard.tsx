@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createTournament,
   createScoreLink as createScoreLinkData,
@@ -23,6 +23,7 @@ import {
   unlockScoreCourt,
   updateAdminUser,
   updateGameDisplayOrders,
+  validateAdminSession,
 } from "../dataApi";
 import type { HvvTournamentOption } from "../dataApi";
 import { draftFromGame } from "../scoreLogic";
@@ -77,8 +78,11 @@ export function AdminDashboard({ session }: { session: AppSession }) {
   const [loadingHvvTournaments, setLoadingHvvTournaments] = useState(false);
   const [hvvProgressMessage, setHvvProgressMessage] = useState("");
   const isSuperadmin = session.user.role === "superadmin";
+  const dashboardLoads = useRef(0);
 
   const loadDashboard = useCallback(async (options: { silent?: boolean; initial?: boolean } = {}) => {
+    if (options.silent && dashboardLoads.current > 0) return;
+    dashboardLoads.current += 1;
     const silent = options.silent ?? false;
     if (options.initial) {
       setLoading(true);
@@ -89,6 +93,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     }
 
     try {
+      if (isSuperadmin && !await validateAdminSession()) return;
       const tournamentList = await listTournaments();
       const selectedId = selectedTournamentId && tournamentList.some((item) => item.id === selectedTournamentId)
         ? selectedTournamentId
@@ -125,6 +130,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
         setError(gamesError instanceof Error ? gamesError.message : "Dashboard konnte nicht geladen werden.");
       }
     } finally {
+      dashboardLoads.current -= 1;
       if (options.initial) {
         setLoading(false);
       }
@@ -133,10 +139,15 @@ export function AdminDashboard({ session }: { session: AppSession }) {
 
   useEffect(() => {
     loadDashboard({ initial: true });
+    const onFocus = () => { void loadDashboard({ silent: true }); };
+    window.addEventListener("focus", onFocus);
     const interval = window.setInterval(() => {
       loadDashboard({ silent: true });
     }, 10000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [loadDashboard]);
 
   async function saveTournamentDraft(nextTournament: Tournament, options: { silent?: boolean; successMessage?: string } = {}) {

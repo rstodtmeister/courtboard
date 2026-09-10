@@ -1,23 +1,61 @@
-import { clearHvvCredentials, currentAdminRole, dataMode, getSupabase, updateStore, readStore } from "./dataApiCore";
+import { clearHvvCredentials, dataMode, getSupabase, updateStore, readStore } from "./dataApiCore";
 import type { AppSession } from "./types";
+
+const sessionNoticeKey = "courtboard.sessionNotice";
+const sessionEndedEvent = "courtboard:session-ended";
+const replacedMessage = "Du wurdest abgemeldet, weil dein Konto auf einem anderen Gerät angemeldet wurde.";
+
+export function getSessionNotice() {
+  return window.sessionStorage.getItem(sessionNoticeKey) ?? "";
+}
+
+async function endCurrentSession(accessToken: string, message: string) {
+  const client = getSupabase();
+  const { data } = await client.auth.getSession();
+  // A response for an older login must not log out a newer login in this browser.
+  if (data.session?.access_token !== accessToken) return;
+  window.sessionStorage.setItem(sessionNoticeKey, message);
+  clearHvvCredentials();
+  window.dispatchEvent(new Event(sessionEndedEvent));
+  // Never revoke the new device's session when dismissing the old one.
+  await client.auth.signOut({ scope: "local" });
+}
+
+export async function validateAdminSession(): Promise<boolean> {
+  if (dataMode === "local") return true;
+  const client = getSupabase();
+  const { data: authData, error: authError } = await client.auth.getSession();
+  if (authError) throw authError;
+  if (!authData.session) return false;
+  const { data: status, error } = await client.rpc("get_admin_session_status");
+  if (error) throw new Error(`Sitzung konnte nicht geprüft werden: ${error.message}`);
+  if (status === "superadmin" || status === "admin") return true;
+  await endCurrentSession(authData.session.access_token, status === "replaced"
+    ? replacedMessage : "Dein Adminzugang ist nicht mehr verfügbar. Bitte melde dich erneut an.");
+  return false;
+}
 
 export async function getSession(): Promise<AppSession | null> {
   if (dataMode === "local") {
     return readStore().session;
   }
 
-  const { data } = await getSupabase().auth.getSession();
+  const { data, error: authError } = await getSupabase().auth.getSession();
+  if (authError) throw authError;
   const user = data.session?.user;
   if (!user?.email) {
     return null;
   }
 
-  const role = await currentAdminRole(user.id);
-  if (!role) {
-    await getSupabase().auth.signOut();
+  const { data: role, error } = await getSupabase().rpc("claim_admin_session");
+  if (error) throw new Error(`Sitzung konnte nicht geprüft werden: ${error.message}`);
+  if (role !== "admin" && role !== "superadmin") {
+    await endCurrentSession(data.session!.access_token, role === "replaced"
+      ? replacedMessage : "Dein Adminzugang ist nicht verfügbar.");
     return null;
   }
 
+  window.sessionStorage.removeItem(sessionNoticeKey);
   return { user: { email: user.email, role } };
 }
 
@@ -89,8 +127,9 @@ export async function setAdminPassword(password: string): Promise<{ error?: stri
   return {};
 }
 
-export function onSessionChange(callback: (session: AppSession | null) => void) {
+export function onSessionChange(callback: (session: AppSession | null) => void, onError: (error: Error) => void) {
   if (dataMode === "local") {
+    callback(readStore().session);
     const listener = (event: StorageEvent) => {
       if (event.key === "courtboard.localData.v1") {
         callback(readStore().session);
@@ -100,22 +139,36 @@ export function onSessionChange(callback: (session: AppSession | null) => void) 
     return () => window.removeEventListener("storage", listener);
   }
 
+  let generation = 0;
+  let timer: number | undefined;
+  const ended = () => {
+    generation += 1;
+    callback(null);
+  };
+  window.addEventListener(sessionEndedEvent, ended);
   const { data } = getSupabase().auth.onAuthStateChange((_event, session) => {
-    const user = session?.user;
-    if (!user?.email) {
+    const current = ++generation;
+    window.clearTimeout(timer);
+    if (!session?.user.email) {
       callback(null);
       return;
     }
-    currentAdminRole(user.id).then((role) => {
-      if (!role) {
-        callback(null);
-        return;
-      }
-      callback({ user: { email: user.email!, role } });
-    });
+    // Leave the Auth callback before making another Supabase request.
+    timer = window.setTimeout(() => {
+      getSession().then((next) => {
+        if (current === generation) callback(next);
+      }).catch((error) => {
+        if (current === generation) onError(error instanceof Error ? error : new Error(String(error)));
+      });
+    }, 0);
   });
 
-  return () => data.subscription.unsubscribe();
+  return () => {
+    generation += 1;
+    window.clearTimeout(timer);
+    window.removeEventListener(sessionEndedEvent, ended);
+    data.subscription.unsubscribe();
+  };
 }
 
 export async function signIn(email: string, password: string): Promise<{ error?: string }> {
@@ -135,12 +188,13 @@ export async function signIn(email: string, password: string): Promise<{ error?:
 
 export async function signOut() {
   clearHvvCredentials();
+  window.sessionStorage.removeItem(sessionNoticeKey);
   if (dataMode === "local") {
     updateStore({ session: null });
     return;
   }
 
-  await getSupabase().auth.signOut();
+  await getSupabase().auth.signOut({ scope: "local" });
 }
 
 function loginUrl() {

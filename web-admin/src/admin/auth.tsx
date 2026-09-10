@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import {
   completeAuthRedirect,
-  getSession,
+  getSessionNotice,
   onSessionChange,
   requestPasswordReset,
   setAdminPassword,
@@ -111,14 +111,17 @@ export function AdminApp({
 }) {
   const [session, setSession] = useState<AppSession | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
+  const [sessionMessage, setSessionMessage] = useState("");
 
   useEffect(() => {
-    getSession().then((nextSession) => {
+    return onSessionChange((nextSession) => {
       setSession(nextSession);
+      setSessionMessage(nextSession ? "" : getSessionNotice());
+      setLoadingSession(false);
+    }, (error) => {
+      setSessionMessage(error.message);
       setLoadingSession(false);
     });
-
-    return onSessionChange(setSession);
   }, []);
 
   if (loadingSession) {
@@ -127,6 +130,7 @@ export function AdminApp({
 
   return (
     <Shell>
+      {sessionMessage && <div className="error" role="alert">{sessionMessage}</div>}
       {session ? dashboard(session) : <LoginForm />}
     </Shell>
   );

@@ -249,3 +249,53 @@ Die Seite laedt die erlaubten Spiele ueber `submit-score` per `GET` und speicher
 ## Schritt 5: GitHub Pages
 
 Die Web-App wird als statische Vite-App gebaut. GitHub Actions deployed `web-admin/dist` nach GitHub Pages.
+
+## Eine Sitzung pro Superadmin (auch im Free-Tarif)
+
+Die Migration `20260910120000_single_superadmin_session.sql` speichert die aktive
+Supabase-Auth-Sitzung je Superadmin. Beim Anmelden uebernimmt die neueste Sitzung.
+Normale Admins und tokenbasierte Ergebnislinks bleiben davon unberuehrt. Der lokale
+Offline-Modus hat keine geraeteuebergreifende Authentifizierung und nutzt diese Regel nicht.
+
+Die Datenbank prueft die Sitzung bei administrativen Zugriffen ueber RLS. Auch die
+Admin-Pruefung der Edge Functions verwendet den Benutzer-JWT, bevor privilegierte
+Operationen stattfinden. Bereits laufende Anfragen werden nicht rueckwirkend abgebrochen.
+Alte Sitzungen koennen die aktive Sitzung durch Neuladen oder Token-Erneuerung nicht
+zurueckholen, auch nicht nach dem Abmelden des neuen Geraets.
+
+Im alten Browser erscheint beim naechsten Dashboard-Abgleich (normalerweise nach
+spaetestens etwa zehn Sekunden plus Netzwerklaufzeit) oder beim Fensterfokus die
+Abmeldemeldung. Hintergrund-Tabs/offline befindliche Geraete koennen sie spaeter anzeigen;
+die serverseitige Sperre haengt nicht von diesem Abgleich ab. Automatisches und normales
+Abmelden verwenden `scope: "local"`, damit die neue Sitzung auf dem anderen Geraet bestehen bleibt.
+
+Zur Aktivierung im gehosteten Projekt sind **alle drei Schritte** erforderlich:
+
+1. `supabase db push` (Migration einspielen; bestehende Superadmins behalten zunaechst ihre neueste Auth-Sitzung).
+2. Die fuenf geaenderten Edge Functions bereitstellen:
+
+   ```bash
+   supabase functions deploy manage-admins
+   supabase functions deploy sync-games
+   supabase functions deploy save-game
+   supabase functions deploy create-score-link
+   supabase functions deploy list-hvv-tournaments
+   ```
+
+3. Die aktualisierte Web-App ueber den GitHub-Pages-Workflow bereitstellen und auf beiden Geraeten neu laden.
+
+Migration, Functions und Web-App zusammen ausrollen: Alte Functions pruefen die Sitzung
+noch nicht, und eine alte Web-App kann neue Sitzungen noch nicht registrieren.
+
+Pruefung: Mit demselben Superadmin in zwei getrennten Browserprofilen anmelden. Nach
+der zweiten Anmeldung muss das erste Profil abgemeldet werden; das zweite muss weiter
+speichern koennen. Nach Abmelden des zweiten Profils darf Neuladen im ersten dessen alte
+Sitzung nicht reaktivieren. Normale Admins duerfen weiterhin mehrere Sitzungen verwenden.
+
+Der SQL-Regressionstest `supabase/tests/superadmin_sessions.sql` prueft Uebernahme,
+RLS-Schreibschutz, die Rollenabfrage der Edge Functions und die Sperre alter Sitzungen
+nach Abmeldung. Auf einer migrierten lokalen Testdatenbank mit
+`psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/superadmin_sessions.sql`
+ausfuehren; alle Testdaten werden zurueckgerollt.
+Die Frontend-Regressionstests laufen mit `cd web-admin && npm run test:auth`
+und sind auch in `npm run check` enthalten.
