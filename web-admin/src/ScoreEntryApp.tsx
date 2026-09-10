@@ -45,6 +45,12 @@ export function ScoreEntryApp({ token }: { token: string }) {
   const [liveError, setLiveError] = useState("");
   const [message, setMessage] = useState("");
   const sideSwapTimeouts = useRef<number[]>([]);
+  const latestLiveSave = useRef(0);
+  const finishingSet = useRef(false);
+
+  useEffect(() => {
+    return () => { latestLiveSave.current += 1; };
+  }, [token, selectedGameId]);
 
   async function loadEntry() {
     setLoading(true);
@@ -362,13 +368,19 @@ export function ScoreEntryApp({ token }: { token: string }) {
 
   async function persistLiveDraft(nextDraft: GameDraft) {
     if (!selectedGame) {
-      return;
+      return false;
     }
+    const saveNumber = ++latestLiveSave.current;
     setLiveError("");
     try {
       await submitScore(token, selectedGame, nextDraft);
+      if (saveNumber === latestLiveSave.current) setLiveError("");
+      return true;
     } catch (submitError) {
-      setLiveError(submitError instanceof Error ? submitError.message : "Live-Stand konnte nicht gespeichert werden.");
+      if (saveNumber === latestLiveSave.current) {
+        setLiveError(submitError instanceof Error ? submitError.message : "Live-Stand konnte nicht gespeichert werden.");
+      }
+      return false;
     }
   }
 
@@ -385,7 +397,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function changeSetPoint(team: TeamKey, delta: 1 | -1) {
-    if (!draft || isSwappingSides) {
+    if (!draft || isSwappingSides || finishingSet.current) {
       return;
     }
     setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
@@ -426,6 +438,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function undoLastPoint() {
+    if (finishingSet.current) return;
     cancelPendingSideSwap();
     const previous = pointHistory[pointHistory.length - 1];
     if (!previous) {
@@ -486,7 +499,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function takeTimeout(team: TeamKey) {
-    if (!draft || timeoutScore[team]) {
+    if (!draft || timeoutScore[team] || finishingSet.current) {
       return;
     }
     setTimeoutScore((current) => ({ ...current, [team]: `${setScore[team]}:${setScore[team === "A" ? "B" : "A"]}` }));
@@ -517,7 +530,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   async function finishCurrentSet() {
-    if (!draft) {
+    if (!draft || finishingSet.current) {
       return;
     }
     if (setScore.A === setScore.B) {
@@ -528,51 +541,65 @@ export function ScoreEntryApp({ token }: { token: string }) {
       setLiveError("Satzabschluss ist erst ab 15 Punkten und 2 Punkten Vorsprung möglich.");
       return;
     }
-    setLiveError("");
-    const nextDraft = withScoreAutomation(draftWithSetScore(draft, activeSet, setScore));
-    setDraft(nextDraft);
-    await persistLiveDraft(nextDraft);
+    finishingSet.current = true;
+    setSaving(true);
+    try {
+      setLiveError("");
+      const nextDraft = withScoreAutomation(draftWithSetScore(draft, activeSet, setScore));
+      setDraft(nextDraft);
+      if (!await persistLiveDraft(nextDraft)) return;
 
-    const result = matchResult(nextDraft);
-    if (result.teamA >= 2 || result.teamB >= 2 || activeSet === 3) {
-      setFinalEditing(false);
-      setWorkflowStep("scoring");
-      return;
+      const result = matchResult(nextDraft);
+      if (result.teamA >= 2 || result.teamB >= 2 || activeSet === 3) {
+        setFinalEditing(false);
+        setWorkflowStep("scoring");
+        return;
+      }
+
+      setActiveSet((current) => (current === 1 ? 2 : 3) as 1 | 2 | 3);
+      setServingTeam("");
+      setFirstServerTeamA("");
+      setFirstServerTeamB("");
+      setSideChangeInterval(null);
+      setServerSetupStep("serve-team");
+      setSetScore({ A: 0, B: 0 });
+      setServerIndex({ A: 0, B: 0 });
+      setServeCounts({ A: 0, B: 0 });
+      setPointHistory([]);
+      setCorrectionMode(false);
+      setLastPointTeam(null);
+      setSideChangeAck(null);
+      setIsSwappingSides(false);
+      setTimeoutScore({ A: null, B: null });
+      setActiveTimeoutTeam(null);
+      setTimeoutRemaining(0);
+      setWorkflowStep("servers");
+    } finally {
+      finishingSet.current = false;
+      setSaving(false);
     }
-
-    setActiveSet((current) => (current === 1 ? 2 : 3) as 1 | 2 | 3);
-    setServingTeam("");
-    setFirstServerTeamA("");
-    setFirstServerTeamB("");
-    setSideChangeInterval(null);
-    setServerSetupStep("serve-team");
-    setSetScore({ A: 0, B: 0 });
-    setServerIndex({ A: 0, B: 0 });
-    setServeCounts({ A: 0, B: 0 });
-    setPointHistory([]);
-    setCorrectionMode(false);
-    setLastPointTeam(null);
-    setSideChangeAck(null);
-    setIsSwappingSides(false);
-    setTimeoutScore({ A: null, B: null });
-    setActiveTimeoutTeam(null);
-    setTimeoutRemaining(0);
-    setWorkflowStep("servers");
   }
 
   async function finishWithSpecialRating(rating: string) {
-    if (!draft) {
+    if (!draft || finishingSet.current) {
       return;
     }
-    const nextDraft = withScoreAutomation({
-      ...draftWithSetScore(draft, activeSet, setScore),
-      game_rating: rating,
-      completed: false,
-    });
-    setDraft(nextDraft);
-    await persistLiveDraft(nextDraft);
-    setFinalEditing(false);
-    setWorkflowStep("scoring");
+    finishingSet.current = true;
+    setSaving(true);
+    try {
+      const nextDraft = withScoreAutomation({
+        ...draftWithSetScore(draft, activeSet, setScore),
+        game_rating: rating,
+        completed: false,
+      });
+      setDraft(nextDraft);
+      if (!await persistLiveDraft(nextDraft)) return;
+      setFinalEditing(false);
+      setWorkflowStep("scoring");
+    } finally {
+      finishingSet.current = false;
+      setSaving(false);
+    }
   }
 
   async function confirmFinalResult(nextDraft: GameDraft | null = draft) {
@@ -652,7 +679,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
             {data && data.games.length > 1 && (
               <label>
                 Spiel
-                <select value={selectedGameId} onChange={(event) => selectGame(event.target.value)}>
+                <select value={selectedGameId} onChange={(event) => selectGame(event.target.value)} disabled={saving}>
                   {data.games.map((game) => (
                     <option key={game.id} value={game.id}>
                       {game.number} - {game.team_a} vs. {game.team_b}
@@ -723,8 +750,10 @@ export function ScoreEntryApp({ token }: { token: string }) {
               />
             )}
 
+            {workflowStep === "live" && saving && <div className="status" role="status">Satz wird gespeichert...</div>}
             {workflowStep === "live" && (
               <LiveSetStep
+                saving={saving}
                 game={selectedGame}
                 draft={draft}
                 leftTeam={leftTeam}

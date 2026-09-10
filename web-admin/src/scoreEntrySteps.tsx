@@ -471,6 +471,7 @@ function ServerSetupProgress({ current, total }: { current: number; total: numbe
 
 export function LiveSetStep({
   game,
+  saving,
   draft,
   activeSet,
   leftTeam,
@@ -502,6 +503,7 @@ export function LiveSetStep({
   onSpecialRating,
 }: {
   game: Game;
+  saving: boolean;
   draft: GameDraft;
   activeSet: 1 | 2 | 3;
   leftTeam: TeamKey;
@@ -561,7 +563,7 @@ export function LiveSetStep({
   const completedSets = completedSetRows({ ...game, ...draft });
 
   return (
-    <section className={correctionMode ? "live-set-card correcting" : "live-set-card"}>
+    <section inert={saving} aria-busy={saving} className={correctionMode ? "live-set-card correcting" : "live-set-card"}>
       <div className="landscape-notice">Hoch- und Querformat werden unterstützt.</div>
       {completedSets.length > 0 && (
         <div className="live-set-results">

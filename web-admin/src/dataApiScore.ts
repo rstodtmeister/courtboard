@@ -1,6 +1,9 @@
 import { dataMode, getSupabase, LocalLinksResponse, localAdminJson, localJson, scoreDeviceId, supabaseFunctionErrorMessage } from "./dataApiCore";
 import type { CourtLock, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkResponse } from "./types";
 import { getPrimaryTournament } from "./dataApiTournaments";
+import { createScoreSaveQueue } from "./scoreSaveQueue";
+
+const enqueueScoreSave = createScoreSaveQueue();
 
 export async function createScoreLink(params: { tournamentId: string; gameId?: string; court?: string }): Promise<ScoreLinkResponse> {
   if (dataMode === "local") {
@@ -145,14 +148,22 @@ export async function unlockScoreCourt(tournamentId: string, court: string): Pro
   }
 }
 
-export async function submitScore(token: string, game: Game, draft: GameDraft): Promise<void> {
+export function submitScore(token: string, game: Game, draft: GameDraft): Promise<void> {
+  // Capture the score and identity now, not when the queued request starts.
+  const snapshot = { ...draft };
+  const gameId = game.id;
+  const deviceId = scoreDeviceId();
+  return enqueueScoreSave(gameId, () => sendScore(token, gameId, deviceId, snapshot));
+}
+
+async function sendScore(token: string, gameId: string, deviceId: string, draft: GameDraft): Promise<void> {
   if (dataMode === "local") {
     await localJson<{ ok: boolean }>("/api/submit-score", {
       method: "POST",
       body: JSON.stringify({
         token,
-        deviceId: scoreDeviceId(),
-        gameId: game.id,
+        deviceId,
+        gameId,
         referee: draft.referee,
         result: draft.result,
         winnerTeam: draft.winner_team,
@@ -174,8 +185,8 @@ export async function submitScore(token: string, game: Game, draft: GameDraft): 
   const { error } = await getSupabase().functions.invoke("submit-score", {
     body: {
       token,
-      deviceId: scoreDeviceId(),
-      gameId: game.id,
+      deviceId,
+      gameId,
       referee: draft.referee,
       result: draft.result,
       winnerTeam: draft.winner_team,

@@ -246,6 +246,19 @@ https://<pages-url>/?token=<token>
 
 Die Seite laedt die erlaubten Spiele ueber `submit-score` per `GET` und speichert Ergebnisse ueber dieselbe Function per `POST`.
 
+Speicheranfragen werden im Browser pro Spiel in Eingabereihenfolge ausgefuehrt.
+Das umfasst Schiedsrichterauswahl, Live-Punkte, Korrekturen und den Spielabschluss.
+Die Anfrage verwendet den Spielstand zum Zeitpunkt der Eingabe. Andere Spiele und
+Courts haben eigene Warteschlangen und koennen gleichzeitig speichern. Fehler werden
+an den jeweiligen Aufrufer gemeldet; spaetere Speicherungen laufen weiter, ohne alte
+Spielstaende automatisch erneut zu senden. Die Warteschlange selbst liegt im Arbeitsspeicher
+der Browserseite und ist kein geraeteuebergreifender oder dauerhafter Offline-Puffer.
+
+Beim Satzabschluss sind weitere Eingaben bis zur Antwort gesperrt. Schlaegt das Speichern
+fehl, bleibt der aktuelle Satz geoeffnet und kann erneut bestaetigt werden.
+`cd web-admin && npm run test:score` prueft die Reihenfolge mit verzoegerten Antworten,
+Fehlern und vier gleichzeitig genutzten Courts im lokalen und im Supabase-Datenadapter.
+
 ## Schritt 5: GitHub Pages
 
 Die Web-App wird als statische Vite-App gebaut. GitHub Actions deployed `web-admin/dist` nach GitHub Pages.
