@@ -1,0 +1,139 @@
+{
+  "writers": {
+    "measuredAt": "2026-09-10T14:19:15.188Z",
+    "scenario": "Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion",
+    "baseline": {
+      "requests": 61,
+      "errors": 0,
+      "medianMs": 259.7634510000007,
+      "p95Ms": 737.2740180000001,
+      "maxMs": 1111.9721539999991
+    },
+    "combined": {
+      "requests": 241,
+      "errors": 0,
+      "medianMs": 260.2950780000101,
+      "p95Ms": 376.5344150000019,
+      "maxMs": 996.1706260000065
+    },
+    "heartbeats": {
+      "requests": 8,
+      "errors": 0,
+      "medianMs": 249.37575300000026,
+      "p95Ms": 326.20940199999313,
+      "maxMs": 326.20940199999313
+    },
+    "checks": [
+      {
+        "court": "1",
+        "moves": 76,
+        "score": "41:41",
+        "historyEntries": 120,
+        "matches": true
+      },
+      {
+        "court": "2",
+        "moves": 76,
+        "score": "41:41",
+        "historyEntries": 120,
+        "matches": true
+      },
+      {
+        "court": "3",
+        "moves": 75,
+        "score": "41:40",
+        "historyEntries": 120,
+        "matches": true
+      },
+      {
+        "court": "4",
+        "moves": 75,
+        "score": "41:40",
+        "historyEntries": 120,
+        "matches": true
+      }
+    ],
+    "viewerCode": 0
+  },
+  "viewers": {
+    "measuredAt": "2026-09-10T14:19:15.056Z",
+    "scenario": "Public courts overview; five seconds after completion, tournament cache 60 seconds; HTTP clients, no browser rendering or writes",
+    "fixture": {
+      "compactDisplay": true,
+      "games": 120,
+      "openGames": 4,
+      "liveHistoryGames": 4
+    },
+    "halted": false,
+    "stages": [
+      {
+        "users": 50,
+        "elapsedSeconds": 120.001089381,
+        "requests": 1300,
+        "errors": 0,
+        "medianMs": 69.19732599999406,
+        "p95Ms": 208.36669600000005,
+        "maxMs": 1443.7389649999986,
+        "decodedBytes": 75905500,
+        "requestsPerSecond": 10.833234987330302,
+        "cycleP95Ms": 235.76664300000994,
+        "cycles": 1200
+      }
+    ]
+  },
+  "serverTiming": {
+    "hash": {
+      "medianMs": 0.68,
+      "p95Ms": 1.37,
+      "samples": 241
+    },
+    "validate": {
+      "medianMs": 0.41,
+      "p95Ms": 0.61,
+      "samples": 241
+    },
+    "database": {
+      "medianMs": 61.76,
+      "p95Ms": 142.48,
+      "samples": 241
+    },
+    "total": {
+      "medianMs": 67.01,
+      "p95Ms": 149.09,
+      "samples": 241
+    }
+  },
+  "firstAttempt": {
+    "requests": 58,
+    "errors": 1,
+    "medianMs": 288.69823499999984,
+    "p95Ms": 2307.179398,
+    "maxMs": 15002.526658000002,
+    "combinedStageStarted": false,
+    "cleanupVerified": true,
+    "cause": "Unresolved client timeout; no correlated failed server request available"
+  },
+  "schedulerProbe": [
+    {
+      "status": "retry",
+      "attempts": 2,
+      "phase": "score",
+      "last_error": "Fuer das Spiel wurde kein Bearbeiten-Link gefunden."
+    }
+  ],
+  "completionProbe": {
+    "completion_ms": 444.11,
+    "saved": true,
+    "winner_correct": true,
+    "delivery_status": "not_configured"
+  },
+  "cleanup": [
+    {
+      "tournaments": 0,
+      "games": 0,
+      "links": 0,
+      "locks": 0,
+      "jobs": 0
+    }
+  ]
+}

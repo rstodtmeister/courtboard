@@ -359,7 +359,7 @@ async function fetchOnce(
     headers.set("Cookie", [...cookies].map(([name, value]) => `${name}=${value}`).join("; "));
   }
 
-  const response = await fetch(url, { ...init, headers, redirect: "manual" });
+  const response = await fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(15_000), headers, redirect: "manual" });
   storeCookies(response.headers, cookies);
   return response;
 }

@@ -59,9 +59,9 @@ test('display queries filter courts, omit bulk histories and fetch only unfinish
     const games = await listDisplayGames('t');
     assert.equal(calls[0].fields.includes('point_history'), false);
     assert.equal(calls[0].fields.includes('dirty'), false);
-    assert.deepEqual(calls[1].id, ['live']);
-    assert.equal(games[0].point_history, 'history');
-    assert.equal(games[1].point_history, null);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].fields.includes('display_state'), true);
+    assert.equal(games[0].point_history, undefined);
     calls.length = 0;
     await listDisplayGames('t', undefined, true);
     assert.equal(calls.length, 1);
@@ -69,5 +69,6 @@ test('display queries filter courts, omit bulk histories and fetch only unfinish
     await listDisplayGames('t', ['1', '01']);
     assert.deepEqual(calls[0].court, ['1', '01']);
     assert.equal(calls[0].tournament_id, 't');
+    assert.deepEqual(calls[1].id, ['live', 'future']);
   } finally { delete globalThis.__displayDb; }
 });

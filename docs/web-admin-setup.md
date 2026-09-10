@@ -323,9 +323,10 @@ Turnierdaten werden pro Anzeige eine Minute zwischengespeichert. Auszeit-Countdo
 laufen unabhängig davon sekündlich im Browser weiter.
 
 Im Supabase-Betrieb laden Anzeigen reduzierte Spielfelder. Einzelcourt und Overlay
-filtern bereits auf dem Server nach dem Court. Gruppentabellen laden keine
-Punkteverläufe; die Übersicht lädt sie nur für offene Spiele mit angemeldetem
-Schiedsgericht, die Einzelansicht für offene Spiele ihres Courts. Abgeschlossene
+filtern bereits auf dem Server nach dem Court. Gruppentabellen und Court-Übersichten laden keine Punkteverläufe mehr.
+Die Übersicht erhält den beim Speichern vorberechneten `display_state` mit
+Spielbeginn und letztem Auszeitstatus. Die Einzelansicht lädt weiterhin die
+Punkteverläufe offener Spiele ihres Courts. Abgeschlossene
 Spiele bleiben für Ergebnisse und Tabellen in der Übersicht enthalten.
 Die lokale Java-API liefert weiterhin ihre vollständige öffentliche Spieleantwort;
 Abfragepausen und Turniercache gelten auch dort.
@@ -333,3 +334,61 @@ Abfragepausen und Turniercache gelten auch dort.
 `npm run test:display` prüft Abfragepausen, Wiederaufnahme, Fehlerwiederholung,
 Überlappungsschutz und die reduzierte Supabase-Datenauswahl. Ein Lasttest mit
 50 Zuschauern ist damit noch nicht durchgeführt.
+
+
+### Atomare Speicherung und HVV-Hintergrundübertragung
+
+`submit-score` validiert Punkte und Wertung, hasht den Token und führt anschließend
+`submit_score_atomic` aus. Dieser eine Datenbankaufruf prüft Token, Ablaufdatum,
+Spielzuordnung und Court-Sperre, speichert das Ergebnis und aktualisiert die
+Link-Nutzung innerhalb einer Transaktion. Nur `service_role` darf ihn aufrufen.
+`Server-Timing` zeigt Hash-, Validierungs-, Datenbank- und Gesamtzeit; die
+Datenbankzeit enthält auch die Verbindung zwischen Edge Function und Data API.
+Es werden keine Tokens oder Punkteverläufe protokolliert.
+
+Beim Spielabschluss wird in derselben Transaktion ein Eintrag in
+`hvv_delivery_jobs` angelegt. Die HTTP-Antwort wartet nicht mehr auf HVV-Aufrufe.
+`EdgeRuntime.waitUntil` startet einen sofortigen Versuch; ein Cron-Job prüft jede
+Minute auf fällige oder abgebrochene Aufträge. Ohne fällige Aufträge erfolgt kein
+HTTP-Aufruf. Leases verhindern parallele Bearbeitung desselben Turniers und
+laufen nach fünf Minuten ab. Fehler werden bis zu acht Versuchen mit wachsender
+Wartezeit (höchstens 30 Minuten) erneut versucht. Danach zeigt die Erfassung an,
+dass die Turnierleitung die Übertragung prüfen muss; das Ergebnis bleibt gespeichert
+und `dirty` bleibt gesetzt. Bestehende ältere Ergebnisse werden nicht nachträglich
+automatisch eingereiht.
+
+Nach erfolgreicher Ergebnisübertragung wird die Phase `refresh` gespeichert.
+Scheitert anschließend das Nachladen des Turniers, wird nur dieses wiederholt.
+Bei einem Verbindungsabbruch nach dem HVV-POST, aber vor der Phasenbestätigung,
+kann derselbe Ergebnisstand erneut übertragen werden: keine Exactly-once-Garantie.
+Ein währenddessen geänderter Spielstand wird nicht als sauber markiert. Die
+Schiedsrichter-Abschlussseite fragt den tokengebundenen Status alle 15 Sekunden
+ab, pausiert im Hintergrund und beendet die Abfragen bei einem Endstatus.
+Spiele ohne Bearbeiten-Link erhalten `not_configured` und lösen keine HVV-Anfrage aus.
+
+Deployment-Reihenfolge: Migrationen, Worker-Geheimnis, Edge-Funktionen, Frontend.
+Für den Worker wird ein zufälliges eigenes Geheimnis als Edge-Secret
+`HVV_WORKER_SECRET` und mit demselben Wert in Vault unter `hvv_worker_secret`
+benötigt. Vault enthält außerdem `hvv_worker_project_url` (Projekt-URL ohne
+abschließenden Slash). Keine Geheimnisse in Git speichern. `submit-score` und
+`process-hvv-deliveries` haben gemäß `supabase/config.toml` kein Gateway-JWT:
+Ersteres prüft Spieltokens, letzteres den eigenen Header `x-worker-secret`.
+Die Worker- und Queue-Funktionen sind für anonyme und angemeldete Browser gesperrt.
+
+Grundlage: [Supabase-Hintergrundaufgaben](https://supabase.com/docs/guides/functions/background-tasks)
+und [geplante Edge-Funktionen mit Cron, pg_net und Vault](https://supabase.com/docs/guides/functions/schedule-functions).
+
+Prüfungen: `npm run check` umfasst auch die HVV-Worker- und Endpoint-Tests.
+`supabase/tests/score_performance.sql` und `supabase/tests/hvv_delivery.sql` prüfen
+atomare Speicherung, Zugriffsgrenzen, Wiederholungen und Leases in zurückgerollten
+Testtransaktionen. Sie benötigen eine Entwicklungsdatenbank mit allen Migrationen.
+Der Scheduler benötigt die Supabase-Erweiterungen und wird separat live geprüft.
+
+### Gespeicherte Performance-Messungen
+
+Die Referenzmessungen liegen unter `docs/reports/`: zuerst die reine Zuschauerlast,
+danach vier Schiedsrichter parallel zu 50 Zuschauern und zuletzt
+[der größere Test mit 120 Spielen](reports/public-performance-2026-09-10.md).
+Dieser letzte Bericht dokumentiert auch einen abgebrochenen Anlauf mit Timeout
+und die Grenzen des erfolgreichen Wiederholungstests. Bei späteren Änderungen
+Datenumfang, Beobachtungsdauer und fehlgeschlagene Versuche mit vergleichen.

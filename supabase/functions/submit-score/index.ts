@@ -1,12 +1,13 @@
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { sha256Hex } from "../_shared/token.ts";
-import { hvvCredentialsFromEnv, refreshTournamentGamesFromHvv, submitGameToHvv } from "../_shared/hvv.ts";
+import { processHvvDelivery } from "../_shared/hvv-delivery.ts";
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 import { ScoreValidationError, validateScoreSubmission } from "../_shared/score-validation.ts";
 
 type SubmitScoreRequest = {
   token: string;
-  action?: "heartbeat";
+  action?: "heartbeat" | "sync-status";
   deviceId?: string;
   gameId?: string;
   referee?: string;
@@ -38,6 +39,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
+  const requestStarted = performance.now();
   const url = new URL(req.url);
   let body: SubmitScoreRequest | null = null;
   if (req.method === "POST") {
@@ -75,26 +77,29 @@ Deno.serve(async (req) => {
   }
 
   const adminClient = createAdminClient();
+  const hashStarted = performance.now();
   const tokenHash = await sha256Hex(token);
-  const { data: link, error: linkError } = await adminClient
-    .from("score_entry_links")
-    .select("id, tournament_id, game_id, court, expires_at, used_at")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
-
-  if (linkError) {
-    return jsonResponse({ error: linkError.message }, 500);
-  }
-
-  if (!link) {
-    return jsonResponse({ error: "Invalid token" }, 404);
-  }
-
-  if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
-    return jsonResponse({ error: "Token expired" }, 410);
-  }
-
+  const hashMs = performance.now() - hashStarted;
   if (req.method === "GET") {
+    const { data: link, error: linkError } = await adminClient
+      .from("score_entry_links")
+      .select("id, tournament_id, game_id, court, expires_at, used_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (linkError) {
+      return jsonResponse({ error: linkError.message }, 500);
+    }
+
+    if (!link) {
+      return jsonResponse({ error: "Invalid token" }, 404);
+    }
+
+    if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
+      return jsonResponse({ error: "Token expired" }, 410);
+    }
+
+
     let query = adminClient
       .from("games")
       .select(gameSelect)
@@ -177,112 +182,45 @@ Deno.serve(async (req) => {
     });
   }
 
-  const gameIdValue: unknown = body?.gameId ?? link.game_id;
-  if (typeof gameIdValue !== "string" || !gameIdValue) {
-    return jsonResponse({ error: "gameId is required for court links" }, 400);
-  }
-  if (gameIdValue.length > 128) {
+  const gameId = body?.gameId ?? null;
+  if (gameId !== null && (typeof gameId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(gameId))) {
     return jsonResponse({ error: "Invalid gameId" }, 400);
   }
-  const gameId = gameIdValue;
-
-  const { data: game, error: gameError } = await adminClient
-    .from("games")
-    .select("id, tournament_id, court, team_a, team_b, completed, score_locked_by_device")
-    .eq("id", gameId)
-    .maybeSingle();
-
-  if (gameError) {
-    return jsonResponse({ error: gameError.message }, 500);
+  if (body?.action === "sync-status") {
+    const { data, error } = await adminClient.rpc("score_delivery_status", { p_token_hash: tokenHash, p_game_id: gameId });
+    return error ? scoreDatabaseError(error.message) : jsonResponse({ status: data });
   }
-
-  if (!game || game.tournament_id !== link.tournament_id || (link.court && game.court !== link.court)) {
-    return jsonResponse({ error: "Game is not allowed for this token" }, 403);
-  }
-
-  if (!deviceId) {
-    return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
-  }
-
-  if (body?.action === "heartbeat") {
-    const { error: heartbeatError } = await adminClient.rpc("heartbeat_score_court_lock", {
-      p_game_id: game.id,
-      p_tournament_id: link.tournament_id,
-      p_device_id: deviceId,
-      p_stale_after: scoreLockTimeout,
-    });
-    if (heartbeatError) {
-      return scoreDatabaseError(heartbeatError.message);
-    }
-    return jsonResponse({ ok: true });
-  }
-
+  if (!deviceId) return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
   let validated;
+  const validationStarted = performance.now();
   try {
-    validated = validateScoreSubmission(body ?? {}, game);
+    validated = body?.action === "heartbeat" ? null : validateScoreSubmission(body ?? {}, { team_a: "1", team_b: "2" });
   } catch (error) {
-    if (error instanceof ScoreValidationError) {
-      return jsonResponse({ error: error.message }, 400);
-    }
+    if (error instanceof ScoreValidationError) return jsonResponse({ error: error.message }, 400);
     throw error;
   }
-
-  const completed = validated.completed;
-
-  const { data: updatedGame, error: updateError } = await adminClient.rpc("save_score_game", {
-    p_game_id: game.id,
-    p_tournament_id: link.tournament_id,
-    p_link_game_id: link.game_id,
-    p_link_court: link.court,
-    p_device_id: deviceId,
-    p_stale_after: scoreLockTimeout,
-    p_score: {
-      referee: validated.referee,
-      result: validated.result,
-      winnerTeam: validated.winnerTeam,
-      gameRating: validated.gameRating,
-      set1TeamA: validated.set1TeamA,
-      set1TeamB: validated.set1TeamB,
-      set2TeamA: validated.set2TeamA,
-      set2TeamB: validated.set2TeamB,
-      set3TeamA: validated.set3TeamA,
-      set3TeamB: validated.set3TeamB,
-      completed,
-      pointHistory: validated.pointHistory,
-    },
+  const validationMs = performance.now() - validationStarted;
+  const dbStarted = performance.now();
+  const { data: updatedGame, error: updateError } = await adminClient.rpc("submit_score_atomic", {
+    p_token_hash: tokenHash, p_game_id: gameId, p_device_id: deviceId,
+    p_score: validated, p_heartbeat: body?.action === "heartbeat",
   });
-
+  const dbMs = performance.now() - dbStarted;
   if (updateError) {
+    if (updateError.message.includes("score_token_invalid")) return jsonResponse({ error: "Invalid token" }, 404);
+    if (updateError.message.includes("score_token_expired")) return jsonResponse({ error: "Token expired" }, 410);
     return scoreDatabaseError(updateError.message);
   }
-
-  let hvvSynced = false;
-  let hvvError = "";
-  if (completed && updatedGame) {
-    try {
-      const hvvCredentials = hvvCredentialsFromEnv();
-      await submitGameToHvv(updatedGame, hvvCredentials);
-      const { error: cleanError } = await adminClient
-        .from("games")
-        .update({ dirty: false })
-        .eq("id", game.id);
-      if (cleanError) {
-        hvvError = cleanError.message;
-      } else {
-        await refreshTournamentGamesFromHvv(adminClient, updatedGame.tournament_id, hvvCredentials);
-        hvvSynced = true;
-      }
-    } catch (error) {
-      hvvError = error instanceof Error ? error.message : String(error);
-    }
+  const completed = validated?.completed ?? false;
+  if (completed && updatedGame?.edit_url) {
+    EdgeRuntime.waitUntil(processHvvDelivery(adminClient).catch(() => {
+      console.error("HVV background attempt failed; durable job will be retried");
+    }));
   }
-
-  await adminClient
-    .from("score_entry_links")
-    .update({ used_at: new Date().toISOString() })
-    .eq("id", link.id);
-
-  return jsonResponse({ ok: true, hvvSynced, hvvError: hvvError || null });
+  const response = jsonResponse({ ok: true, hvvStatus: completed ? (updatedGame?.edit_url ? "queued" : "not_configured") : null });
+  response.headers.set("Server-Timing", `hash;dur=${hashMs.toFixed(2)}, validate;dur=${validationMs.toFixed(2)}, database;dur=${dbMs.toFixed(2)}, total;dur=${(performance.now()-requestStarted).toFixed(2)}`);
+  response.headers.set("Access-Control-Expose-Headers", "Server-Timing");
+  return response;
 });
 
 function sortGames<T extends { number: string | null; display_order?: number | null }>(games: T[]) {

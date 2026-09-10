@@ -256,7 +256,7 @@ function singleCourtGameStatus(game: Game, scoreState: ReturnType<typeof gameSco
 
 function gameScoreState(game: Game) {
   return {
-    hasPointHistory: parsePointHistory(game.point_history).length > 0,
+    hasPointHistory: game.display_state?.hasPoints ?? parsePointHistory(game.point_history).length > 0,
     setScores: [
       game.set1_team_a,
       game.set1_team_b,
@@ -443,7 +443,7 @@ function DisplayCurrentTeam({ game, team, points }: { game: Game; team: TeamKey;
 }
 
 function activeTimeoutInfo(game: Game) {
-  const timeout = parseTimeoutHistory(game.point_history).at(-1);
+  const timeout = game.display_state ? game.display_state.timeout : parseTimeoutHistory(game.point_history).at(-1);
   if (!timeout) {
     return null;
   }

@@ -223,3 +223,12 @@ export async function heartbeatScoreEntry(token: string, gameId: string): Promis
     throw new Error(await supabaseFunctionErrorMessage(error, "Court-Sperre konnte nicht verlaengert werden."));
   }
 }
+
+export async function getScoreDeliveryStatus(token: string, gameId: string): Promise<string | null> {
+  if (dataMode === "local") return null;
+  const { data, error } = await getSupabase().functions.invoke("submit-score", {
+    body: { token, gameId, action: "sync-status" },
+  });
+  if (error) throw new Error("HVV-Status ist momentan nicht verfügbar.");
+  return data.status;
+}

@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 const base = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_ANON_KEY;
 if (!base || !key) throw new Error('Set SUPABASE_URL and SUPABASE_ANON_KEY');
-const gameFields = 'id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,completed,score_locked_by_device';
+const gameFields = 'id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,completed,score_locked_by_device,display_state';
 const tournamentFields = 'id,name,hvv_edit_url,hvv_public_url,hvv_turnier_id,hvv_veranstaltung_id,hvv_type,hvv_gender,tournament_date,location,token_base_url,courts,court_streams';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const observations = [];
@@ -45,7 +45,7 @@ const tournamentId = process.env.TOURNAMENT_ID || tournaments[0]?.id;
 if (!tournamentId) throw new Error('No public tournament found');
 const initial = await read('public_games', { select: gameFields, tournament_id: `eq.${tournamentId}`, order: 'number.asc' });
 const historyIds = (games) => games.filter((g) => !g.completed && (!(g.game_rating ?? '').trim() || g.game_rating.trim() === 'Normal') && g.score_locked_by_device).map((g) => g.id);
-const fixture = { games: initial.length, openGames: initial.filter((g) => !g.completed).length, liveHistoryGames: historyIds(initial).length };
+const fixture = { compactDisplay: true, games: initial.length, openGames: initial.filter((g) => !g.completed).length, liveHistoryGames: historyIds(initial).length };
 console.log(JSON.stringify({ event: 'dataset', ...fixture }));
 const percentile = (values, p) => values.length ? [...values].sort((a,b) => a-b)[Math.ceil(values.length*p)-1] : null;
 function summarize(rows) {
@@ -73,8 +73,7 @@ for (const [users, seconds] of plan) {
           tournamentLoadedAt = performance.now();
         }
         const games = await read('public_games', { select: gameFields, tournament_id: `eq.${tournamentId}`, order: 'number.asc' });
-        const ids = historyIds(games);
-        if (ids.length) await read('public_games', { select: 'id,point_history', tournament_id: `eq.${tournamentId}`, id: `in.(${ids.join(',')})` });
+        // The compact overview uses display_state; full histories are only for single-court pages.
         cycles.push(performance.now()-cycleStart);
       } catch { /* Recorded above; stop globally after ten errors. */ }
       await sleep(Math.max(0, Math.min(5000, deadline-performance.now())));

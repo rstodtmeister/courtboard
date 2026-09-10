@@ -1,3 +1,4 @@
+import { HvvDeliveryStatus } from "./HvvDeliveryStatus";
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions } from "./appConfig";
 import { heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
@@ -674,6 +675,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
         )}
         {error && <div className="error">{error}</div>}
         {message && <div className="success">{message}</div>}
+        {completedState && <HvvDeliveryStatus token={token} gameId={completedState.game.id} />}
         {!loading && !lockedMessage && selectedGame && draft && (
           <div className="score-form">
             {data && data.games.length > 1 && (
