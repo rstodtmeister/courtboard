@@ -6626,3 +6626,16 @@ html.court-overlay-document,
   .protocol-event-summary strong { flex-basis:calc(100% - 1.2rem); order:3; margin-left:1rem; }
   .protocol-event-source { margin-left:auto; }
 }
+.protocol-game-line { white-space:nowrap; overflow-x:auto; margin:.7rem 0; padding:.3rem 0; font-size:.9rem; }
+.protocol-score-line { display:flex; align-items:baseline; gap:.6rem; padding:.5rem 0; border-bottom:1px solid #e7ebf1; }
+.protocol-score-line > strong { flex:none; font-size:.85rem; }
+.protocol-score-track { min-width:0; flex:1; white-space:nowrap; overflow-x:auto; padding:.2rem 0 .4rem; font-size:.88rem; font-variant-numeric:tabular-nums; }
+.protocol-score-arrow { color:#94a0b0; }
+.protocol-short-note { font-size:.78rem; margin:.4rem 0 .7rem; }
+.protocol-audit-details { margin:.75rem 0; }
+.protocol-audit-details > summary { cursor:pointer; font-size:.85rem; color:#59677a; }
+.protocol-score-track:focus-visible,.protocol-game-line:focus-visible { outline:2px solid #2458a6; outline-offset:2px; }
+.protocol-events .protocol-event-summary { flex-wrap:nowrap; }
+.protocol-events .protocol-event-summary strong { flex:1; order:initial; margin-left:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.game-protocols, .protocol-detail, .protocol-score-lines { min-width:0; max-width:100%; }

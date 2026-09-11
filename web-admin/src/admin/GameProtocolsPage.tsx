@@ -2,7 +2,7 @@ import { ProtocolEventItem } from './ProtocolEventItem';
 import React, { useEffect, useRef, useState } from 'react';
 import { dataMode } from '../dataApiCore';
 import { downloadProtocolJson, exportGameProtocols, listGameProtocols, loadProtocolEvents } from '../dataApiProtocols';
-import { protocolKind, protocolValue, type GameProtocol, type ProtocolEvent } from '../gameProtocols';
+import { protocolKind, protocolScoreLines, protocolValue, type GameProtocol, type ProtocolEvent } from '../gameProtocols';
 import type { Tournament } from '../types';
 
 export function GameProtocolsPage({ tournament }: { tournament: Tournament | null }) {
@@ -33,14 +33,14 @@ export function GameProtocolsPage({ tournament }: { tournament: Tournament | nul
   if(dataMode!=='supabase')return <div className="status">Spielprotokolle stehen im Supabase-Betrieb zur Verfügung.</div>;
   if(!tournament)return <div className="empty">Bitte ein Turnier auswählen.</div>;
   return <section className="game-protocols" aria-label="Spielprotokolle">
-    <div className="protocol-heading"><div><h2>Spielprotokolle</h2><p>Bestätigte Spielstände und Änderungen. Details werden erst beim Öffnen geladen.</p></div>
+    <div className="protocol-heading"><div><h2>Spielprotokolle</h2>{!current && <p>Bestätigte Spielstände und Änderungen. Details werden erst beim Öffnen geladen.</p>}</div>
       <button type="button" className="secondary" disabled={loading} onClick={()=>{setSelected('');void refresh()}}>Aktualisieren</button></div>
     {error&&<div className="error" role="alert">{error}</div>}
     {downloading&&<div className="status" role="status">Protokolle werden für den Download zusammengestellt…</div>}
     {current ? <>
-      <div className="protocol-actions"><button type="button" className="secondary" onClick={()=>setSelected('')}>← Alle Spielprotokolle</button>
-        <button type="button" disabled={downloading} onClick={()=>void download([current],'json')}>Spiel als JSON</button>
-        <button type="button" disabled={downloading} onClick={()=>void download([current],'pdf')}>Spiel als PDF</button></div>
+      <div className="protocol-actions"><button type="button" className="secondary" aria-label="Alle Spielprotokolle" onClick={()=>setSelected('')}>← Übersicht</button>
+        <button type="button" disabled={downloading} aria-label="Spiel als JSON" onClick={()=>void download([current],'json')}>JSON</button>
+        <button type="button" disabled={downloading} aria-label="Spiel als PDF" onClick={()=>void download([current],'pdf')}>PDF</button></div>
       <ProtocolDetail key={current.game_id} protocol={current}/>
     </> : <>
       <div className="protocol-actions">
@@ -68,13 +68,21 @@ function ProtocolDetail({protocol}:{protocol:GameProtocol}) {
     catch(e){if(alive.current)setError(e instanceof Error?e.message:'Verlauf konnte nicht geladen werden.')}
     finally{if(alive.current)setLoading(false)}
   }
-  return <article className="protocol-detail"><h3>Spiel {protocol.snapshot.number} · {protocolKind(protocol)}</h3>
-    <p>{protocolValue(protocol.snapshot.team_a)} gegen {protocolValue(protocol.snapshot.team_b)} · Court {protocolValue(protocol.snapshot.court)}</p>
-    <p>Ergebnis: <strong>{protocolValue(protocol.snapshot.result)}</strong> · Schiedsgericht: {protocolValue(protocol.snapshot.referee)}</p>
-    <p className="protocol-note">Aufzeichnung seit {new Date(protocol.started_at).toLocaleString('de-DE')}. Zeitangaben zeigen die Serverbestätigung, bei Offline-Eingaben gegebenenfalls später. Ein Ergebnislink weist keine persönliche Identität nach. Übernommene oder teilweise erfasste Verläufe sind kein vollständiger Live-Nachweis.</p>
+  const scoreLines = protocolScoreLines(events);
+  const setResults = [1,2,3].filter(set => protocol.snapshot[`set${set}_team_a`] || protocol.snapshot[`set${set}_team_b`]).map(set => `S${set} ${protocolValue(protocol.snapshot[`set${set}_team_a`])}:${protocolValue(protocol.snapshot[`set${set}_team_b`])}`).join(' · ');
+  return <article className="protocol-detail">
+    <p className="protocol-game-line" tabIndex={0}><strong>#{protocol.snapshot.number} · {protocolValue(protocol.snapshot.team_a)} – {protocolValue(protocol.snapshot.team_b)}</strong> · C{protocolValue(protocol.snapshot.court)} · {protocolValue(protocol.snapshot.result)}{setResults && ` (${setResults})`} · SR: {protocolValue(protocol.snapshot.referee)} · {protocolKind(protocol)}</p>
     {error&&<div className="error" role="alert">{error}</div>}
-    <p className="protocol-note">Eine Zeile je Speicherung. Zum Anzeigen aller Details die Zeile öffnen.</p>
-    <ol className="protocol-events protocol-events-compact">{events.map(event => <ProtocolEventItem key={event.id} event={event}/>)}</ol>
+    {scoreLines.length > 0 ? <div className="protocol-score-lines">
+      {scoreLines.map(line => <div className="protocol-score-line" key={line.set}><strong>S{line.set}</strong><div className="protocol-score-track" tabIndex={0} aria-label={`Punkteverlauf Satz ${line.set}`}>
+        {line.items.map((item,index) => <React.Fragment key={index}>{index>0 && <span className="protocol-score-arrow" aria-hidden="true"> → </span>}<span title={item.title}>{item.text}</span></React.Fragment>)}
+      </div></div>)}
+      <p className="protocol-note protocol-short-note">Seitlich scrollen · AZ = Auszeit · ↶ / ↺ = Korrektur</p>
+    </div> : !loading && <p className="protocol-note protocol-short-note">Kein Live-Punkteverlauf in den geladenen Einträgen.</p>}
+    <details className="protocol-audit-details"><summary>Speicherprotokoll · {events.length}{more ? '+' : ''} Einträge · Details</summary>
+      <p className="protocol-note">Aufzeichnung seit {new Date(protocol.started_at).toLocaleString('de-DE')}. Zeiten zeigen die Serverbestätigung, bei Offline-Eingaben gegebenenfalls später. Ein Ergebnislink weist keine persönliche Identität nach. Übernommene oder teilweise erfasste Verläufe sind kein vollständiger Live-Nachweis.</p>
+      <ol className="protocol-events protocol-events-compact">{events.map(event => <ProtocolEventItem key={event.id} event={event}/>)}</ol>
+    </details>
     {loading&&<div className="status">Verlauf wird geladen…</div>}
     {!loading&&more&&<button type="button" className="secondary" onClick={()=>void load(events.at(-1)?.id??0)}>{error?'Erneut versuchen':'Weitere Einträge laden'}</button>}
   </article>;

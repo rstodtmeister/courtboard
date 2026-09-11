@@ -71,3 +71,62 @@ export function protocolEventSummary(event: ProtocolEvent) {
   const fields = Object.keys(event.changes).map(field => protocolFieldLabels[field] ?? field);
   return fields.length ? fields.join(' · ') : 'Speicherung';
 }
+
+export type ProtocolScoreLine = { set: number; items: { text: string; title: string }[] };
+export function protocolScoreLines(events: ProtocolEvent[]): ProtocolScoreLine[] {
+  const lines = new Map<number, ProtocolScoreLine>();
+  let window: Record<string, unknown>[] = [];
+  let state: ProtocolSnapshot = {};
+  const add = (set: number, text: string, title: string) => {
+    if (![1, 2, 3].includes(set)) return;
+    if (!lines.has(set)) lines.set(set, { set, items: [] });
+    lines.get(set)!.items.push({ text, title });
+  };
+  const entries = (value: unknown) => Array.isArray(value) ? value.filter((item): item is Record<string, unknown> =>
+    !!item && typeof item === 'object' && [1, 2, 3].includes(item.set) && Number.isInteger(item.scoreA) && Number.isInteger(item.scoreB)) : [];
+  for (const event of events) {
+    if (event.snapshot) state = { ...event.snapshot };
+    for (const [key, change] of Object.entries(event.changes)) state[key] = change.after as string | boolean | null;
+    const edit = event.history_change;
+    if (!edit) continue; // Result-only saves must not become fictional live points.
+    const title = `${new Date(event.recorded_at).toLocaleString('de-DE')} · ${protocolSourceLabels[event.source]}`;
+    if ('replace' in edit) {
+      const replaced = window;
+      window = entries(edit.replace);
+      if (event.action === 'baseline' || event.action === 'created') {
+        const seen = new Set<number>();
+        for (const item of window) {
+          const set = Number(item.set);
+          if (!seen.has(set)) { add(set, 'Bestand:', 'Übernommener Verlauf; Vollständigkeit unbekannt'); seen.add(set); }
+          add(set, `${item.type === 'timeout' ? `AZ ${item.team} ` : ''}${item.scoreA}:${item.scoreB}`, title);
+        }
+      } else {
+        for (const set of [1, 2, 3]) {
+          const last = window.filter(item => item.set === set).at(-1);
+          if (last) add(set, `↺ ${last.scoreA}:${last.scoreB}`, `${title} · Verlauf ersetzt; Details im Speicherprotokoll`);
+          else if (replaced.some(item => item.set === set)) add(set, '↺ Verlauf gelöscht', title);
+        }
+      }
+      continue;
+    }
+    const previous = window;
+    const appended = entries(edit.append);
+    const drop = edit.drop ?? 0, keep = edit.keep ?? 0;
+    const shortened = drop + keep < previous.length;
+    window = [...previous.slice(drop, drop + keep), ...appended];
+    if (appended.length === 1 && !shortened) {
+      const item = appended[0];
+      add(Number(item.set), `${item.type === 'timeout' ? `AZ ${item.team} ` : ''}${item.scoreA}:${item.scoreB}`, title);
+    } else if (appended.length || shortened) {
+      const changedSets = [1, 2, 3].filter(set => Object.keys(event.changes).some(key => key.startsWith(`set${set}_team_`)));
+      const sets = changedSets.length ? changedSets : [...new Set([...appended, ...previous.slice(drop + keep)].map(item => Number(item.set)))];
+      for (const set of sets) {
+        const last = window.filter(item => item.set === set).at(-1);
+        const a = state[`set${set}_team_a`] ?? last?.scoreA;
+        const b = state[`set${set}_team_b`] ?? last?.scoreB;
+        add(set, `${shortened ? "↶" : "↺"} ${protocolValue(a)}:${protocolValue(b)}`, `${title} · ${shortened ? "Rücknahme / Verlaufsänderung" : "Verlauf ergänzt / ersetzt"}`);
+      }
+    }
+  }
+  return [...lines.values()].sort((a, b) => a.set - b.set);
+}

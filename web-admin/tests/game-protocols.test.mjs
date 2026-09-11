@@ -7,7 +7,7 @@ import ts from 'typescript';
 const require=createRequire(import.meta.url);
 const url=source=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
 const modelUrl=url(await readFile(new URL('../src/gameProtocols.ts',import.meta.url),'utf8'));
-const {protocolKind,historyDescription,protocolEventSummary}=await import(modelUrl);
+const {protocolKind,historyDescription,protocolEventSummary,protocolScoreLines}=await import(modelUrl);
 const base={game_id:'g',tournament_id:'t',snapshot:{number:'1',team_a:'Änne / Alice',team_b:'Bob / 李',result:'2:0'},has_live:false,has_admin_changes:false,has_result_entry:false,baseline_has_score:false};
 test('labels distinguish imported, result-only, admin and partial live histories',()=>{
  assert.equal(protocolKind({...base,baseline_has_score:true}),'Übernommener Stand');
@@ -53,4 +53,17 @@ test('compact rows distinguish points, timeouts and corrections without inventin
  const correction=protocolEventSummary({...event,history_change:{keep:4,append:[]},changes:{set1_team_a:{before:'12',after:'11'}}});
  assert.match(correction,/Rücknahme \/ Korrektur/);assert.match(correction,/12 → 11/);assert.ok(!correction.includes(':10'));
  assert.equal(protocolEventSummary({...event,changes:{completed:{before:false,after:true}}}),'Spiel abgeschlossen');
+});
+
+test('single-line score flow preserves points, timeouts and undo without inventing result-only points',()=>{
+ const event=(id,changes,history_change,extra={})=>({id,action:'updated',source:'referee',recorded_at:'2026-09-11T10:00:00Z',changes,history_change,...extra});
+ const point={set:1,team:'A',scoreA:1,scoreB:0};
+ const rows=[event(1,{},null,{action:'created',snapshot:{set1_team_a:'0',set1_team_b:'0'}}),
+ event(2,{set1_team_a:{before:'0',after:'1'}},{drop:0,keep:0,append:[point]}),
+ event(3,{}, {drop:0,keep:1,append:[{...point,type:'timeout',team:'B'}]}),
+ event(4,{set1_team_a:{before:'1',after:'0'}},{drop:0,keep:0,append:[]}),
+ event(5,{set2_team_a:{before:'0',after:'21'}},null,{source:'admin'})];
+ assert.deepEqual(protocolScoreLines(rows).map(line=>({set:line.set,text:line.items.map(item=>item.text)})),[{set:1,text:['1:0','AZ B 1:0','↶ 0:0']}]);
+ const baseline=protocolScoreLines([event(6,{}, {replace:[point]},{action:'baseline'})]);assert.equal(baseline[0].items[0].text,'Bestand:');
+ const cleared=protocolScoreLines([rows[0],rows[1],event(7,{}, {replace:[]},{source:'admin'})]);assert.equal(cleared[0].items.at(-1).text,'↺ Verlauf gelöscht');
 });
