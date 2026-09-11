@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createTournament,
   createScoreLink as createScoreLinkData,
@@ -34,6 +34,8 @@ import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournament
 import { GamesEditor, isAssignedCourt, isCompleted, resolvedReferee } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
 import { normalizeStreamUrl } from "../stream";
+
+const GameProtocolsPage = lazy(() => import("./GameProtocolsPage").then(module => ({ default: module.GameProtocolsPage })));
 
 type PendingHvvAction = "sync" | "selectTournament" | "importTournament" | "pushDirtyGames" | null;
 
@@ -139,16 +141,16 @@ export function AdminDashboard({ session }: { session: AppSession }) {
 
   useEffect(() => {
     loadDashboard({ initial: true });
-    const onFocus = () => { void loadDashboard({ silent: true }); };
+    const onFocus = () => { if (activeTab !== "protocols") void loadDashboard({ silent: true }); };
     window.addEventListener("focus", onFocus);
     const interval = window.setInterval(() => {
-      loadDashboard({ silent: true });
+      if (activeTab !== "protocols") loadDashboard({ silent: true });
     }, 10000);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [loadDashboard]);
+  }, [loadDashboard, activeTab]);
 
   async function saveTournamentDraft(nextTournament: Tournament, options: { silent?: boolean; successMessage?: string } = {}) {
     if (!options.silent) {
@@ -570,7 +572,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
       return;
     }
     const remaining = tournaments.filter((item) => item.id !== tournament.id);
-    if (!window.confirm(`Turnier "${tournament.name}" wirklich loeschen? Alle Spiele, Ergebnislinks und Zuweisungen dieses Turniers werden entfernt.`)) {
+    if (!window.confirm(`Turnier "${tournament.name}" wirklich loeschen? Alle Spiele, Spielprotokolle, Ergebnislinks und Zuweisungen dieses Turniers werden entfernt.`)) {
       return;
     }
     setError("");
@@ -689,6 +691,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
         <div className="status">Dashboard wird geladen...</div>
       ) : (
         <div className="admin-tab-panel">
+          {activeTab === "protocols" && <Suspense fallback={<div className="status">Spielprotokolle werden geladen…</div>}><GameProtocolsPage key={selectedTournamentId} tournament={tournament}/></Suspense>}
           {activeTab === "games" && (
             <GamesEditor games={games} tournament={tournament} onSave={saveGame} onReorder={reorderGames} onUnlockGame={unlockGame} onPrintPdf={printPdf} printing={printing} />
           )}
@@ -816,6 +819,7 @@ function AdminTabs({
     { id: "games", label: "Spiele", count: gamesCount },
     { id: "courts", label: "Courts", count: courtsCount },
     { id: "settings", label: "Turnier" },
+    { id: "protocols", label: "Spielprotokolle" },
   ];
   if (isSuperadmin) {
     tabs.push({ id: "admins", label: "Admins", count: adminCount });
