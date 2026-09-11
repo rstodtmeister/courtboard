@@ -1,7 +1,8 @@
+import { ProtocolEventItem } from './ProtocolEventItem';
 import React, { useEffect, useRef, useState } from 'react';
 import { dataMode } from '../dataApiCore';
 import { downloadProtocolJson, exportGameProtocols, listGameProtocols, loadProtocolEvents } from '../dataApiProtocols';
-import { historyDescription, protocolFieldLabels, protocolKind, protocolSourceLabels, protocolValue, type GameProtocol, type ProtocolEvent } from '../gameProtocols';
+import { protocolKind, protocolValue, type GameProtocol, type ProtocolEvent } from '../gameProtocols';
 import type { Tournament } from '../types';
 
 export function GameProtocolsPage({ tournament }: { tournament: Tournament | null }) {
@@ -72,13 +73,8 @@ function ProtocolDetail({protocol}:{protocol:GameProtocol}) {
     <p>Ergebnis: <strong>{protocolValue(protocol.snapshot.result)}</strong> · Schiedsgericht: {protocolValue(protocol.snapshot.referee)}</p>
     <p className="protocol-note">Aufzeichnung seit {new Date(protocol.started_at).toLocaleString('de-DE')}. Zeitangaben zeigen die Serverbestätigung, bei Offline-Eingaben gegebenenfalls später. Ein Ergebnislink weist keine persönliche Identität nach. Übernommene oder teilweise erfasste Verläufe sind kein vollständiger Live-Nachweis.</p>
     {error&&<div className="error" role="alert">{error}</div>}
-    <ol className="protocol-events">{events.map(event=><li key={event.id}>
-      <div><strong>{event.action==='baseline'?'Ausgangsstand übernommen':event.action==='created'?'Spiel angelegt':event.action==='deleted'?'Spiel gelöscht':'Speicherung'}</strong> · {protocolSourceLabels[event.source]}{event.source==='admin'&&` · ${event.actor_label??event.actor_id??'Unbekannt'}`}</div>
-      <time dateTime={event.recorded_at}>{new Date(event.recorded_at).toLocaleString('de-DE')}</time>
-      {event.snapshot&&<details><summary>Ausgangsdaten anzeigen</summary><dl>{Object.entries(event.snapshot).map(([field,value])=><React.Fragment key={field}><dt>{protocolFieldLabels[field]??field}</dt><dd>{protocolValue(value)}</dd></React.Fragment>)}</dl></details>}
-      {Object.keys(event.changes).length>0&&<ul>{Object.entries(event.changes).map(([field,change])=><li key={field}>{protocolFieldLabels[field]??field}: {protocolValue(change.before)} → <strong>{protocolValue(change.after)}</strong></li>)}</ul>}
-      {event.history_change&&<details open={!('replace' in event.history_change)}><summary>Punkteverlauf / Auszeiten</summary><ul>{historyDescription(event).map((text,i)=><li key={i}>{text}</li>)}</ul></details>}
-    </li>)}</ol>
+    <p className="protocol-note">Eine Zeile je Speicherung. Zum Anzeigen aller Details die Zeile öffnen.</p>
+    <ol className="protocol-events protocol-events-compact">{events.map(event => <ProtocolEventItem key={event.id} event={event}/>)}</ol>
     {loading&&<div className="status">Verlauf wird geladen…</div>}
     {!loading&&more&&<button type="button" className="secondary" onClick={()=>void load(events.at(-1)?.id??0)}>{error?'Erneut versuchen':'Weitere Einträge laden'}</button>}
   </article>;

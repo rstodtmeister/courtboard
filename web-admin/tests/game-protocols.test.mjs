@@ -7,7 +7,7 @@ import ts from 'typescript';
 const require=createRequire(import.meta.url);
 const url=source=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
 const modelUrl=url(await readFile(new URL('../src/gameProtocols.ts',import.meta.url),'utf8'));
-const {protocolKind,historyDescription}=await import(modelUrl);
+const {protocolKind,historyDescription,protocolEventSummary}=await import(modelUrl);
 const base={game_id:'g',tournament_id:'t',snapshot:{number:'1',team_a:'Änne / Alice',team_b:'Bob / 李',result:'2:0'},has_live:false,has_admin_changes:false,has_result_entry:false,baseline_has_score:false};
 test('labels distinguish imported, result-only, admin and partial live histories',()=>{
  assert.equal(protocolKind({...base,baseline_has_score:true}),'Übernommener Stand');
@@ -44,4 +44,13 @@ test('PDF includes long protocols on multiple valid pages and accepts non-Latin 
  const events=Array.from({length:150},(_,i)=>({recorded_at:'2026-09-11T10:00:00Z',source:'admin',action:'updated',actor_label:'Tester',changes:{set1_team_a:{before:i,after:i+1}},history_change:null}));
  const bytes=await createProtocolPdf({tournament:{name:'Testturnier'},exported_at:'2026-09-11',games:[{protocol:base,events}]});
  const document=await PDFDocument.load(bytes);assert.ok(document.getPageCount()>3);
+});
+
+test('compact rows distinguish points, timeouts and corrections without inventing a second score',()=>{
+ const event={action:'updated',source:'referee',changes:{set1_team_a:{before:'11',after:'12'}},history_change:{append:[{set:1,team:'A',scoreA:12,scoreB:10}]}};
+ assert.equal(protocolEventSummary(event),'Satz 1 · 12:10 · Punkt A');
+ assert.match(protocolEventSummary({...event,history_change:{append:[{set:1,team:'B',scoreA:12,scoreB:10,type:'timeout'}]}}),/Auszeit B/);
+ const correction=protocolEventSummary({...event,history_change:{keep:4,append:[]},changes:{set1_team_a:{before:'12',after:'11'}}});
+ assert.match(correction,/Rücknahme \/ Korrektur/);assert.match(correction,/12 → 11/);assert.ok(!correction.includes(':10'));
+ assert.equal(protocolEventSummary({...event,changes:{completed:{before:false,after:true}}}),'Spiel abgeschlossen');
 });

@@ -46,3 +46,28 @@ export function historyDescription(event: ProtocolEvent) {
   else lines.push('Älterer Verlauf nicht lesbar; Originaldaten bleiben im JSON-Download enthalten.');
   return lines;
 }
+
+export function protocolEventSummary(event: ProtocolEvent) {
+  if (event.action === 'baseline') return 'Ausgangsstand übernommen';
+  if (event.action === 'created') return 'Spiel angelegt';
+  if (event.action === 'deleted') return 'Spiel gelöscht';
+  if (event.changes.completed?.after === true) return 'Spiel abgeschlossen';
+  if (event.changes.completed?.after === false) return 'Spiel wieder geöffnet';
+  const scores = Object.entries(event.changes).filter(([key]) => /^set[123]_team_[ab]$/.test(key));
+  const decreased = scores.some(([, change]) => change.before != null && change.before !== '' && change.after != null && change.after !== '' && Number(change.after) < Number(change.before));
+  const last = event.history_change?.append?.at(-1);
+  if (last && typeof last === 'object') {
+    const entry = last as Record<string, unknown>;
+    if ([1, 2, 3].includes(Number(entry.set)) && ['A', 'B'].includes(String(entry.team)) && Number.isInteger(entry.scoreA) && Number.isInteger(entry.scoreB)) {
+      const action = entry.type === 'timeout' ? `Auszeit ${entry.team}` : decreased ? 'Korrektur' : `Punkt ${entry.team}`;
+      return `Satz ${entry.set} · ${entry.scoreA}:${entry.scoreB} · ${action}${(event.history_change?.append?.length ?? 0) > 1 ? ` (${event.history_change!.append!.length} Einträge)` : ''}`;
+    }
+  }
+  if (scores.length) {
+    const action = decreased ? 'Rücknahme / Korrektur' : event.source === 'admin' ? 'Ergebniskorrektur' : 'Ergebnis';
+    return `${action} · ${scores.map(([key, change]) => `S${key[3]} ${key.at(-1)!.toUpperCase()}: ${protocolValue(change.before)} → ${protocolValue(change.after)}`).join(' · ')}`;
+  }
+  if (event.history_change) return 'Punkteverlauf geändert';
+  const fields = Object.keys(event.changes).map(field => protocolFieldLabels[field] ?? field);
+  return fields.length ? fields.join(' · ') : 'Speicherung';
+}

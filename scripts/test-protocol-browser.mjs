@@ -33,6 +33,12 @@ try{
  await page.getByRole('button',{name:'Protokoll Spiel 1 öffnen'}).click();
  await page.getByRole('button',{name:'Weitere Einträge laden'}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.protocol-events > li').length===105);
+ assert.equal(await page.locator('.protocol-event > details[open]').count(),0,'Event details start collapsed');
+ await page.locator('.protocol-event-summary').nth(1).click();assert.equal(await page.locator('.protocol-event > details[open]').count(),1);
+ await page.locator('.protocol-event-summary').nth(1).click();
+ await page.screenshot({path:'/private/tmp/courtboard-compact-protocol-desktop.png'});
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/private/tmp/courtboard-compact-protocol-mobile.png'});
+ await page.setViewportSize({width:1280,height:720});
  const jsonDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Spiel als JSON'}).click();const json=JSON.parse(await readFile(await(await jsonDownload).path(),'utf8'));
  assert.equal(json.games[0].events.length,105);assert.equal(json.games[0].protocol.snapshot.set1_team_a,104);
  const pdfDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Spiel als PDF'}).click();const pdf=await readFile(await(await pdfDownload).path());assert.equal(pdf.subarray(0,4).toString(),'%PDF');
