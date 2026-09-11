@@ -9,11 +9,14 @@ try {
  page.on('pageerror',error=>console.log('Page error:',error.message));
  const teams=['Müller / Schmidt mit einem besonders langen Teamnamen','Weber / Fischer'];
  const games=[1,2,3,4].map(n=>({id:String(n),tournament_id:'t',number:String(n),court:String(n),team_a:n===1?teams[0]:teams[1],team_b:'Gäste '+n,completed:false,point_history:[]}));
+ const placeholders=['Pool A 1.','Pool B 2.','Gewinner','Verlierer Spiel 3','Sieger 4'];
+ games.push(...placeholders.map((name,i)=>({...games[0],id:'placeholder'+i,number:String(i+10),team_a:name,team_b:'Pool C 1.'})));
  await page.addInitScript(()=>{if(!localStorage.getItem('courtboard.localData.v1'))localStorage.setItem('courtboard.localData.v1',JSON.stringify({session:null,admins:[],tournaments:[{id:'t',name:'Test',courts:['1','2','3','4'],court_streams:{}},{id:'other',name:'Anderes Turnier',courts:['1'],court_streams:{}}],games:[],links:[]}));});
  await page.route('**/api/games',route=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:{games}}));
  await page.goto('http://127.0.0.1:4174/?view=courts&tournamentId=t');
  const select=page.getByRole('combobox',{name:/Mein Team/});
  await select.waitFor({timeout:8000}).catch(async e=>{console.log(await page.locator('body').innerText());throw e;});
+ for(const name of placeholders) assert.equal(await select.locator('option').filter({hasText:name}).count(),0);
  await select.selectOption(teams[0]);
  assert.equal(await page.locator('.my-team-game').count(),1);
  assert.equal(await page.locator('.display-court-section').count(),4);

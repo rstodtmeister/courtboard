@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { isSelectableTeam } from './teamNames';
 import type { Game } from './types';
 
 const MyTeamContext = createContext('');
@@ -9,9 +10,9 @@ export function isMyTeamGame(game: Game, team: string) {
 export function MyTeam({ tournamentId, games, children }: { tournamentId: string; games: Game[]; children: React.ReactNode }) {
   const key = `courtboard.myTeam.v1.${tournamentId}`;
   const [team, setTeam] = useState(() => {
-    try { return localStorage.getItem(key) || ''; } catch { return ''; }
+    try { const saved = localStorage.getItem(key); if (isSelectableTeam(saved)) return saved!; localStorage.removeItem(key); return ''; } catch { return ''; }
   });
-  const teams = [...new Set(games.flatMap(game => [game.team_a, game.team_b]).map(name => name?.trim() || '').filter(name => name && name !== '(Freilos)'))].sort((a, b) => a.localeCompare(b, 'de'));
+  const teams = [...new Set(games.flatMap(game => [game.team_a, game.team_b]).map(name => name?.trim() || '').filter(isSelectableTeam))].sort((a, b) => a.localeCompare(b, 'de'));
   const [storageError, setStorageError] = useState(false);
   function choose(value: string) {
     setTeam(value);
