@@ -1,0 +1,243 @@
+{
+  "applicationCommit": "f90d12b37cc38730314e8e24bf91d6749bf6da48",
+  "restart": {
+    "requestedAt": "2026-09-11T07:04:51.487742+00:00",
+    "response": "HTTP 200",
+    "healthyObservedAt": "2026-09-11T07:07:07.951310+00:00",
+    "healthyServices": [
+      "db",
+      "auth",
+      "rest"
+    ]
+  },
+  "before": {
+    "writers": {
+      "measuredAt": "2026-09-11T07:03:46.236Z",
+      "scenario": "Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion",
+      "baseline": {
+        "requests": 62,
+        "errors": 0,
+        "medianMs": 285.98899900000106,
+        "p95Ms": 1031.295771,
+        "maxMs": 1083.9960700000001
+      },
+      "combined": {
+        "requests": 242,
+        "errors": 0,
+        "medianMs": 276.41182700000354,
+        "p95Ms": 421.8001770000119,
+        "maxMs": 2143.4763200000016
+      },
+      "heartbeats": {
+        "requests": 8,
+        "errors": 0,
+        "medianMs": 254.61652300000424,
+        "p95Ms": 411.0449679999874,
+        "maxMs": 411.0449679999874
+      },
+      "checks": [
+        {
+          "court": "1",
+          "moves": 75,
+          "score": "41:40",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "2",
+          "moves": 77,
+          "score": "42:41",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "3",
+          "moves": 75,
+          "score": "41:40",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "4",
+          "moves": 77,
+          "score": "42:41",
+          "historyEntries": 120,
+          "matches": true
+        }
+      ],
+      "viewerCode": 0
+    },
+    "viewers": {
+      "measuredAt": "2026-09-11T07:03:46.065Z",
+      "scenario": "Public courts overview; five seconds after completion, tournament cache 60 seconds; HTTP clients, no browser rendering or writes",
+      "fixture": {
+        "compactDisplay": true,
+        "games": 120,
+        "openGames": 4,
+        "liveHistoryGames": 4
+      },
+      "halted": false,
+      "stages": [
+        {
+          "users": 50,
+          "elapsedSeconds": 120.23646582399999,
+          "requests": 1255,
+          "errors": 0,
+          "medianMs": 123.78910099999484,
+          "p95Ms": 422.0427820000041,
+          "maxMs": 2195.0368830000007,
+          "decodedBytes": 73060330,
+          "requestsPerSecond": 10.43776521040669,
+          "cycleP95Ms": 459.61941399998614,
+          "cycles": 1155
+        }
+      ]
+    },
+    "serverTiming": {
+      "hash": {
+        "medianMs": 0.66,
+        "p95Ms": 1.35,
+        "samples": 242
+      },
+      "validate": {
+        "medianMs": 0.4,
+        "p95Ms": 0.6,
+        "samples": 242
+      },
+      "database": {
+        "medianMs": 62.92,
+        "p95Ms": 204.76,
+        "samples": 242
+      },
+      "total": {
+        "medianMs": 67.54,
+        "p95Ms": 210.99,
+        "samples": 242
+      }
+    },
+    "cleanup": [
+      {
+        "tournaments": 0,
+        "games": 0,
+        "links": 0,
+        "locks": 0,
+        "jobs": 0
+      }
+    ]
+  },
+  "after": {
+    "writers": {
+      "measuredAt": "2026-09-11T07:09:42.045Z",
+      "scenario": "Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion",
+      "baseline": {
+        "requests": 61,
+        "errors": 0,
+        "medianMs": 274.1008619999993,
+        "p95Ms": 928.905445,
+        "maxMs": 961.2303860000001
+      },
+      "combined": {
+        "requests": 241,
+        "errors": 0,
+        "medianMs": 260.87138699999196,
+        "p95Ms": 344.7369069999986,
+        "maxMs": 658.9703050000098
+      },
+      "heartbeats": {
+        "requests": 8,
+        "errors": 0,
+        "medianMs": 241.98452499999257,
+        "p95Ms": 283.3529290000006,
+        "maxMs": 283.3529290000006
+      },
+      "checks": [
+        {
+          "court": "1",
+          "moves": 75,
+          "score": "41:40",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "2",
+          "moves": 77,
+          "score": "42:41",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "3",
+          "moves": 75,
+          "score": "41:40",
+          "historyEntries": 120,
+          "matches": true
+        },
+        {
+          "court": "4",
+          "moves": 75,
+          "score": "41:40",
+          "historyEntries": 120,
+          "matches": true
+        }
+      ],
+      "viewerCode": 0
+    },
+    "viewers": {
+      "measuredAt": "2026-09-11T07:09:41.915Z",
+      "scenario": "Public courts overview; five seconds after completion, tournament cache 60 seconds; HTTP clients, no browser rendering or writes",
+      "fixture": {
+        "compactDisplay": true,
+        "games": 120,
+        "openGames": 4,
+        "liveHistoryGames": 4
+      },
+      "halted": false,
+      "stages": [
+        {
+          "users": 50,
+          "elapsedSeconds": 120.000775128,
+          "requests": 1299,
+          "errors": 0,
+          "medianMs": 159.7038670000038,
+          "p95Ms": 263.48898400000326,
+          "maxMs": 1744.7144249999983,
+          "decodedBytes": 75842274,
+          "requestsPerSecond": 10.824930077446657,
+          "cycleP95Ms": 281.36841200000345,
+          "cycles": 1199
+        }
+      ]
+    },
+    "serverTiming": {
+      "hash": {
+        "medianMs": 0.68,
+        "p95Ms": 1.33,
+        "samples": 241
+      },
+      "validate": {
+        "medianMs": 0.41,
+        "p95Ms": 0.6,
+        "samples": 241
+      },
+      "database": {
+        "medianMs": 57.7,
+        "p95Ms": 127.54,
+        "samples": 241
+      },
+      "total": {
+        "medianMs": 63.06,
+        "p95Ms": 133.84,
+        "samples": 241
+      }
+    },
+    "cleanup": [
+      {
+        "tournaments": 0,
+        "games": 0,
+        "links": 0,
+        "locks": 0,
+        "jobs": 0
+      }
+    ]
+  }
+}

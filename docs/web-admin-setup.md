@@ -392,3 +392,8 @@ danach vier Schiedsrichter parallel zu 50 Zuschauern und zuletzt
 Dieser letzte Bericht dokumentiert auch einen abgebrochenen Anlauf mit Timeout
 und die Grenzen des erfolgreichen Wiederholungstests. Bei späteren Änderungen
 Datenumfang, Beobachtungsdauer und fehlgeschlagene Versuche mit vergleichen.
+
+Der [Neustartvergleich vom 11.09.2026](reports/supabase-restart-2026-09-11.md)
+vergleicht denselben Test vor und nach einem Supabase-Neustart: etwas niedrigere
+Speicherzeiten, aber keine durchgängige Verbesserung der Zuschauerzeiten.
+Ein dauerhafter Effekt ist damit nicht nachgewiesen.
