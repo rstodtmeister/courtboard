@@ -9,7 +9,7 @@ try {
  page.on('pageerror',error=>console.log('Page error:',error.message));
  const teams=['Müller / Schmidt mit einem besonders langen Teamnamen','Weber / Fischer'];
  const games=[1,2,3,4].map(n=>({id:String(n),tournament_id:'t',number:String(n),court:String(n),team_a:n===1?teams[0]:teams[1],team_b:'Gäste '+n,completed:false,point_history:[]}));
- const placeholders=['Pool A 1.','Pool B 2.','Gewinner','Verlierer Spiel 3','Sieger 4'];
+ const placeholders=['Pool A','Pool B','Pool C','Pool D','Gruppe E','Pool A 1.','Pool B 2.','Gewinner','Verlierer Spiel 3','Sieger 4'];
  games.push(...placeholders.map((name,i)=>({...games[0],id:'placeholder'+i,number:String(i+10),team_a:name,team_b:'Pool C 1.'})));
  await page.addInitScript(()=>{if(!localStorage.getItem('courtboard.localData.v1'))localStorage.setItem('courtboard.localData.v1',JSON.stringify({session:null,admins:[],tournaments:[{id:'t',name:'Test',courts:['1','2','3','4'],court_streams:{}},{id:'other',name:'Anderes Turnier',courts:['1'],court_streams:{}}],games:[],links:[]}));});
  await page.route('**/api/games',route=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:{games}}));
