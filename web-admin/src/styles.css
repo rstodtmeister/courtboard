@@ -6656,3 +6656,6 @@ html.court-overlay-document,
   .my-team-bar label, .my-team-bar small { grid-column:1/-1; }
   .my-team-bar select { width:100%; }
 }
+
+.court-display-download-actions { display:grid; gap:8px; }
+.court-display-download-actions .secondary-link { text-align:center; }

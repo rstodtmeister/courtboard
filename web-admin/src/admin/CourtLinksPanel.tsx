@@ -27,6 +27,23 @@ export function CourtLinksPanel({
   courtStreams: Record<string, string>;
   onSaveCourtStream: (court: string, value: string) => Promise<void>;
 }) {
+  const [printingQr, setPrintingQr] = useState(false);
+  const [qrError, setQrError] = useState("");
+  async function printCourtQrCodes() {
+    setPrintingQr(true);
+    setQrError("");
+    try {
+      const entries = courts.map(entry => {
+        const url = new URL(displayUrl(entry.tournamentId, displayOrientation));
+        url.searchParams.set("court", entry.court);
+        return { court: entry.court, url: url.toString() };
+      });
+      const { downloadCourtQrPdf } = await import("../courtQrPdf");
+      await downloadCourtQrPdf(entries, "QR Codes Courts · Öffentliche Anzeigen");
+    } catch (error) {
+      setQrError(error instanceof Error ? error.message : "PDF konnte nicht erstellt werden.");
+    } finally { setPrintingQr(false); }
+  }
   const sortedGames = sortGames(games);
   const [openSections, setOpenSections] = useState<Record<string, string>>({});
   const [displayOrientation, setDisplayOrientation] = useState<"normal" | "landscape">("normal");
@@ -56,9 +73,13 @@ export function CourtLinksPanel({
             <option value="normal">Standard</option>
             <option value="landscape">Querformat</option>
           </select>
-          <a className="secondary-link" href={displayUrl(tournamentId, displayOrientation)} target="_blank" rel="noreferrer">Courts anzeigen</a>
+          <div className="court-display-download-actions">
+            <a className="secondary-link" href={displayUrl(tournamentId, displayOrientation)} target="_blank" rel="noreferrer">Courts anzeigen</a>
+            <button type="button" className="secondary" onClick={() => void printCourtQrCodes()} disabled={printingQr || !courts.length}>{printingQr ? "PDF wird erstellt…" : "QR Codes Courts pdf"}</button>
+          </div>
         </div>
       </div>
+      {qrError && <div className="error" role="alert">{qrError}</div>}
       <div className="court-link-grid">
         {courts.map((entry) => {
           const link = links.find((item) => item.court === entry.court);
