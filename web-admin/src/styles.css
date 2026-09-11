@@ -6639,3 +6639,6 @@ html.court-overlay-document,
 .protocol-events .protocol-event-summary strong { flex:1; order:initial; margin-left:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .game-protocols, .protocol-detail, .protocol-score-lines { min-width:0; max-width:100%; }
+
+.admin-session-bar { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.admin-session-bar span { overflow-wrap:anywhere; min-width:0; }

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  signOut,
   createTournament,
   createScoreLink as createScoreLinkData,
   deleteAdminUser,
@@ -53,6 +54,14 @@ function courtEntries(games: Game[], tournament: Tournament | null) {
 }
 
 export function AdminDashboard({ session }: { session: AppSession }) {
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function logout() {
+    setLoggingOut(true);
+    setError("");
+    try { await signOut(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Abmelden fehlgeschlagen. Bitte erneut versuchen."); }
+    finally { setLoggingOut(false); }
+  }
   const [games, setGames] = useState<Game[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
@@ -731,8 +740,10 @@ export function AdminDashboard({ session }: { session: AppSession }) {
               </div>
             )
           )}
-          {activeTab === "admins" && isSuperadmin && (
-            <AdminUsersPanel
+          {activeTab === "admins" && (
+            <>
+            <div className="admin-session-bar"><span>{session.user.email}</span><button type="button" className="secondary" disabled={loggingOut} onClick={() => void logout()}>{loggingOut ? "Wird abgemeldet…" : "Logout"}</button></div>
+            {isSuperadmin && <AdminUsersPanel
               admins={adminUsers}
               tournaments={tournaments}
               currentUserEmail={session.user.email}
@@ -740,7 +751,8 @@ export function AdminDashboard({ session }: { session: AppSession }) {
               onUpdate={updateAdmin}
               onUpdateTournaments={updateAdminTournaments}
               onDelete={deleteAdmin}
-            />
+            />}
+            </>
           )}
         </div>
       )}
@@ -821,9 +833,7 @@ function AdminTabs({
     { id: "settings", label: "Turnier" },
     { id: "protocols", label: "Spielprotokolle" },
   ];
-  if (isSuperadmin) {
-    tabs.push({ id: "admins", label: "Admins", count: adminCount });
-  }
+  tabs.push({ id: "admins", label: "Admin", count: isSuperadmin ? adminCount : undefined });
 
   return (
     <nav className="admin-tabs" aria-label="Admin Bereiche">

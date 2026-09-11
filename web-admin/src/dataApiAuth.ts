@@ -179,6 +179,7 @@ export async function signIn(email: string, password: string): Promise<{ error?:
 
     const admin = readStore().admins.find((item) => item.email.toLowerCase() === email.toLowerCase());
     updateStore({ session: { user: { email, role: admin?.role ?? "admin" } } });
+    window.dispatchEvent(new StorageEvent("storage", { key: "courtboard.localData.v1" }));
     return {};
   }
 
@@ -191,10 +192,12 @@ export async function signOut() {
   window.sessionStorage.removeItem(sessionNoticeKey);
   if (dataMode === "local") {
     updateStore({ session: null });
+    window.dispatchEvent(new StorageEvent("storage", { key: "courtboard.localData.v1" }));
     return;
   }
 
-  await getSupabase().auth.signOut({ scope: "local" });
+  const { error } = await getSupabase().auth.signOut({ scope: "local" });
+  if (error) throw error;
 }
 
 function loginUrl() {

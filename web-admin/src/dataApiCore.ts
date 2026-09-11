@@ -326,7 +326,7 @@ function normalizeStore(store: Partial<LocalStore>): LocalStore {
   return {
     session: store.session
       ? { user: { ...store.session.user, role: store.session.user.role ?? seeded.admins[0].role } }
-      : seeded.session,
+      : store.session === null ? null : seeded.session,
     admins: (store.admins ?? seeded.admins).map((admin) => ({
       ...admin,
       tournament_ids: admin.tournament_ids ?? tournaments.map((tournament) => tournament.id),

@@ -128,3 +128,9 @@ test('manual logout only revokes the current session', async () => {
   await api.signOut();
   assert.deepEqual(state.signOutCalls, [{ scope: 'local' }]);
 });
+
+test('manual logout reports a server error instead of claiming success', async () => {
+  const { state, api } = await setup();
+  state.client.auth.signOut = async () => ({ error: new Error('Logout unavailable') });
+  await assert.rejects(api.signOut(), /Logout unavailable/);
+});
