@@ -26,6 +26,7 @@ export type Game = {
   printed: boolean;
   dirty: boolean;
   completed: boolean;
+  score_revision?: number;
   point_history?: string | null;
   display_state?: { hasPoints: boolean; timeout: { team: "A" | "B"; startedAt: string } | null };
   score_locked_by_device?: string | null;

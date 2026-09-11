@@ -3,15 +3,16 @@ export function startDisplayPolling(load: () => Promise<void>, onError: (error: 
   const isVisible = () => document.visibilityState !== "hidden";
   let stopped = false;
   let running = false;
+  let failures = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   async function refresh() {
     if (stopped || running || !isVisible()) return;
     clearTimeout(timer);
     running = true;
-    try { await load(); } catch (error) { if (!stopped) onError(error); }
+    try { await load(); failures = 0; } catch (error) { failures++; if (!stopped) onError(error); }
     finally {
       running = false;
-      if (!stopped && isVisible()) timer = setTimeout(refresh, 5_000);
+      if (!stopped && isVisible()) timer = setTimeout(refresh, Math.min(30_000, 5_000 * 2 ** Math.min(failures, 3)));
     }
   }
   function visibilityChanged() {

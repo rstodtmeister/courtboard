@@ -3,7 +3,32 @@ import type { CourtLock, Game, GameDraft, ScoreEntryData, ScoreLink, ScoreLinkRe
 import { getPrimaryTournament } from "./dataApiTournaments";
 import { createScoreSaveQueue } from "./scoreSaveQueue";
 
+import { createScoreOutbox, ScoreTransportError, type ScoreAck } from "./scoreOutbox";
+import { draftFromGame } from "./scoreLogic";
+
+export const scoreOutbox = createScoreOutbox({
+  storage: { getItem: (key) => window.localStorage.getItem(key), setItem: (key, value) => window.localStorage.setItem(key, value),
+    key: (index) => window.localStorage.key(index), get length() { return window.localStorage.length; } },
+  uuid: () => crypto.randomUUID(), online: () => navigator.onLine,
+  send: async (record, command) => {
+    const { data, error } = await getSupabase().functions.invoke<ScoreAck>("submit-score", {
+      body: { ...command, token: record.token, deviceId: record.deviceId, gameId: record.game.id },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (error || !data) {
+      const status = error?.context instanceof Response ? error.context.status : 0;
+      throw new ScoreTransportError(await supabaseFunctionErrorMessage(error, "Verbindung unterbrochen. Eingaben bleiben lokal gesichert."),
+        [400,401,403,404,409,410,413,422,423].includes(status));
+    }
+    return data;
+  },
+});
+
 const enqueueScoreSave = createScoreSaveQueue();
+function cachedScoreEntry(record: NonNullable<ReturnType<typeof scoreOutbox.cached>>): ScoreEntryData {
+  const draft = record.pending.at(-1)?.draft ?? record.acknowledged;
+  return { ...record.context, games: [{ ...record.game, ...draft, completed: record.acknowledged.completed, score_revision: record.revision }] };
+}
 
 export async function createScoreLink(params: { tournamentId: string; gameId?: string; court?: string }): Promise<ScoreLinkResponse> {
   if (dataMode === "local") {
@@ -39,15 +64,22 @@ export async function loadScoreEntry(token: string): Promise<ScoreEntryData> {
     );
   }
 
+  const cached = scoreOutbox.cached(token);
+  if (cached && (cached.pending.length || cached.blocked)) {
+    scoreOutbox.retry();
+    return cachedScoreEntry(cached);
+  }
   const { data, error } = await getSupabase().functions.invoke<ScoreEntryData>(
     `submit-score?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(scoreDeviceId())}`,
     { method: "GET" },
   );
 
   if (error || !data) {
+    const status = error?.context instanceof Response ? error.context.status : 0;
+    if (cached && (status === 0 || status >= 500 || status === 408 || status === 429)) return cachedScoreEntry(cached);
     throw new Error(await supabaseFunctionErrorMessage(error, "Der Ergebnislink konnte nicht geladen werden."));
   }
-
+  for (const game of data.games) scoreOutbox.initialize(token, game, data, scoreDeviceId(), draftFromGame(game));
   return data;
 }
 
@@ -151,6 +183,7 @@ export async function unlockScoreCourt(tournamentId: string, court: string): Pro
 export function submitScore(token: string, game: Game, draft: GameDraft): Promise<void> {
   // Capture the score and identity now, not when the queued request starts.
   const snapshot = { ...draft };
+  if (dataMode === "supabase") return scoreOutbox.enqueue(game.id, snapshot);
   const gameId = game.id;
   const deviceId = scoreDeviceId();
   return enqueueScoreSave(gameId, () => sendScore(token, gameId, deviceId, snapshot));
@@ -182,29 +215,7 @@ async function sendScore(token: string, gameId: string, deviceId: string, draft:
     return;
   }
 
-  const { error } = await getSupabase().functions.invoke("submit-score", {
-    body: {
-      token,
-      deviceId,
-      gameId,
-      referee: draft.referee,
-      result: draft.result,
-      winnerTeam: draft.winner_team,
-      gameRating: draft.game_rating,
-      set1TeamA: draft.set1_team_a,
-      set1TeamB: draft.set1_team_b,
-      set2TeamA: draft.set2_team_a,
-      set2TeamB: draft.set2_team_b,
-      set3TeamA: draft.set3_team_a,
-      set3TeamB: draft.set3_team_b,
-      completed: draft.completed,
-      pointHistory: draft.point_history,
-    },
-  });
-
-  if (error) {
-    throw new Error(await supabaseFunctionErrorMessage(error, "Ergebnis konnte nicht gespeichert werden."));
-  }
+  throw new Error("Unbekannter Speichermodus.");
 }
 
 export async function heartbeatScoreEntry(token: string, gameId: string): Promise<void> {

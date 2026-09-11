@@ -38,10 +38,14 @@ async function setup(mode) {
     // ${++moduleId}
   `);
   const tournamentsUrl = asModule('export const getPrimaryTournament = () => { throw new Error("Unexpected tournament lookup"); };');
+  const outboxUrl = asModule('export const createScoreOutbox = () => ({}); export class ScoreTransportError extends Error {}');
+  const logicUrl = asModule('export const draftFromGame = game => game;');
   const code = compile(apiSource)
     .replace('"./dataApiCore"', JSON.stringify(coreUrl))
     .replace('"./dataApiTournaments"', JSON.stringify(tournamentsUrl))
-    .replace('"./scoreSaveQueue"', JSON.stringify(queueUrl));
+    .replace('"./scoreSaveQueue"', JSON.stringify(queueUrl))
+    .replace('"./scoreOutbox"', JSON.stringify(outboxUrl))
+    .replace('"./scoreLogic"', JSON.stringify(logicUrl));
   return { state, api: await import(asModule(code)) };
 }
 
@@ -52,7 +56,7 @@ const score = (points, completed = false) => ({
   point_history: JSON.stringify([{ set: 1, team: 'A', scoreA: points, scoreB: 6 }]),
 });
 
-for (const mode of ['supabase', 'local']) {
+for (const mode of ['local']) {
   test(`${mode}: rapid points, undo and final result reach the server in order`, async () => {
     const { state, api } = await setup(mode);
     const writes = [
@@ -143,7 +147,7 @@ for (const mode of ['supabase', 'local']) {
 }
 
 test('different links to the same game share one write queue', async () => {
-  const { state, api } = await setup('supabase');
+  const { state, api } = await setup('local');
   const first = api.submitScore('court-link', game, score(7));
   const second = api.submitScore('individual-game-link', game, score(8));
   await flush();

@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc -b",
     "test:auth": "node --test tests/auth-session.test.mjs",
-    "test:score": "node --test tests/score-save-order.test.mjs",
+    "test:score": "node --test tests/score-save-order.test.mjs tests/score-outbox.test.mjs",
     "build": "tsc -b && vite build",
     "check": "npm run test:auth && npm run test:score && npm run test:display && npm run test:hvv && npm run typecheck && npm run build",
     "preview": "vite preview --host 127.0.0.1",

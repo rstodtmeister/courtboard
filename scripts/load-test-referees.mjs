@@ -2,6 +2,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
+import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import ts from '../web-admin/node_modules/typescript/lib/typescript.js';
 const fixture = JSON.parse(await readFile(process.env.LOAD_TEST_FIXTURE, 'utf8'));
 if (fixture.purpose !== 'courtboard-disposable-load-test' || fixture.games.length !== 4) throw new Error('Invalid disposable fixture');
@@ -9,28 +11,46 @@ const queueSource = await readFile(new URL('../web-admin/src/scoreSaveQueue.ts',
 const compiled = ts.transpileModule(queueSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const { createScoreSaveQueue } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 const enqueue = createScoreSaveQueue();
+const patchSource = await readFile(new URL('../web-admin/src/scorePatch.ts', import.meta.url), 'utf8');
+const patchCompiled = ts.transpileModule(patchSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { historyDelta } = await import('data:text/javascript;base64,' + Buffer.from(patchCompiled).toString('base64'));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const observations = [];
 let failures = 0;
 let stage = 'baseline';
 const states = fixture.games.map((game, i) => ({ ...game, deviceId: `load-test-${fixture.tournamentId}-${i}`, history: game.history ?? [], a: game.history?.at(-1)?.scoreA ?? 0, b: game.history?.at(-1)?.scoreB ?? 0, moves: 0, lastHeartbeat: performance.now(), expected: null }));
+for (const state of states) {
+ const response = await fetch(`${process.env.SUPABASE_URL}/functions/v1/submit-score?token=${encodeURIComponent(state.token)}&deviceId=${encodeURIComponent(state.deviceId)}`, { headers: { apikey: process.env.SUPABASE_ANON_KEY }, signal: AbortSignal.timeout(15000) });
+ const data = await response.json();
+ if (!response.ok) throw new Error('Cannot initialize referee fixture');
+ const game = data.games.find(game => game.id === state.id);
+ state.revision = game.score_revision; state.acknowledgedHistory = game.point_history;
+}
 async function submit(state, body, kind = 'score') {
+  const wire = kind === 'score' ? { ...body, pointHistory: undefined, protocol: 2, operationId: randomUUID(), baseRevision: state.revision,
+    historyDelta: historyDelta(state.acknowledgedHistory, body.pointHistory) } : body;
+  const requestBody = JSON.stringify({ token: state.token, deviceId: state.deviceId, gameId: state.id, ...wire });
+  const legacyBytes = Buffer.byteLength(JSON.stringify({ token: state.token, deviceId: state.deviceId, gameId: state.id, ...body }));
   const started = performance.now();
   let ok = false, status = 0, serverTiming = null, failureType = null;
   const startedAt = new Date().toISOString();
   try {
     const response = await fetch(`${process.env.SUPABASE_URL}/functions/v1/submit-score`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', apikey: process.env.SUPABASE_ANON_KEY },
-      body: JSON.stringify({ token: state.token, deviceId: state.deviceId, gameId: state.id, ...body }),
+      body: requestBody,
       signal: AbortSignal.timeout(15000),
     });
     status = response.status;
     serverTiming = response.headers.get('Server-Timing');
     const result = await response.json();
     if (!response.ok || result.ok !== true) throw new Error(`Submit failed: HTTP ${status}`);
+    if (kind === 'score') {
+      if (result.operationId !== wire.operationId || !Number.isSafeInteger(result.revision)) throw new Error('Invalid acknowledgement');
+      state.revision = result.revision; state.acknowledgedHistory = body.pointHistory;
+    }
     ok = true;
   } catch (error) { failureType = error.name; failures++; throw error; }
-  finally { observations.push({ stage, court: state.court, kind, status, ok, startedAt, failureType, serverTiming, ms: performance.now()-started }); }
+  finally { observations.push({ requestBytes: Buffer.byteLength(requestBody), legacyBytes, stage, court: state.court, kind, status, ok, startedAt, failureType, serverTiming, ms: performance.now()-started }); }
 }
 function nextScore(state) {
   state.moves++;
@@ -62,7 +82,7 @@ async function runWriters(seconds) {
           await submit(state, { action: 'heartbeat' }, 'heartbeat');
           state.lastHeartbeat = performance.now();
         }
-      } catch { /* Stop new writes after five errors; never retry an old snapshot. */ }
+      } catch { break; /* Preserve the failed head; this benchmark does not simulate automatic recovery. */ }
       await sleep(Math.max(0, Math.min(2000-(performance.now()-start), deadline-performance.now())));
     }
   }));
@@ -88,9 +108,9 @@ const stored = await response.json();
 const checks = states.map((state) => {
   const actual = stored.find((game)=>game.id===state.id);
   const expected = state.expected;
-  return { court: state.court, moves: state.moves, score: `${state.a}:${state.b}`, historyEntries: Math.min(120,state.history.length), matches: !!actual && [1,2,3].every((set) => ['A','B'].every((team) => (actual[`set${set}_team_${team.toLowerCase()}`] ?? '') === expected[`set${set}Team${team}`])) && JSON.stringify(JSON.parse(actual.point_history))===expected.pointHistory && actual.completed===false };
+  return { court: state.court, moves: state.moves, score: `${state.a}:${state.b}`, historyEntries: Math.min(120,state.history.length), matches: !!actual && [1,2,3].every((set) => ['A','B'].every((team) => (actual[`set${set}_team_${team.toLowerCase()}`] ?? '') === expected[`set${set}Team${team}`])) && isDeepStrictEqual(JSON.parse(actual.point_history),JSON.parse(expected.pointHistory)) && actual.completed===false };
 });
-const report = { measuredAt: new Date().toISOString(), scenario: 'Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion', baseline: summary(observations.filter((r)=>r.stage==='baseline')), combined: summary(observations.filter((r)=>r.stage!=='baseline' && r.kind==='score')), heartbeats: summary(observations.filter((r)=>r.kind==='heartbeat')), checks, viewerCode, observations };
+const report = { measuredAt: new Date().toISOString(), protocol: 2, requestBytes: observations.filter(r=>r.kind==='score').reduce((n,r)=>n+r.requestBytes,0), legacyBytes: observations.filter(r=>r.kind==='score').reduce((n,r)=>n+r.legacyBytes,0), scenario: 'Four serial score writers, one change per two seconds, every tenth change undo; 30 seconds baseline then 120 seconds alongside 50 viewers; no match completion', baseline: summary(observations.filter((r)=>r.stage==='baseline')), combined: summary(observations.filter((r)=>r.stage!=='baseline' && r.kind==='score')), heartbeats: summary(observations.filter((r)=>r.kind==='heartbeat')), checks, viewerCode, observations };
 await writeFile('/private/tmp/courtboard-combined-referees.json', JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify({ event: 'writers-complete', ...report, observations: undefined }));
 if (failures || viewerCode !== 0 || checks.some((check)=>!check.matches)) process.exitCode=1;

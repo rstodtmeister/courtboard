@@ -7,6 +7,10 @@ import { ScoreValidationError, validateScoreSubmission } from "../_shared/score-
 
 type SubmitScoreRequest = {
   token: string;
+  protocol?: number;
+  operationId?: string;
+  baseRevision?: number;
+  historyDelta?: { drop: number; keep: number; append: unknown[] };
   action?: "heartbeat" | "sync-status";
   deviceId?: string;
   gameId?: string;
@@ -25,7 +29,7 @@ type SubmitScoreRequest = {
 };
 
 const gameSelect =
-  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until";
+  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until,score_revision";
 
 const scoreLockTimeout = "30 minutes";
 
@@ -191,20 +195,34 @@ Deno.serve(async (req) => {
     return error ? scoreDatabaseError(error.message) : jsonResponse({ status: data });
   }
   if (!deviceId) return jsonResponse({ error: "Dieses Geraet konnte nicht erkannt werden. Bitte Link neu oeffnen." }, 403);
+  const reliable = body?.protocol === 2 && body.action !== "heartbeat";
+  if (reliable) {
+    const delta = body?.historyDelta;
+    if (!body?.operationId || !/^[0-9a-f-]{36}$/i.test(body.operationId) || !Number.isSafeInteger(body.baseRevision) || body.baseRevision! < 0
+      || !delta || !Number.isInteger(delta.drop) || !Number.isInteger(delta.keep) || delta.drop < 0 || delta.keep < 0 || delta.drop > 120 || delta.keep > 120 || !Array.isArray(delta.append) || delta.append.length + delta.keep > 120) {
+      return jsonResponse({ error: "Invalid score operation" }, 400);
+    }
+  }
   let validated;
   const validationStarted = performance.now();
   try {
-    validated = body?.action === "heartbeat" ? null : validateScoreSubmission(body ?? {}, { team_a: "1", team_b: "2" });
+    validated = body?.action === "heartbeat" ? null : validateScoreSubmission(reliable ? { ...body, pointHistory: JSON.stringify(body!.historyDelta!.append) } : body ?? {}, { team_a: "1", team_b: "2" });
   } catch (error) {
     if (error instanceof ScoreValidationError) return jsonResponse({ error: error.message }, 400);
     throw error;
   }
   const validationMs = performance.now() - validationStarted;
   const dbStarted = performance.now();
-  const { data: updatedGame, error: updateError } = await adminClient.rpc("submit_score_atomic", {
-    p_token_hash: tokenHash, p_game_id: gameId, p_device_id: deviceId,
-    p_score: validated, p_heartbeat: body?.action === "heartbeat",
-  });
+  const { data: updatedGame, error: updateError } = reliable
+    ? await adminClient.rpc("submit_score_operation", {
+      p_token_hash: tokenHash, p_game_id: gameId, p_device_id: deviceId,
+      p_operation_id: body!.operationId, p_revision: body!.baseRevision,
+      p_score: { ...validated, pointHistory: null }, p_history_delta: body!.historyDelta,
+    })
+    : await adminClient.rpc("submit_score_atomic", {
+      p_token_hash: tokenHash, p_game_id: gameId, p_device_id: deviceId,
+      p_score: validated, p_heartbeat: body?.action === "heartbeat",
+    });
   const dbMs = performance.now() - dbStarted;
   if (updateError) {
     if (updateError.message.includes("score_token_invalid")) return jsonResponse({ error: "Invalid token" }, 404);
@@ -212,12 +230,12 @@ Deno.serve(async (req) => {
     return scoreDatabaseError(updateError.message);
   }
   const completed = validated?.completed ?? false;
-  if (completed && updatedGame?.edit_url) {
+  if (completed && (reliable ? updatedGame?.hvvStatus === "queued" && !updatedGame.replayed : updatedGame?.edit_url)) {
     EdgeRuntime.waitUntil(processHvvDelivery(adminClient).catch(() => {
       console.error("HVV background attempt failed; durable job will be retried");
     }));
   }
-  const response = jsonResponse({ ok: true, hvvStatus: completed ? (updatedGame?.edit_url ? "queued" : "not_configured") : null });
+  const response = jsonResponse(reliable ? updatedGame : { ok: true, hvvStatus: completed ? (updatedGame?.edit_url ? "queued" : "not_configured") : null });
   response.headers.set("Server-Timing", `hash;dur=${hashMs.toFixed(2)}, validate;dur=${validationMs.toFixed(2)}, database;dur=${dbMs.toFixed(2)}, total;dur=${(performance.now()-requestStarted).toFixed(2)}`);
   response.headers.set("Access-Control-Expose-Headers", "Server-Timing");
   return response;
@@ -240,6 +258,10 @@ function gameNumberSortKey(number: string | null) {
 }
 
 function scoreDatabaseError(message: string) {
+  if (message.includes("score_revision_conflict")) return jsonResponse({ error: "Das Spiel wurde zwischenzeitlich geändert. Lokale Eingaben bleiben erhalten; bitte mit der Turnierleitung abgleichen.", code: "revision_conflict" }, 409);
+  if (message.includes("score_protocol_upgrade_required")) return jsonResponse({ error: "Bitte diese ältere Erfassungsseite neu laden.", code: "upgrade_required" }, 409);
+  if (message.includes("score_operation_mismatch")) return jsonResponse({ error: "Die Bestätigung passt nicht zum gespeicherten Vorgang.", code: "operation_mismatch" }, 409);
+  if (message.includes("score_invalid_")) return jsonResponse({ error: "Ungültige Spielstandsänderung." }, 400);
   if (message.includes("score_lock_conflict")) {
     return jsonResponse({ error: "Dieses Spiel wird bereits auf einem anderen Geraet erfasst." }, 423);
   }

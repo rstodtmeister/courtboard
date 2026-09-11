@@ -1,7 +1,9 @@
+import { ScoreWriterGuard } from "./ScoreWriterGuard";
+import { ScoreSyncStatus } from "./ScoreSyncStatus";
 import { HvvDeliveryStatus } from "./HvvDeliveryStatus";
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions } from "./appConfig";
-import { heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
+import { dataMode, scoreOutbox, heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
 import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import { clearCompletedScoreEntry, clearScoreEntryResume, type CompletedScoreEntryState, loadCompletedScoreEntry, loadScoreEntryResume, saveCompletedScoreEntry, saveScoreEntryResume } from "./scoreEntryStorage";
 import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
@@ -9,6 +11,10 @@ import type { Game, GameDraft, ScoreEntryData } from "./types";
 import type { LiveSnapshot, ScoreEntryResumeState, ScoreWorkflowStep, ServerSetupStep, TeamKey } from "./workflowTypes";
 
 export function ScoreEntryApp({ token }: { token: string }) {
+  return <ScoreWriterGuard><ScoreEntryContent token={token} /></ScoreWriterGuard>;
+}
+
+function ScoreEntryContent({ token }: { token: string }) {
   const [data, setData] = useState<ScoreEntryData | null>(null);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [draft, setDraft] = useState<GameDraft | null>(null);
@@ -48,6 +54,20 @@ export function ScoreEntryApp({ token }: { token: string }) {
   const sideSwapTimeouts = useRef<number[]>([]);
   const latestLiveSave = useRef(0);
   const finishingSet = useRef(false);
+  const [syncVersion, setSyncVersion] = useState(0);
+  useEffect(() => scoreOutbox.subscribe(() => setSyncVersion((value) => value+1)), []);
+  const syncStatus = dataMode === "supabase" ? scoreOutbox.status(selectedGameId) : null;
+  const syncBlocked = Boolean(syncStatus?.blocked || syncStatus?.completing);
+  useEffect(() => {
+    if (dataMode !== "supabase" || !selectedGameId || syncStatus?.pending) return;
+    const confirmed = scoreOutbox.latest(selectedGameId);
+    const game = data?.games.find((item) => item.id === selectedGameId);
+    if (!confirmed?.completed || !game) return;
+    const state = { game: { ...game, ...confirmed }, draft: confirmed, completedAt: new Date().toISOString() };
+    saveCompletedScoreEntry(token, state); clearScoreEntryResume(token);
+    setCompletedState(state); setDraft(confirmed); setWorkflowStep("done"); setSaving(false);
+  }, [syncVersion, selectedGameId]);
+
 
   useEffect(() => {
     return () => { latestLiveSave.current += 1; };
@@ -89,7 +109,11 @@ export function ScoreEntryApp({ token }: { token: string }) {
       }
       const savedState = loadScoreEntryResume(token);
       if (savedState && entryData.games.some((game) => game.id === savedState.gameId && !game.completed)) {
-        setResumeState(savedState);
+        const reliableDraft = dataMode === "supabase" ? scoreOutbox.latest(savedState.gameId) : null;
+        const changed = reliableDraft && JSON.stringify(reliableDraft) !== JSON.stringify(savedState.draft);
+        setResumeState(reliableDraft ? { ...savedState, draft: reliableDraft, setScore: scoreForSet(reliableDraft, savedState.activeSet),
+          pointHistory: changed ? [] : savedState.pointHistory,
+          workflowStep: changed ? "servers" : savedState.workflowStep, serverSetupStep: changed ? "serve-team" : savedState.serverSetupStep } : savedState);
       }
     } catch (invokeError) {
       const text = invokeError instanceof Error ? invokeError.message : "Der Ergebnislink konnte nicht geladen werden.";
@@ -120,7 +144,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
     }
     let stopped = false;
     const heartbeat = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
       try {
         await heartbeatScoreEntry(token, selectedGameId);
       } catch (heartbeatError) {
@@ -398,7 +422,7 @@ export function ScoreEntryApp({ token }: { token: string }) {
   }
 
   function changeSetPoint(team: TeamKey, delta: 1 | -1) {
-    if (!draft || isSwappingSides || finishingSet.current) {
+    if (!draft || isSwappingSides || finishingSet.current || syncBlocked) {
       return;
     }
     setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
@@ -675,9 +699,10 @@ export function ScoreEntryApp({ token }: { token: string }) {
         )}
         {error && <div className="error">{error}</div>}
         {message && <div className="success">{message}</div>}
+        <ScoreSyncStatus gameId={selectedGameId} />
         {completedState && <HvvDeliveryStatus token={token} gameId={completedState.game.id} />}
         {!loading && !lockedMessage && selectedGame && draft && (
-          <div className="score-form">
+          <div className="score-form" inert={syncBlocked}>
             {data && data.games.length > 1 && (
               <label>
                 Spiel

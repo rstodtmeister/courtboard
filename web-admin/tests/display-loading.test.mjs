@@ -9,9 +9,10 @@ const flush = () => new Promise(setImmediate);
 test('display polling pauses while hidden, refreshes on return, serializes and retries failures', async () => {
   const original = { document: globalThis.document, setTimeout, clearTimeout };
   let listener;
+  const delays = [];
   const timers = new Map();
   globalThis.document = { visibilityState: 'hidden', addEventListener: (_, fn) => { listener = fn; }, removeEventListener: () => { listener = null; } };
-  globalThis.setTimeout = (fn, delay) => { assert.equal(delay, 5000); const id = {}; timers.set(id, fn); return id; };
+  globalThis.setTimeout = (fn, delay) => { delays.push(delay); const id = {}; timers.set(id, fn); return id; };
   globalThis.clearTimeout = (id) => timers.delete(id);
   const pending = [];
   const errors = [];
@@ -27,7 +28,7 @@ test('display polling pauses while hidden, refreshes on return, serializes and r
     document.visibilityState = 'visible'; listener();
     assert.equal(pending.length, 2);
     pending[1].reject(new Error('offline')); await flush();
-    assert.equal(errors.length, 1); assert.equal(timers.size, 1);
+    assert.equal(errors.length, 1); assert.equal(timers.size, 1); assert.deepEqual(delays, [5000, 10000]);
     const retry = [...timers.values()][0]; timers.clear(); retry();
     assert.equal(pending.length, 3);
     stop(); pending[2].resolve(); await flush();
