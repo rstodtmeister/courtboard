@@ -40,14 +40,14 @@ export function GameProtocolsPage({ tournament }: { tournament: Tournament | nul
     {current ? <>
       <div className="protocol-actions"><button type="button" className="secondary" aria-label="Alle Spielprotokolle" onClick={()=>setSelected('')}>← Übersicht</button>
         <button type="button" disabled={downloading} aria-label="Spiel als JSON" onClick={()=>void download([current],'json')}>JSON</button>
-        <button type="button" disabled={downloading} aria-label="Spiel als PDF" onClick={()=>void download([current],'pdf')}>PDF</button></div>
+        <button type="button" disabled={downloading} aria-label="Spiel als PDF" onClick={()=>void download([current],'pdf')}>PDF kompakt</button></div>
       <ProtocolDetail key={current.game_id} protocol={current}/>
     </> : <>
       <div className="protocol-actions">
         <label>Court<select aria-label="Court" value={court} onChange={e=>setCourt(e.target.value)}><option value="">Alle Courts</option>{[...new Set(protocols.map(row=>String(row.snapshot.court??'')).filter(Boolean))].sort().map(value=><option key={value}>{value}</option>)}</select></label>
         <label>Erfassung<select aria-label="Erfassung" value={kind} onChange={e=>setKind(e.target.value)}><option value="">Alle Erfassungsarten</option>{[...new Set(protocols.map(protocolKind))].map(value=><option key={value}>{value}</option>)}</select></label>
         <button type="button" disabled={downloading||!visible.length} onClick={()=>void download(visible,'json')}>Liste als JSON ({visible.length})</button>
-        <button type="button" disabled={downloading||!visible.length} onClick={()=>void download(visible,'pdf')}>Liste als PDF ({visible.length})</button>
+        <button type="button" disabled={downloading||!visible.length} onClick={()=>void download(visible,'pdf')}>Liste als PDF kompakt ({visible.length})</button>
       </div>
       {loading?<div className="status">Protokolle werden geladen…</div>:!visible.length?<div className="empty">Keine Spielprotokolle für diese Auswahl.</div>:
         <div className="protocol-table-wrap"><table className="protocol-table"><thead><tr><th>Spiel / Court</th><th>Teams</th><th>Ergebnis</th><th>Erfassung</th><th>Protokoll</th></tr></thead><tbody>

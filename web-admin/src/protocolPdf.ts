@@ -66,5 +66,5 @@ export async function createProtocolPdf(value: ProtocolExport) {
 }
 export async function downloadProtocolPdf(value: ProtocolExport) {
   const bytes = await createProtocolPdf(value);
-  downloadProtocolFile(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), `spielprotokolle-${value.tournament.id}.pdf`);
+  downloadProtocolFile(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), `spielprotokolle-kompakt-${value.tournament.id}-${value.exported_at.replace(/[^0-9]/g, "")}.pdf`);
 }

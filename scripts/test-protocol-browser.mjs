@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(new URL('../web-admin/package.json', import.meta.url));
+const { PDFDocument } = require('pdf-lib');
 import { readFile } from 'node:fs/promises';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const browser=await chromium.launch({headless:true});const context=await browser.newContext({acceptDownloads:true});
@@ -49,7 +52,7 @@ try{
  await page.setViewportSize({width:1280,height:720});
  const jsonDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Spiel als JSON'}).click();const json=JSON.parse(await readFile(await(await jsonDownload).path(),'utf8'));
  assert.equal(json.games[0].events.length,105);assert.equal(json.games[0].protocol.snapshot.set1_team_a,104);
- const pdfDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Spiel als PDF'}).click();const pdf=await readFile(await(await pdfDownload).path());assert.equal(pdf.subarray(0,4).toString(),'%PDF');
+ const pdfDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Spiel als PDF'}).click();const downloadedPdf=await pdfDownload;assert.match(downloadedPdf.suggestedFilename(),/^spielprotokolle-kompakt-/);const pdf=await readFile(await downloadedPdf.path());assert.equal(pdf.subarray(0,4).toString(),'%PDF');assert.equal((await PDFDocument.load(pdf)).getPageCount(),1,'90 point scores must fit on one compact PDF page');
  await page.getByRole('button',{name:'Alle Spielprotokolle',exact:false}).click();await page.getByLabel('Erfassung',{exact:true}).selectOption('Admin-Eingabe');assert.equal(await page.getByRole('button',{name:'Protokoll Spiel 2 öffnen'}).count(),1);
  await page.setViewportSize({width:390,height:844});assert.ok(await page.locator('body').evaluate(el=>el.scrollWidth<=window.innerWidth),'Mobile page overflow');
  const openBox=await page.getByRole('button',{name:'Protokoll Spiel 2 öffnen'}).boundingBox();assert.ok(openBox.x+openBox.width<=390,'Open action must be visible without horizontal scrolling');
