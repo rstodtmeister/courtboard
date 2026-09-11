@@ -5,6 +5,7 @@ import type { Game, GameDraft, Tournament } from "./types";
 import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
 import { streamEmbed } from "./stream";
+import { MyTeam, useMyTeam, isMyTeamGame } from "./MyTeam";
 import { startDisplayPolling } from "./displayPolling";
 
 type GroupStanding = {
@@ -114,6 +115,7 @@ export function CourtDisplayApp({
   return (
     <DisplayViewport orientation={orientation}>
       <main className={`court-display-page court-count-${Math.min(courts.length, 6)}`}>
+        <MyTeam key={tournament?.id ?? tournamentId} tournamentId={tournament?.id ?? tournamentId ?? "default"} games={games}>
         <section className="court-board" aria-label="Court Anzeige">
           {courts.map((court) => (
             <CourtPanel key={court} court={court} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === court).slice(0, 3)} orientation={orientation} hasStream={Boolean(streamEmbed(tournament?.court_streams?.[String(court)]))} />
@@ -136,6 +138,7 @@ export function CourtDisplayApp({
             </div>
           </div>
         </aside>
+        </MyTeam>
       </main>
     </DisplayViewport>
   );
@@ -375,13 +378,15 @@ function CourtPanel({ court, tournamentId, games, orientation, hasStream }: { co
 }
 
 function DisplayGame({ game, position }: { game: Game; position: number; court: number }) {
+  const favorite = isMyTeamGame(game, useMyTeam());
   const current = position === 1;
   const live = current && Boolean(game.score_locked_by_device);
   const result = formatResultWithSets(game);
   const liveScore = liveScoreParts(game);
   const timeout = live ? activeTimeoutInfo(game) : null;
   return (
-    <div className={`display-game ${current ? "current" : "next"} ${live ? "live" : ""}`}>
+    <div className={`display-game ${current ? "current" : "next"} ${live ? "live" : ""} ${favorite ? "my-team-game" : ""}`}>
+      {favorite && <span className="my-team-marker">★ Mein Team</span>}
       {!current && (
         <div className="display-label">
           {position === 2 ? "Naechstes Spiel" : "Uebernaechstes Spiel"}
@@ -478,6 +483,7 @@ function displayPlayersForTeam(teamName: string | null, players?: string[]) {
 }
 
 function DisplayOpenGames({ games }: { games: Game[] }) {
+  const team = useMyTeam();
   return (
     <section className="display-side-box">
       <h2>Offene Spiele</h2>
@@ -492,7 +498,7 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
             <React.Fragment key={game.id}>
               <div className="display-open-cell">{game.number}</div>
               <div className="display-open-cell">{game.court}</div>
-              <div className="display-open-cell">{teamLine(game)}</div>
+              <div className={`display-open-cell ${isMyTeamGame(game, team) ? "my-team-highlight" : ""}`}>{isMyTeamGame(game, team) && <span aria-label="Mein Team">★ </span>}{teamLine(game)}</div>
             </React.Fragment>
           ))}
         </div>
@@ -502,6 +508,7 @@ function DisplayOpenGames({ games }: { games: Game[] }) {
 }
 
 function DisplayResults({ games }: { games: Game[] }) {
+  const team = useMyTeam();
   return (
     <section className="display-side-box">
       <div className="display-side-title">
@@ -512,8 +519,8 @@ function DisplayResults({ games }: { games: Game[] }) {
       ) : (
         <div className="display-side-list">
           {games.map((game) => (
-            <div className="display-side-item display-result-item" key={game.id}>
-              <span className="display-result-number">{game.number ? `Nr. ${game.number}` : ""}</span>
+            <div className={`display-side-item display-result-item ${isMyTeamGame(game, team) ? "my-team-highlight" : ""}`} key={game.id}>
+              <span className="display-result-number">{isMyTeamGame(game, team) ? "★ " : ""}{game.number ? `Nr. ${game.number}` : ""}</span>
               <ResultTeam game={game} team="a" />
               <span className="display-result-vs">vs.</span>
               <ResultTeam game={game} team="b" />
