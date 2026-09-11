@@ -37,13 +37,18 @@ test('export paginates past API limits and fixes its snapshot at an event bounda
  assert.equal(calls.length,4);assert.ok(calls.slice(1).every(call=>call.through===205));
  revoked=true;await assert.rejects(exportGameProtocols({id:'t',name:'Test'},[base]),/vollständig/);
 });
-test('PDF includes long protocols on multiple valid pages and accepts non-Latin team names',async()=>{
+test('compact PDF packs result-only games together and paginates long live histories',async()=>{
  const pdfUrl=pathToFileURL(require.resolve('pdf-lib')).href;
  const source=(await readFile(new URL('../src/protocolPdf.ts',import.meta.url),'utf8')).replace("'pdf-lib'",JSON.stringify(pdfUrl)).replace("'./gameProtocols'",JSON.stringify(modelUrl)).replace("'./dataApiProtocols'",JSON.stringify(url('export const downloadProtocolFile=()=>{};')));
  const {createProtocolPdf}=await import(url(source));const {PDFDocument}=await import('pdf-lib');
  const events=Array.from({length:150},(_,i)=>({recorded_at:'2026-09-11T10:00:00Z',source:'admin',action:'updated',actor_label:'Tester',changes:{set1_team_a:{before:i,after:i+1}},history_change:null}));
  const bytes=await createProtocolPdf({tournament:{name:'Testturnier'},exported_at:'2026-09-11',games:[{protocol:base,events}]});
- const document=await PDFDocument.load(bytes);assert.ok(document.getPageCount()>3);
+ const document=await PDFDocument.load(bytes);assert.equal(document.getPageCount(),1);
+ const packed=await PDFDocument.load(await createProtocolPdf({tournament:{name:'Test'},exported_at:'2026-09-11',games:Array.from({length:5},()=>({protocol:base,events}))}));
+ assert.equal(packed.getPageCount(),1,'Five result-only games fit on one page without audit rows');
+ const live=Array.from({length:1200},(_,i)=>({...events[0],source:'referee',history_change:{drop:0,keep:i,append:[{set:1,team:'A',scoreA:i+1,scoreB:0}]}}));
+ const long=await PDFDocument.load(await createProtocolPdf({tournament:{name:'Test'},exported_at:'2026-09-11',games:[{protocol:{...base,has_live:true},events:live}]}));
+ assert.ok(long.getPageCount()>1,'Long point sequences continue without truncation');
 });
 
 test('compact rows distinguish points, timeouts and corrections without inventing a second score',()=>{
