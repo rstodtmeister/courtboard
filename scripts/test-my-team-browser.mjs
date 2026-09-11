@@ -23,7 +23,7 @@ try {
  assert.ok(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),'Mobile page must not overflow');
  await page.reload();await select.waitFor();assert.equal(await select.inputValue(),teams[0]);
  await select.selectOption(teams[1]);assert.equal(await page.locator('.my-team-game').count(),3);
- await page.getByRole('button',{name:'Mein Team entfernen'}).click();assert.equal(await page.locator('.my-team-game').count(),0);
+ await select.selectOption('');assert.equal(await page.locator('.my-team-game').count(),0);
  await page.reload();await select.waitFor();assert.equal(await select.inputValue(),'');
  await select.selectOption(teams[0]);await page.screenshot({path:'/private/tmp/courtboard-my-team-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:900});await page.screenshot({path:'/private/tmp/courtboard-my-team-desktop.png'});

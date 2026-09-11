@@ -6647,13 +6647,12 @@ html.court-overlay-document,
 .my-team-bar { grid-column:1/-1; display:flex; align-items:center; gap:8px; min-width:0; }
 .my-team-bar label { font-size:14px; font-weight:700; white-space:nowrap; }
 .my-team-bar select { width: min(420px, 100%); min-width:0; min-height:44px; font-size:16px; background:#fff; color:#111; }
-.my-team-bar button { min-height:44px; }
 .my-team-bar small { font-size:12px; }
 .display-game.my-team-game { box-shadow:inset 4px 0 #b77900; background:#fff8df; }
 .my-team-marker { display:block; color:#775000; font-size:12px; font-weight:700; padding:2px 6px; }
 .my-team-highlight { background:#fff8df; box-shadow:inset 3px 0 #b77900; }
 @media (max-width: 700px) {
-  .my-team-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; margin-bottom:12px; }
+  .my-team-bar { display:grid; grid-template-columns:minmax(0,1fr); margin-bottom:12px; }
   .my-team-bar label, .my-team-bar small { grid-column:1/-1; }
   .my-team-bar select { width:100%; }
 }

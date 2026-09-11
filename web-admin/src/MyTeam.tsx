@@ -27,7 +27,6 @@ export function MyTeam({ tournamentId, games, children }: { tournamentId: string
         {team && !teams.includes(team) && <option value={team}>{team} (derzeit nicht im Spielplan)</option>}
         {teams.map(name => <option key={name} value={name}>{name}</option>)}
       </select>
-      {team && <button type="button" className="secondary" onClick={() => choose('')} aria-label="Mein Team entfernen">Entfernen</button>}
       {storageError && <small role="status">Auswahl gilt nur bis zum Neuladen; Speichern auf diesem Gerät ist nicht möglich.</small>}
     </div>
     {children}
