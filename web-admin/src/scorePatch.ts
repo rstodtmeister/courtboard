@@ -20,7 +20,7 @@ export function scoreFields(draft: GameDraft) {
   return { referee: draft.referee, gameRating: draft.game_rating || 'Normal',
     set1TeamA: (draft.set1_team_a ?? ""), set1TeamB: (draft.set1_team_b ?? ""),
     set2TeamA: (draft.set2_team_a ?? ""), set2TeamB: (draft.set2_team_b ?? ""),
-    set3TeamA: (draft.set3_team_a ?? ""), set3TeamB: (draft.set3_team_b ?? ""), completed: draft.completed };
+    set3TeamA: (draft.set3_team_a ?? ""), set3TeamB: (draft.set3_team_b ?? ""), completed: draft.completed, scoreEntryState: draft.score_entry_state ?? null };
 }
 export type ScoreCommand = ReturnType<typeof scoreFields> & {
   protocol: 2; operationId: string; baseRevision: number; historyDelta: ReturnType<typeof historyDelta>;

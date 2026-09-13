@@ -1,3 +1,4 @@
+import { parseScoreSession } from "./score-session.ts";
 export type ScoreSubmissionInput = {
   referee?: unknown;
   gameRating?: unknown;
@@ -9,6 +10,7 @@ export type ScoreSubmissionInput = {
   set3TeamB?: unknown;
   completed?: unknown;
   pointHistory?: unknown;
+  scoreEntryState?: unknown;
 };
 
 export type ScoreValidationGame = {
@@ -57,6 +59,19 @@ export function validateScoreSubmission(input: ScoreSubmissionInput, game: Score
     [score(input.set3TeamA, "Satz 3 Team A"), score(input.set3TeamB, "Satz 3 Team B")],
   ] as const;
   const pointHistory = validatedPointHistory(input.pointHistory);
+  let scoreEntryState: string | null = null;
+  try {
+    const session = parseScoreSession(input.scoreEntryState);
+    if (session && !completed) {
+      const [a, b] = setScores[session.activeSet - 1];
+      if (session.setScore.A !== Number(a || 0) || session.setScore.B !== Number(b || 0)) {
+        throw new Error("Erfassungszustand und Spielstand passen nicht zusammen.");
+      }
+      scoreEntryState = JSON.stringify(session);
+    }
+  } catch (error) {
+    throw new ScoreValidationError(error instanceof Error ? error.message : "Ungültiger Erfassungszustand.");
+  }
   const normalRating = gameRating === "Normal";
   const result = evaluateSets(setScores, completed && normalRating);
   const winnerTeam = normalRating
@@ -74,6 +89,7 @@ export function validateScoreSubmission(input: ScoreSubmissionInput, game: Score
     set3TeamB: setScores[2][1],
     completed,
     pointHistory,
+    ...(input.scoreEntryState !== undefined ? { scoreEntryState } : {}),
     result: result.validSetCount > 0 ? `${result.teamAWins}:${result.teamBWins}` : "",
     winnerTeam,
   };

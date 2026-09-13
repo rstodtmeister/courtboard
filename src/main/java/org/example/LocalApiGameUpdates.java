@@ -16,6 +16,15 @@ final class LocalApiGameUpdates {
             nextPointHistory = inferredPointHistory(game, nextSet1TeamA, nextSet1TeamB, nextSet2TeamA, nextSet2TeamB, nextSet3TeamA, nextSet3TeamB);
         }
 
+        if (!java.util.Objects.equals(game.set1TeamA, nextSet1TeamA)
+                || !java.util.Objects.equals(game.set1TeamB, nextSet1TeamB)
+                || !java.util.Objects.equals(game.set2TeamA, nextSet2TeamA)
+                || !java.util.Objects.equals(game.set2TeamB, nextSet2TeamB)
+                || !java.util.Objects.equals(game.set3TeamA, nextSet3TeamA)
+                || !java.util.Objects.equals(game.set3TeamB, nextSet3TeamB)
+                || !java.util.Objects.equals(game.pointHistory, nextPointHistory)) {
+            game.scoreEntryState = "";
+        }
         String courtValue = LocalApiJson.jsonField(body, "court");
         if (!courtValue.isBlank() || body.contains("\"court\"")) {
             game.court = courtValue;
@@ -37,6 +46,7 @@ final class LocalApiGameUpdates {
         game.printed = "true".equals(LocalApiJson.jsonField(body, "printed"));
         game.completed = "true".equals(LocalApiJson.jsonField(body, "completed"));
         if (game.completed) {
+            game.scoreEntryState = "";
             game.scoreLockedByDevice = "";
             game.scoreLockedAt = "";
         }

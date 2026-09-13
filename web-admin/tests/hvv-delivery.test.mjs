@@ -44,7 +44,7 @@ test('score endpoint acknowledges a durable completion without waiting for HVV, 
   for(const [path,replacement] of [
     ['../_shared/cors.ts',url(await readFile(new URL('_shared/cors.ts',root),'utf8'))],
     ['../_shared/token.ts',url(await readFile(new URL('_shared/token.ts',root),'utf8'))],
-    ['../_shared/score-validation.ts',url(await readFile(new URL('_shared/score-validation.ts',root),'utf8'))],
+    ['../_shared/score-validation.ts',url((await readFile(new URL('_shared/score-validation.ts',root),'utf8')).replace('"./score-session.ts"', JSON.stringify(url(await readFile(new URL('_shared/score-session.ts',root),'utf8')))))],
     ['../_shared/supabase.ts',url('export const createAdminClient=()=>globalThis.__scoreClient;')],
     ['../_shared/hvv-delivery.ts',url('export const processHvvDelivery=()=>new Promise(()=>{});')],
   ])code=code.replace(JSON.stringify(path),JSON.stringify(replacement));

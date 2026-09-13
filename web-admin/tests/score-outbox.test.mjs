@@ -70,3 +70,14 @@ test('a blocked court does not hold back three other courts',async()=>{
  assert.equal(box.status('g').pending,1);for(const id of ['g1','g2','g3'])assert.equal(box.status(id).pending,0);
  }finally{box.stop()}
 });
+
+test('reopening an acknowledged session is a no-op, but a side change is persisted',async()=>{
+ const {box,state}=setup();try{
+ await box.enqueue('g',draft(0));assert.equal(state.calls.length,0);
+ await box.enqueue('g',{...draft(0),score_entry_state:'{"leftTeam":"B"}'});
+ assert.equal(state.calls.length,1);assert.equal(state.calls[0].command.scoreEntryState,'{"leftTeam":"B"}');
+ state.calls[0].resolve();await flush();
+ await box.enqueue('g',{...draft(0),score_entry_state:'{"leftTeam":"B"}',printed:false});
+ assert.equal(state.calls.length,1);
+ }finally{box.stop()}
+});

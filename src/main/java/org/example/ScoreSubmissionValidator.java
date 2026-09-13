@@ -44,6 +44,13 @@ final class ScoreSubmissionValidator {
             throw new IllegalArgumentException("Der Punkteverlauf ist ungültig oder zu groß.");
         }
 
+        String scoreEntryState = LocalApiJson.jsonField(body, "scoreEntryState");
+        if (scoreEntryState.length() > 200_000 || (!scoreEntryState.isBlank()
+                && !(scoreEntryState.startsWith("{") && scoreEntryState.endsWith("}")))) {
+            throw new IllegalArgumentException("Der Erfassungszustand ist ungültig oder zu groß.");
+        }
+
+        game.scoreEntryState = completed ? "" : scoreEntryState;
         game.referee = referee;
         game.gameRating = rating;
         game.set1TeamA = scores[0][0];

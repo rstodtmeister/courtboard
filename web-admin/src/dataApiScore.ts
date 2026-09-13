@@ -210,6 +210,7 @@ async function sendScore(token: string, gameId: string, deviceId: string, draft:
         printed: draft.printed,
         completed: draft.completed,
         pointHistory: draft.point_history,
+        scoreEntryState: draft.score_entry_state ?? null,
       }),
     });
     return;

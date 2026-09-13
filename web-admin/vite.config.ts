@@ -31,9 +31,11 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (event.request.mode === 'navigate') {
     if (!url.searchParams.has('token')) return;
-    event.respondWith(fetch(event.request).catch(() => caches.open(CACHE).then(cache => cache.match('index.html'))));
+    event.respondWith(fetch(event.request).catch(() => caches.open(CACHE).then(cache => cache.match('index.html', { ignoreVary: true }))));
+  // These immutable same-origin shell files do not vary by request headers.
+  // Preview/CDN Vary: Origin must not hide the prefetched copy when offline.
   } else if (files.some(file => new URL(file, self.registration.scope).href === url.href)) {
-    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(event.request)) || fetch(event.request)));
+    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(event.request, { ignoreVary: true })) || fetch(event.request)));
   }
 });
 ` });

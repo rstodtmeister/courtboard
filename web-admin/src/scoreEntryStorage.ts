@@ -67,6 +67,8 @@ export function loadScoreEntryResume(token: string): ScoreEntryResumeState | nul
     }
     return {
       gameId: parsed.gameId,
+      finalEditing: Boolean(parsed.finalEditing),
+      timeoutEndsAt: typeof parsed.timeoutEndsAt === "number" ? parsed.timeoutEndsAt : null,
       draft: parsed.draft,
       workflowStep: parsed.workflowStep,
       serverSetupStep: isServerSetupStep(parsed.serverSetupStep) ? parsed.serverSetupStep : "serve-team",

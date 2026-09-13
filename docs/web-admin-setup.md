@@ -397,3 +397,42 @@ Der [Neustartvergleich vom 11.09.2026](reports/supabase-restart-2026-09-11.md)
 vergleicht denselben Test vor und nach einem Supabase-Neustart: etwas niedrigere
 Speicherzeiten, aber keine durchgängige Verbesserung der Zuschauerzeiten.
 Ein dauerhafter Effekt ist damit nicht nachgewiesen.
+
+### Gerätewechsel während der Schiedsrichtererfassung
+
+Der vollständige Erfassungszustand wird mit dem Spielstand gespeichert: aktueller
+Satz und Einrichtungsschritt, Kapitäne, Aufschlagreihenfolge und aktueller
+Aufschläger, Seiten und bestätigter Seitenwechsel, Auszeiten sowie bis zu 120
+Rückgängig-Schritte. Auch Änderungen ohne neuen Punkt werden übertragen. Eine
+laufende Auszeit verwendet eine feste Endzeit und beginnt auf einem anderen Gerät
+nicht erneut bei 30 Sekunden.
+
+Vor dem Wechsel müssen alle Eingaben vom Server bestätigt sein. Anschließend
+kann die Turnierleitung die bestehende Court-Sperre freigeben; auf dem neuen Gerät
+wird derselbe Spiel-/Court-Link geöffnet. Sowohl „Letzte Eingabe fortsetzen“ als
+auch das Bestätigen des Schiedsgerichts übernehmen den gespeicherten Zustand.
+Ein Gerät mit ausschließlich lokal wartenden Offline-Eingaben muss diese zuerst
+übertragen. Die Court-Sperre verhindert weiterhin gleichzeitiges Schreiben.
+
+Für die Einführung zuerst `20260913090000_persist_score_session.sql` anwenden,
+danach die Edge Function `submit-score` und das Web-Frontend aktualisieren.
+Bereits vor der Einführung gespeicherte Browser-Sitzungen werden beim Fortsetzen
+auf dem bisherigen Gerät übernommen, sofern ihr Punktestand noch aktuell ist.
+Ohne diese Übertragung kann ein neues Gerät frühere, ausschließlich lokal
+vorhandene Satzdaten nicht rekonstruieren. Manuelle Ergebnisentwürfe werden
+weiterhin erst beim Bestätigen an den Server gesendet.
+
+`score_entry_state` gehört zum privaten Spielzugriff und erscheint nicht in den
+öffentlichen Anzeigedaten. Zustand und Punkte werden in derselben versionierten
+Operation gespeichert; Wiederholungen verändern den Zustand nicht nochmals.
+Ändert ein Admin die Punkte oder Teams unabhängig von der Erfassung, wird der
+zugehörige veraltete Satz-Zustand verworfen. Im lokalen Java-API-Betrieb hält der
+laufende Server die Satzdaten für andere Geräte bereit; ein Neustart dieses
+Servers ist keine dauerhafte Speicherung.
+
+Prüfungen: `npm run check` in `web-admin`, `supabase/tests/score_session.sql`,
+`mvn test-compile` und
+`java -ea -cp target/classes:target/test-classes org.example.ScoreSessionPersistenceTest`.
+Die Browserprüfungen `scripts/test-score-device-handover.mjs` und
+`scripts/test-score-browser.mjs` verwenden eine Cloud-Vorschau mit synthetischer
+URL `https://example.supabase.co` und ausschließlich simulierten Serverantworten.

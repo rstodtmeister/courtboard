@@ -32,6 +32,8 @@ export type LiveSnapshot = {
 };
 
 export type ScoreEntryResumeState = {
+  finalEditing?: boolean;
+  timeoutEndsAt?: number | null;
   gameId: string;
   draft: GameDraft;
   workflowStep: Exclude<ScoreWorkflowStep, "done">;

@@ -26,10 +26,11 @@ type SubmitScoreRequest = {
   set3TeamB?: string;
   completed?: boolean;
   pointHistory?: string;
+  scoreEntryState?: string | null;
 };
 
 const gameSelect =
-  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until,score_revision";
+  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until,score_revision,score_entry_state";
 
 const scoreLockTimeout = "30 minutes";
 
@@ -48,12 +49,12 @@ Deno.serve(async (req) => {
   let body: SubmitScoreRequest | null = null;
   if (req.method === "POST") {
     const contentLength = Number.parseInt(req.headers.get("content-length") ?? "0", 10);
-    if (contentLength > 64_000) {
+    if (contentLength > 256_000) {
       return jsonResponse({ error: "Request body is too large" }, 413);
     }
     try {
       const rawBody = await req.text();
-      if (rawBody.length > 64_000) {
+      if (rawBody.length > 256_000) {
         return jsonResponse({ error: "Request body is too large" }, 413);
       }
       const parsedBody = JSON.parse(rawBody) as unknown;

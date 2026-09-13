@@ -14,7 +14,11 @@ await context.route('https://example.supabase.co/**',async route=>{
  if(body.action)return route.fulfill({json:body.action==='sync-status'?{status:'not_configured'}:{ok:true},headers});
  commands.push(body);
  if(rejectWrites)return route.abort('failed');
- return route.fulfill({json:{ok:true,operationId:body.operationId,revision:body.baseRevision+1,completed:body.completed},headers});
+ const delta=body.historyDelta,history=JSON.parse(game.point_history||'[]');
+ game.point_history=JSON.stringify([...history.slice(delta.drop,delta.drop+delta.keep),...delta.append]);
+ for(let set=1;set<=3;set++)for(const team of ['A','B'])game[`set${set}_team_${team.toLowerCase()}`]=body[`set${set}Team${team}`];
+ game.score_entry_state=body.scoreEntryState;game.referee=body.referee;game.completed=body.completed;game.score_revision=body.baseRevision+1;
+ return route.fulfill({json:{ok:true,operationId:body.operationId,revision:game.score_revision,completed:body.completed},headers});
 });
 try{
  const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -29,6 +33,8 @@ try{
  localStorage.setItem('courtboard.score-entry.browser-test',JSON.stringify({gameId:id,draft:record.acknowledged,workflowStep:'live',serverSetupStep:'side-change',activeSet:1,servingTeam:'A',firstServerTeamA:'Alpha',firstServerTeamB:'Beta',captainTeamA:'Alpha',captainTeamB:'Beta',sideChangeInterval:7,leftTeam:'A',setScore:{A:0,B:0},serverIndex:{A:0,B:0},serveCounts:{A:0,B:0},pointHistory:[]}));
  },game.id);
  await page.reload();await page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
+ await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
+ const initialCommands=commands.length;const initialRevision=game.score_revision;
  const second=await context.newPage();await second.goto(page.url());await second.getByText(/bereits in einem anderen Tab/).waitFor();await second.close();
  await context.setOffline(true);
  await page.locator('.team-point-button').first().click();await page.locator('.team-point-button').first().click();
@@ -41,8 +47,8 @@ try{
  assert.equal(await page.locator('.live-score').first().textContent(),'1');
  await context.setOffline(false);
  await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
- const scores=commands.map(command=>command.set1TeamA);assert.deepEqual(scores,['1','2','1']);
- assert.deepEqual(commands.map(command=>command.baseRevision),[0,1,2]);
+ const scores=commands.slice(initialCommands).map(command=>command.set1TeamA);assert.deepEqual(scores,['1','2','1']);
+ assert.deepEqual(commands.slice(initialCommands).map(command=>command.baseRevision),[initialRevision,initialRevision+1,initialRevision+2]);
  // A final result stays pending through offline reload until its server receipt arrives.
  await page.evaluate(()=>localStorage.removeItem('courtboard.score-entry.browser-test'));
  await page.reload();

@@ -143,9 +143,13 @@ export function createScoreOutbox(options: {
       const record = read(id);
       if (!record) return Promise.reject(new Error('Das Spiel wurde noch nicht für die Erfassung geladen.'));
       if (record.blocked || storageErrors.has(id)) return Promise.reject(new Error(record.blocked || storageErrors.get(id)!.message));
+      // Reopening a synchronized session must not create another write.
+      const sameSubmission = (other: GameDraft) => JSON.stringify(scoreFields(other)) === JSON.stringify(scoreFields(draft))
+        && (other.point_history || "[]") === (draft.point_history || "[]");
+      if (!record.pending.length && sameSubmission(record.acknowledged)) return Promise.resolve();
       // A second click on an unacknowledged final result waits for the same receipt.
       let operation = record.pending.at(-1);
-      if (!operation || JSON.stringify(operation.draft) !== JSON.stringify(draft)) {
+      if (!operation || !sameSubmission(operation.draft)) {
         if (record.pending.some((op) => op.draft.completed)) return Promise.reject(new Error('Der Spielabschluss wartet noch auf Bestätigung.'));
         if (record.pending.length >= 250) { storageErrors.set(id, { message: '250 Eingaben warten auf Übertragung. Die letzte Eingabe ist noch nicht gesichert. Bitte Verbindung wiederherstellen und Sicherung herunterladen.', draft }); notify(); return Promise.reject(new Error('Lokale Warteschlange voll.')); }
         operation = { id: options.uuid(), draft: { ...draft } };

@@ -102,6 +102,7 @@ export function draftFromGame(game: Game): GameDraft {
     printed: game.printed,
     completed: game.completed,
     point_history: game.point_history ?? "",
+    score_entry_state: game.score_entry_state ?? null,
   };
 }
 

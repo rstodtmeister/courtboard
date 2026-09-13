@@ -68,6 +68,7 @@ final class LocalApiPayloads {
                 .append("\"printed\":").append(game.printed).append(',')
                 .append("\"dirty\":").append(game.dirty).append(',')
                 .append("\"completed\":").append(game.completed).append(',')
+                .append("\"score_entry_state\":").append(LocalApiJson.jsonString(game.scoreEntryState.isBlank() ? null : game.scoreEntryState)).append(',')
                 .append("\"point_history\":").append(LocalApiJson.jsonString(game.pointHistory.isBlank() ? null : game.pointHistory)).append(',')
                 .append("\"score_locked_by_device\":").append(LocalApiJson.jsonString(game.scoreLockedByDevice.isBlank() ? null : game.scoreLockedByDevice)).append(',')
                 .append("\"score_locked_at\":").append(LocalApiJson.jsonString(game.scoreLockedAt.isBlank() ? null : game.scoreLockedAt)).append(',')

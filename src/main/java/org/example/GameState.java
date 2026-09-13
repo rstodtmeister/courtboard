@@ -31,6 +31,7 @@ class GameState {
     boolean dirty;
     boolean completed;
     String pointHistory = "";
+    String scoreEntryState = "";
     String scoreLockedByDevice = "";
     String scoreLockedAt = "";
     String scoreBlockedDevice = "";

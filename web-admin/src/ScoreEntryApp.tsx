@@ -1,3 +1,4 @@
+import { resumeForGame, serializeScoreSession } from "./scoreSession";
 import { ScoreWriterGuard } from "./ScoreWriterGuard";
 import { ScoreSyncStatus } from "./ScoreSyncStatus";
 import { HvvDeliveryStatus } from "./HvvDeliveryStatus";
@@ -47,6 +48,8 @@ function ScoreEntryContent({ token }: { token: string }) {
   const [timeoutScore, setTimeoutScore] = useState<Record<TeamKey, string | null>>({ A: null, B: null });
   const [activeTimeoutTeam, setActiveTimeoutTeam] = useState<TeamKey | null>(null);
   const [timeoutRemaining, setTimeoutRemaining] = useState(0);
+  const [timeoutEndsAt, setTimeoutEndsAt] = useState<number | null>(null);
+  const lastSessionSave = useRef("");
   const [error, setError] = useState("");
   const [lockedMessage, setLockedMessage] = useState("");
   const [liveError, setLiveError] = useState("");
@@ -75,6 +78,8 @@ function ScoreEntryContent({ token }: { token: string }) {
 
   async function loadEntry() {
     setLoading(true);
+    setResumeReady(false);
+    lastSessionSave.current = "";
     setError("");
     setLockedMessage("");
 
@@ -107,13 +112,10 @@ function ScoreEntryContent({ token }: { token: string }) {
         setSelectedGameId("");
         setDraft(null);
       }
-      const savedState = loadScoreEntryResume(token);
-      if (savedState && entryData.games.some((game) => game.id === savedState.gameId && !game.completed)) {
-        const reliableDraft = dataMode === "supabase" ? scoreOutbox.latest(savedState.gameId) : null;
-        const changed = reliableDraft && JSON.stringify(reliableDraft) !== JSON.stringify(savedState.draft);
-        setResumeState(reliableDraft ? { ...savedState, draft: reliableDraft, setScore: scoreForSet(reliableDraft, savedState.activeSet),
-          pointHistory: changed ? [] : savedState.pointHistory,
-          workflowStep: changed ? "servers" : savedState.workflowStep, serverSetupStep: changed ? "serve-team" : savedState.serverSetupStep } : savedState);
+      if (firstGame) {
+        setResumeState(resumeForGame(firstGame,
+          dataMode === "supabase" ? scoreOutbox.latest(firstGame.id) : null,
+          loadScoreEntryResume(token)));
       }
     } catch (invokeError) {
       const text = invokeError instanceof Error ? invokeError.message : "Der Ergebnislink konnte nicht geladen werden.";
@@ -165,18 +167,19 @@ function ScoreEntryContent({ token }: { token: string }) {
   }, [token, selectedGameId, workflowStep, completedState]);
 
   useEffect(() => {
-    if (!activeTimeoutTeam) {
-      return;
-    }
-    if (timeoutRemaining <= 0) {
-      setActiveTimeoutTeam(null);
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setTimeoutRemaining((current) => Math.max(0, current - 1));
-    }, 1000);
-    return () => window.clearTimeout(timeoutId);
-  }, [activeTimeoutTeam, timeoutRemaining]);
+    if (!activeTimeoutTeam || timeoutEndsAt === null) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.min(30, Math.ceil((timeoutEndsAt - Date.now()) / 1000)));
+      setTimeoutRemaining(remaining);
+      if (remaining === 0) {
+        setActiveTimeoutTeam(null);
+        setTimeoutEndsAt(null);
+      }
+    };
+    tick();
+    const interval = window.setInterval(tick, 250);
+    return () => window.clearInterval(interval);
+  }, [activeTimeoutTeam, timeoutEndsAt]);
 
   useEffect(() => {
     return () => {
@@ -186,10 +189,10 @@ function ScoreEntryContent({ token }: { token: string }) {
   }, []);
 
   useEffect(() => {
-    if (!resumeReady || !selectedGameId || !draft || workflowStep === "confirm" || workflowStep === "done") {
+    if (!resumeReady || loading || lockedMessage || !selectedGameId || !draft || draft.completed || workflowStep === "confirm" || workflowStep === "done") {
       return;
     }
-    saveScoreEntryResume(token, {
+    const state: ScoreEntryResumeState = {
       gameId: selectedGameId,
       draft,
       workflowStep,
@@ -210,10 +213,31 @@ function ScoreEntryContent({ token }: { token: string }) {
       timeoutScore,
       activeTimeoutTeam,
       timeoutRemaining,
+      timeoutEndsAt,
+      finalEditing,
       pointHistory,
-    });
+    };
+    saveScoreEntryResume(token, state);
+    setResumeState(state);
+    // Manual result fields can be incomplete while typing; only submit those on confirmation.
+    if (finalEditing) return;
+    try {
+      const snapshot = { ...draft, score_entry_state: serializeScoreSession(state) };
+      const key = JSON.stringify(snapshot);
+      if (lastSessionSave.current === key) return;
+      lastSessionSave.current = key;
+      void persistLiveDraft(snapshot).then(saved => {
+        if (!saved && lastSessionSave.current === key) lastSessionSave.current = "";
+      });
+    } catch (saveError) {
+      setLiveError(saveError instanceof Error ? saveError.message : "Erfassungszustand konnte nicht gespeichert werden.");
+    }
   }, [
     resumeReady,
+    loading,
+    lockedMessage,
+    finalEditing,
+    timeoutEndsAt,
     token,
     selectedGameId,
     draft,
@@ -251,7 +275,9 @@ function ScoreEntryContent({ token }: { token: string }) {
     setDraft(nextGame ? draftFromGame(nextGame) : null);
     setWorkflowStep("confirm");
     setServerSetupStep("captain-a");
-    setResumeState(null);
+    setResumeState(nextGame ? resumeForGame(nextGame,
+      dataMode === "supabase" ? scoreOutbox.latest(nextGame.id) : null, loadScoreEntryResume(token)) : null);
+    lastSessionSave.current = "";
     setCompletedState(null);
     setFinalEditing(false);
     setManualFocusedSet(null);
@@ -275,39 +301,41 @@ function ScoreEntryContent({ token }: { token: string }) {
     setTimeoutScore({ A: null, B: null });
     setActiveTimeoutTeam(null);
     setTimeoutRemaining(0);
+    setTimeoutEndsAt(null);
     setMessage("");
     setError("");
     setLiveError("");
   }
 
-  function resumeLastEntry() {
-    if (!resumeState) {
+  function resumeLastEntry(state = resumeState) {
+    if (!state) {
       return;
     }
-    setSelectedGameId(resumeState.gameId);
-    setDraft(resumeState.draft);
-    setWorkflowStep(resumeState.workflowStep);
-    setServerSetupStep(resumeState.serverSetupStep);
-    setFinalEditing(false);
-    setActiveSet(resumeState.activeSet);
-    setServingTeam(resumeState.servingTeam);
-    setFirstServerTeamA(resumeState.firstServerTeamA);
-    setFirstServerTeamB(resumeState.firstServerTeamB);
-    setCaptainTeamA(resumeState.captainTeamA);
-    setCaptainTeamB(resumeState.captainTeamB);
-    setSideChangeInterval(resumeState.sideChangeInterval);
-    setLeftTeam(resumeState.leftTeam);
-    setSetScore(resumeState.setScore);
-    setServerIndex(resumeState.serverIndex);
-    setServeCounts(resumeState.serveCounts);
-    setPointHistory(resumeState.pointHistory.length > 0 ? resumeState.pointHistory : rebuildUndoHistory(resumeState));
-    setCorrectionMode(resumeState.correctionMode);
+    setSelectedGameId(state.gameId);
+    setDraft(state.draft);
+    setWorkflowStep(state.workflowStep);
+    setServerSetupStep(state.serverSetupStep);
+    setFinalEditing(state.finalEditing ?? false);
+    setActiveSet(state.activeSet);
+    setServingTeam(state.servingTeam);
+    setFirstServerTeamA(state.firstServerTeamA);
+    setFirstServerTeamB(state.firstServerTeamB);
+    setCaptainTeamA(state.captainTeamA);
+    setCaptainTeamB(state.captainTeamB);
+    setSideChangeInterval(state.sideChangeInterval);
+    setLeftTeam(state.leftTeam);
+    setSetScore(state.setScore);
+    setServerIndex(state.serverIndex);
+    setServeCounts(state.serveCounts);
+    setPointHistory(state.draft.score_entry_state || state.pointHistory.length > 0 ? state.pointHistory : rebuildUndoHistory(state));
+    setCorrectionMode(state.correctionMode);
     setLastPointTeam(null);
-    setSideChangeAck(resumeState.sideChangeAck);
+    setSideChangeAck(state.sideChangeAck);
     setIsSwappingSides(false);
-    setTimeoutScore(resumeState.timeoutScore);
-    setActiveTimeoutTeam(resumeState.activeTimeoutTeam);
-    setTimeoutRemaining(resumeState.timeoutRemaining);
+    setTimeoutScore(state.timeoutScore);
+    setActiveTimeoutTeam(state.activeTimeoutTeam);
+    setTimeoutRemaining(state.timeoutRemaining);
+    setTimeoutEndsAt(state.timeoutEndsAt ?? (state.activeTimeoutTeam ? Date.now() + state.timeoutRemaining * 1000 : null));
     setMessage("");
     setError("");
     setLiveError("");
@@ -345,7 +373,9 @@ function ScoreEntryContent({ token }: { token: string }) {
     if (!selectedGame || !draft) {
       return;
     }
-    const nextDraft = { ...draft, referee };
+    const savedEntry = resumeState?.gameId === selectedGame.id ? resumeState : null;
+    const nextDraft = { ...(savedEntry?.draft ?? draft), referee,
+      score_entry_state: savedEntry && referee ? serializeScoreSession(savedEntry) : null };
     setSaving(true);
     setError("");
     try {
@@ -360,7 +390,11 @@ function ScoreEntryContent({ token }: { token: string }) {
         setWorkflowStep("scoring");
         return;
       }
-      setWorkflowStep("servers");
+      if (savedEntry) {
+        resumeLastEntry({ ...savedEntry, draft: nextDraft });
+      } else {
+        setWorkflowStep("servers");
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Schiedsgericht konnte nicht gespeichert werden.");
     } finally {
@@ -388,6 +422,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setTimeoutScore({ A: null, B: null });
     setActiveTimeoutTeam(null);
     setTimeoutRemaining(0);
+    setTimeoutEndsAt(null);
     setWorkflowStep("live");
   }
 
@@ -411,7 +446,7 @@ function ScoreEntryContent({ token }: { token: string }) {
 
   function currentLiveSnapshot(nextDraft: GameDraft): LiveSnapshot {
     return {
-      draft: nextDraft,
+      draft: { ...nextDraft, score_entry_state: null },
       leftTeam,
       setScore,
       servingTeam,
@@ -425,7 +460,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     if (!draft || isSwappingSides || finishingSet.current || syncBlocked) {
       return;
     }
-    setPointHistory((current) => [...current, currentLiveSnapshot(draft)]);
+    setPointHistory((current) => [...current, currentLiveSnapshot(draft)].slice(-120));
 
     const nextScore = { ...setScore, [team]: Math.max(0, setScore[team] + delta) };
     const baseDraft = draftWithSetScore(draft, activeSet, nextScore);
@@ -434,6 +469,7 @@ function ScoreEntryContent({ token }: { token: string }) {
       point_history: delta > 0
         ? serializePointHistory([
           ...parsePointHistory(draft.point_history),
+          ...parseTimeoutHistory(draft.point_history),
           { set: activeSet, team, scoreA: nextScore.A, scoreB: nextScore.B },
         ])
         : draft.point_history,
@@ -459,7 +495,6 @@ function ScoreEntryContent({ token }: { token: string }) {
       setLastPointTeam(team);
       window.setTimeout(() => setLastPointTeam(null), 320);
     }
-    void persistLiveDraft(nextDraft);
   }
 
   function undoLastPoint() {
@@ -496,7 +531,6 @@ function ScoreEntryContent({ token }: { token: string }) {
     } else {
       setLeftTeam(previous.leftTeam);
     }
-    void persistLiveDraft(previous.draft);
   }
 
   function swapSides() {
@@ -530,6 +564,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setTimeoutScore((current) => ({ ...current, [team]: `${setScore[team]}:${setScore[team === "A" ? "B" : "A"]}` }));
     setActiveTimeoutTeam(team);
     setTimeoutRemaining(30);
+    setTimeoutEndsAt(Date.now() + 30_000);
     const nextDraft = {
       ...draft,
       point_history: serializePointHistory([
@@ -546,12 +581,12 @@ function ScoreEntryContent({ token }: { token: string }) {
       ]),
     };
     setDraft(nextDraft);
-    void persistLiveDraft(nextDraft);
   }
 
   function endTimeout() {
     setActiveTimeoutTeam(null);
     setTimeoutRemaining(0);
+    setTimeoutEndsAt(null);
   }
 
   async function finishCurrentSet() {
@@ -572,7 +607,6 @@ function ScoreEntryContent({ token }: { token: string }) {
       setLiveError("");
       const nextDraft = withScoreAutomation(draftWithSetScore(draft, activeSet, setScore));
       setDraft(nextDraft);
-      if (!await persistLiveDraft(nextDraft)) return;
 
       const result = matchResult(nextDraft);
       if (result.teamA >= 2 || result.teamB >= 2 || activeSet === 3) {
@@ -598,6 +632,7 @@ function ScoreEntryContent({ token }: { token: string }) {
       setTimeoutScore({ A: null, B: null });
       setActiveTimeoutTeam(null);
       setTimeoutRemaining(0);
+      setTimeoutEndsAt(null);
       setWorkflowStep("servers");
     } finally {
       finishingSet.current = false;
@@ -618,7 +653,7 @@ function ScoreEntryContent({ token }: { token: string }) {
         completed: false,
       });
       setDraft(nextDraft);
-      if (!await persistLiveDraft(nextDraft)) return;
+
       setFinalEditing(false);
       setWorkflowStep("scoring");
     } finally {
@@ -637,7 +672,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setMessage("");
 
     try {
-      const completedDraft = { ...nextDraft, completed: true, game_rating: nextDraft.game_rating || "Normal" };
+      const completedDraft = { ...nextDraft, score_entry_state: null, completed: true, game_rating: nextDraft.game_rating || "Normal" };
       await submitScore(token, selectedGame, completedDraft);
       clearScoreEntryResume(token);
       const completedGame = { ...selectedGame, ...completedDraft, completed: true };
@@ -725,7 +760,7 @@ function ScoreEntryContent({ token }: { token: string }) {
                 saving={saving}
                 canResume={Boolean(resumeState)}
                 onConfirm={confirmReferee}
-                onResume={resumeLastEntry}
+                onResume={() => resumeLastEntry()}
               />
             )}
 

@@ -28,6 +28,7 @@ export type Game = {
   completed: boolean;
   score_revision?: number;
   point_history?: string | null;
+  score_entry_state?: string | null;
   display_state?: { hasPoints: boolean; timeout: { team: "A" | "B"; startedAt: string } | null };
   score_locked_by_device?: string | null;
   score_locked_at?: string | null;
@@ -132,4 +133,5 @@ export type GameDraft = Pick<
   | "printed"
   | "completed"
   | "point_history"
+  | "score_entry_state"
 >;
