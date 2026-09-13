@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({headless:true});
 const game={id:'11111111-1111-4111-8111-111111111111',tournament_id:'22222222-2222-4222-8222-222222222222',number:'1',court:'1',team_a:'Alpha / Alice',team_b:'Beta / Bob',referee:'Ref / Ref2',game_rating:'Normal',set1_team_a:'0',set1_team_b:'0',set2_team_a:'',set2_team_b:'',set3_team_a:'',set3_team_b:'',point_history:'[]',completed:false,score_revision:0,score_entry_state:null};
-const entry={games:[game],allTeams:['Ref / Ref2'],link:{id:'link',game_id:game.id,court:null,expires_at:null,used_at:null}};
+const entry={games:[game],allTeams:['Ref / Ref2'],link:{id:'link',game_id:null,court:'1',expires_at:null,used_at:null}};
 const commands=[], errors=[], receipts=new Map();
 let owner=null;
 async function device() {
@@ -79,7 +79,7 @@ try {
  const third=await device();
  await third.page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
  await third.page.getByRole('button',{name:'Satz 1 abschließen',exact:true}).click();
- await third.page.getByRole('button',{name:'Satz bestätigen',exact:true}).click();
+ assert.equal(await third.page.getByRole('button',{name:'Satz bestätigen',exact:true}).count(),0);
  await third.page.getByRole('heading',{name:'Erster Aufschlag?',exact:true}).waitFor();await saved(third.page);
  assert.equal(session().activeSet,2);assert.equal(session().workflowStep,'servers');assert.equal(session().servingTeam,'');
  await third.context.close();owner=null;
@@ -93,6 +93,20 @@ try {
  await fourth.page.getByRole('button',{name:/alle 7 Punkte/}).click();
  await fourth.page.locator('.team-point-button').first().waitFor();await saved(fourth.page);
  assert.equal(session().activeSet,2);assert.equal(session().servingTeam,'B');assert.deepEqual(session().setScore,{A:0,B:0});
+ // The deciding set goes directly to winner confirmation, never to another set dialog.
+ await fourth.context.close();owner=null;
+ game.set2_team_a='15';game.set2_team_b='13';game.point_history='[]';game.score_revision++;
+ game.score_entry_state=JSON.stringify({...session(),setScore:{A:15,B:13},sideChangeAck:28,undo:[]});
+ const final=await device();
+ await final.page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
+ await final.page.getByRole('button',{name:'Satz 2 abschließen',exact:true}).click();
+ await final.page.getByRole('heading',{name:'Spiel abschließen?',exact:true}).waitFor();
+ await saved(final.page);assert.equal(game.completed,false);
+ assert.equal(await final.page.getByRole('button',{name:'Satz bestätigen',exact:true}).count(),0);
+ await final.page.getByRole('button',{name:'Sieger bestätigen: Alpha / Alice',exact:true}).click();
+ await final.page.getByRole('heading',{name:'Spiel abgeschlossen',exact:true}).waitFor();
+ assert.equal(game.completed,true);
+ assert.equal(await final.page.getByRole('button',{name:'Nächstes Spiel laden',exact:true}).count(),0);
  assert.equal(errors.length,0,errors.join('\n'));
- console.log(JSON.stringify({passed:true,checks:['setup before first point','service rotation','side change','timeout deadline','locked second device','fresh-device resume through referee confirmation','undo across handover','continued scoring','handover at set boundary'],commands:commands.length}));
+ console.log(JSON.stringify({passed:true,checks:['setup before first point','service rotation','side change','timeout deadline','locked second device','fresh-device resume through referee confirmation','undo across handover','continued scoring','handover at set boundary','direct set completion','winner confirmation retained','no next-game button for court link'],commands:commands.length}));
 } finally {await browser.close()}

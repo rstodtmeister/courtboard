@@ -699,12 +699,6 @@ function ScoreEntryContent({ token }: { token: string }) {
     }
   }
 
-  async function loadNextCourtGame() {
-    clearCompletedScoreEntry(token);
-    setCompletedState(null);
-    await loadEntry();
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft) {
@@ -888,7 +882,6 @@ function ScoreEntryContent({ token }: { token: string }) {
               <ThankYouStep
                 game={completedState?.game ?? selectedGame}
                 draft={completedState?.draft ?? draft}
-                onNextGame={data?.link.court && !data.link.game_id ? loadNextCourtGame : undefined}
               />
             )}
           </div>

@@ -536,7 +536,6 @@ export function LiveSetStep({
 }) {
   const [showSpecialRatings, setShowSpecialRatings] = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const [confirmFinishSet, setConfirmFinishSet] = useState(false);
   const [confirmTimeoutTeam, setConfirmTimeoutTeam] = useState<TeamKey | null>(null);
   const teamOrders = {
     A: serviceOrder(playersForTeam(game.team_a, game.team_a_players), firstServerTeamA),
@@ -547,9 +546,6 @@ export function LiveSetStep({
   const shouldChangeSides = totalSetPoints > 0 && totalSetPoints % sideChangeInterval === 0 && sideChangeAck !== totalSetPoints;
   const sideChangeBlocking = shouldChangeSides && !isSwappingSides;
   const canFinishSet = isPlausibleSetResult(setScore);
-  const setWinnerName = setScore.A > setScore.B
-    ? game.team_a || "Team A"
-    : game.team_b || "Team B";
   const activeTimeoutTeamName = activeTimeoutTeam === "A"
     ? game.team_a || "Team A"
     : activeTimeoutTeam === "B"
@@ -651,24 +647,7 @@ export function LiveSetStep({
       {(liveError || canFinishSet) && (
         <div className="score-flow-actions">
           {liveError && <span className="live-save-state error-text">{liveError}</span>}
-          {canFinishSet && <button type="button" onClick={() => setConfirmFinishSet(true)}>Satz {activeSet} abschließen</button>}
-        </div>
-      )}
-      {confirmFinishSet && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="finish-set-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-set-title">
-            <h3 id="finish-set-title">Satz {activeSet} beendet</h3>
-            <p><strong>{setWinnerName}</strong> gewinnt {setScore.A}:{setScore.B}</p>
-            <div className="finish-set-actions">
-              <button type="button" className="secondary" onClick={() => {
-                setConfirmFinishSet(false);
-                if (!correctionMode) {
-                  onToggleCorrection();
-                }
-              }}>Ergebnis korrigieren</button>
-              <button type="button" onClick={() => { setConfirmFinishSet(false); onFinishSet(); }}>Satz bestätigen</button>
-            </div>
-          </section>
+          {canFinishSet && <button type="button" onClick={onFinishSet}>Satz {activeSet} abschließen</button>}
         </div>
       )}
       {showActions && (
@@ -753,7 +732,7 @@ export function FinalReviewStep({
   );
 }
 
-export function ThankYouStep({ game, draft, onNextGame }: { game: Game; draft: GameDraft; onNextGame?: () => void }) {
+export function ThankYouStep({ game, draft }: { game: Game; draft: GameDraft }) {
   const completedGame = { ...game, ...draft };
   const result = completedResultParts(completedGame);
   const winnerSide = completedWinnerSide(completedGame);
@@ -780,11 +759,6 @@ export function ThankYouStep({ game, draft, onNextGame }: { game: Game; draft: G
           </div>
         </div>
       </div>
-      {onNextGame && (
-        <div className="score-flow-actions">
-          <button type="button" onClick={onNextGame}>Nächstes Spiel laden</button>
-        </div>
-      )}
     </section>
   );
 }

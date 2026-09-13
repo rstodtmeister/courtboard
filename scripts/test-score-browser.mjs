@@ -75,6 +75,7 @@ try{
  await context.setOffline(false);
  await waitForSaved(page);
  await page.getByRole('heading',{name:'Spiel abgeschlossen'}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Nächstes Spiel laden',exact:true}).count(),0);
  assert.equal(commands.at(-1).completed,true);
  assert.equal(errors.length,0,errors.join('\n'));
  console.log(JSON.stringify({passed:true,checks:['exclusive scoring tab','offline point/point/undo','offline shell reload','restored visible score','ordered reconnect with revisions','no admin/PDF precache','offline final result confirmed only after reconnect'],commands:commands.length}));
