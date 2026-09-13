@@ -33,7 +33,12 @@ try{
  localStorage.setItem('courtboard.score-entry.browser-test',JSON.stringify({gameId:id,draft:record.acknowledged,workflowStep:'live',serverSetupStep:'side-change',activeSet:1,servingTeam:'A',firstServerTeamA:'Alpha',firstServerTeamB:'Beta',captainTeamA:'Alpha',captainTeamB:'Beta',sideChangeInterval:7,leftTeam:'A',setScore:{A:0,B:0},serverIndex:{A:0,B:0},serveCounts:{A:0,B:0},pointHistory:[]}));
  },game.id);
  await page.reload();await page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
+ await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
+ assert.equal(await page.locator('.score-sync-status').count(),1);
+ assert.equal(await page.getByText('Alle Eingaben vom Server bestätigt.').isVisible(),false);
+ await page.getByText('Speicherstatus',{exact:true}).click();
+ assert.equal(await page.getByText('Alle Eingaben vom Server bestätigt.').isVisible(),true);
+ await page.getByText('Speicherstatus',{exact:true}).click();
  const initialCommands=commands.length;const initialRevision=game.score_revision;
  const second=await context.newPage();await second.goto(page.url());await second.getByText(/bereits in einem anderen Tab/).waitFor();await second.close();
  await context.setOffline(true);
@@ -46,7 +51,7 @@ try{
  await page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
  assert.equal(await page.locator('.live-score').first().textContent(),'1');
  await context.setOffline(false);
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
+ await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
  const scores=commands.slice(initialCommands).map(command=>command.set1TeamA);assert.deepEqual(scores,['1','2','1']);
  assert.deepEqual(commands.slice(initialCommands).map(command=>command.baseRevision),[initialRevision,initialRevision+1,initialRevision+2]);
  // A final result stays pending through offline reload until its server receipt arrives.
@@ -54,7 +59,7 @@ try{
  await page.reload();
  await page.getByLabel('Schiedsgericht').selectOption('__no_referee__');
  await page.getByRole('button',{name:'Ergebnis eintragen',exact:true}).click();
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
+ await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
  const inputs=page.locator('.manual-result-table input');
  await inputs.nth(0).fill('21');await inputs.nth(1).fill('19');await inputs.nth(2).fill('21');await inputs.nth(3).fill('19');
  await context.setOffline(true);
@@ -65,7 +70,7 @@ try{
  assert.equal(await page.locator('.score-form[inert]').count(),1);
  assert.equal(await page.getByRole('heading',{name:'Spiel abgeschlossen'}).count(),0);
  await context.setOffline(false);
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor();
+ await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
  await page.getByRole('heading',{name:'Spiel abgeschlossen'}).waitFor();
  assert.equal(commands.at(-1).completed,true);
  assert.equal(errors.length,0,errors.join('\n'));
