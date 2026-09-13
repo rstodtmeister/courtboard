@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({headless:true});
+const waitForSaved = page => page.waitForFunction(() => {
+ const key = Object.keys(localStorage).find(key => key.startsWith('courtboard.outbox.v2.'));
+ const record = key && JSON.parse(localStorage.getItem(key));
+ return record && !record.pending.length && !record.blocked;
+});
 const context = await browser.newContext();
 const game={id:'11111111-1111-4111-8111-111111111111',tournament_id:'22222222-2222-4222-8222-222222222222',number:'1',court:'1',team_a:'Alpha / Alice',team_b:'Beta / Bob',referee:'Ref / Ref2',game_rating:'Normal',set1_team_a:'0',set1_team_b:'0',set2_team_a:'',set2_team_b:'',set3_team_a:'',set3_team_b:'',point_history:'[]',completed:false,score_revision:0};
 const entry={games:[game],allTeams:['Ref / Ref2'],link:{id:'link',game_id:game.id,court:null,expires_at:null,used_at:null}};
@@ -33,25 +38,23 @@ try{
  localStorage.setItem('courtboard.score-entry.browser-test',JSON.stringify({gameId:id,draft:record.acknowledged,workflowStep:'live',serverSetupStep:'side-change',activeSet:1,servingTeam:'A',firstServerTeamA:'Alpha',firstServerTeamB:'Beta',captainTeamA:'Alpha',captainTeamB:'Beta',sideChangeInterval:7,leftTeam:'A',setScore:{A:0,B:0},serverIndex:{A:0,B:0},serveCounts:{A:0,B:0},pointHistory:[]}));
  },game.id);
  await page.reload();await page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
- assert.equal(await page.locator('.score-sync-status').count(),1);
- assert.equal(await page.getByText('Alle Eingaben vom Server bestätigt.').isVisible(),false);
- await page.getByText('Speicherstatus',{exact:true}).click();
- assert.equal(await page.getByText('Alle Eingaben vom Server bestätigt.').isVisible(),true);
- await page.getByText('Speicherstatus',{exact:true}).click();
+ await waitForSaved(page);
+ assert.equal(await page.getByText('Speicherstatus',{exact:true}).count(),0);
+ assert.equal(await page.locator('.score-sync-notice').count(),0);
  const initialCommands=commands.length;const initialRevision=game.score_revision;
  const second=await context.newPage();await second.goto(page.url());await second.getByText(/bereits in einem anderen Tab/).waitFor();await second.close();
  await context.setOffline(true);
  await page.locator('.team-point-button').first().click();await page.locator('.team-point-button').first().click();
  await page.getByRole('button',{name:'Letzte Punkteingabe rückgängig'}).click();
  await page.getByText(/3 Eingabe\(n\) lokal gesichert/).waitFor();
+ assert.equal(await page.evaluate(() => document.querySelector('.score-panel').lastElementChild.matches('.score-sync-notice')),true);
  const before=await page.evaluate(id=>JSON.parse(localStorage.getItem('courtboard.outbox.v2.'+id)),game.id);
  assert.equal(before.pending.at(-1).draft.set1_team_a,'1');
  await page.reload({waitUntil:'domcontentloaded'});
  await page.getByRole('button',{name:'Letzte Eingabe fortsetzen'}).click();
  assert.equal(await page.locator('.live-score').first().textContent(),'1');
  await context.setOffline(false);
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
+ await waitForSaved(page);
  const scores=commands.slice(initialCommands).map(command=>command.set1TeamA);assert.deepEqual(scores,['1','2','1']);
  assert.deepEqual(commands.slice(initialCommands).map(command=>command.baseRevision),[initialRevision,initialRevision+1,initialRevision+2]);
  // A final result stays pending through offline reload until its server receipt arrives.
@@ -59,7 +62,7 @@ try{
  await page.reload();
  await page.getByLabel('Schiedsgericht').selectOption('__no_referee__');
  await page.getByRole('button',{name:'Ergebnis eintragen',exact:true}).click();
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
+ await waitForSaved(page);
  const inputs=page.locator('.manual-result-table input');
  await inputs.nth(0).fill('21');await inputs.nth(1).fill('19');await inputs.nth(2).fill('21');await inputs.nth(3).fill('19');
  await context.setOffline(true);
@@ -70,7 +73,7 @@ try{
  assert.equal(await page.locator('.score-form[inert]').count(),1);
  assert.equal(await page.getByRole('heading',{name:'Spiel abgeschlossen'}).count(),0);
  await context.setOffline(false);
- await page.getByText('Alle Eingaben vom Server bestätigt.').waitFor({state:'attached'});
+ await waitForSaved(page);
  await page.getByRole('heading',{name:'Spiel abgeschlossen'}).waitFor();
  assert.equal(commands.at(-1).completed,true);
  assert.equal(errors.length,0,errors.join('\n'));

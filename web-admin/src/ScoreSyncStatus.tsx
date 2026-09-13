@@ -19,20 +19,16 @@ export function ScoreSyncStatus({ gameId }: { gameId: string }) {
     return () => { stopped = true; };
   }, []);
   if (!status) return null;
-  const needsAttention = Boolean(status.blocked || status.offline || status.completing || (pending && waitingGameId === gameId));
+  const needsAttention = Boolean(status.blocked || status.offline || (pending && waitingGameId === gameId));
+  if (!needsAttention) return null;
   function download() {
     const url = URL.createObjectURL(new Blob([scoreOutbox.export(gameId)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = `spielstand-${gameId}.json`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  const feedback = <div className="status" role={needsAttention ? "status" : undefined}>
+  return <div className="status score-sync-notice" role="status">
     {status.blocked || (status.offline && !status.pending ? 'Offline – neue Eingaben werden zunächst auf diesem Gerät gespeichert.' : status.pending ? `${status.pending} Eingabe(n) lokal gesichert – ${status.offline ? 'warten auf Verbindung' : 'werden übertragen'}.` : 'Alle Eingaben vom Server bestätigt.')}
     {!offlineReady && <div>Offline-Seite wird vorbereitet. Diese Seite bis dahin geöffnet lassen.</div>}
     {(status.pending > 0 || status.blocked) && <div><button type="button" onClick={download}>Sicherung herunterladen</button>{status.storageFailure && <button type="button" onClick={() => { void scoreOutbox.resumeStorage(gameId).catch(() => {}); }}>Lokale Sicherung erneut versuchen</button>}{!status.blocked && <button type="button" onClick={() => scoreOutbox.retry()}>Jetzt erneut versuchen</button>}</div>}
   </div>;
-  if (needsAttention) return feedback;
-  return <details className="score-sync-status">
-    <summary>Speicherstatus</summary>
-    {feedback}
-  </details>;
 }

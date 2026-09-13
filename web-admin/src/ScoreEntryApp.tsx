@@ -734,7 +734,6 @@ function ScoreEntryContent({ token }: { token: string }) {
         )}
         {error && <div className="error">{error}</div>}
         {message && <div className="success">{message}</div>}
-        <ScoreSyncStatus gameId={selectedGameId} />
         {completedState && <HvvDeliveryStatus token={token} gameId={completedState.game.id} />}
         {!loading && !lockedMessage && selectedGame && draft && (
           <div className="score-form" inert={syncBlocked}>
@@ -894,6 +893,7 @@ function ScoreEntryContent({ token }: { token: string }) {
             )}
           </div>
         )}
+        <ScoreSyncStatus gameId={selectedGameId} />
       </section>
     </main>
   );

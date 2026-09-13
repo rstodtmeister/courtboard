@@ -1835,7 +1835,7 @@ tbody tr:nth-child(even) {
 .score-app {
   min-height: 100vh;
   display: grid;
-  place-items: center;
+  place-items: start center;
   padding: 24px;
   background: #f5f7fa;
 }
@@ -6660,19 +6660,8 @@ html.court-overlay-document,
 .court-display-download-actions { display:grid; gap:8px; }
 .court-display-download-actions .secondary-link { text-align:center; }
 
-/* Routine synchronization stays quiet and does not move the score controls. */
-.score-sync-status {
-  margin: 0 0 8px;
-  color: #596575;
-  font-size: 0.8rem;
-}
-
-.score-sync-status > summary {
-  width: fit-content;
-  padding: 4px 0;
-  cursor: pointer;
-}
-
-.score-sync-status[open] > summary {
-  margin-bottom: 4px;
+/* Storage problems appear below the controls without shifting the playing area. */
+.score-sync-notice {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
 }
