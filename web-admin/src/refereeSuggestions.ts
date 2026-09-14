@@ -39,15 +39,22 @@ export function refereeSuggestions(game: Game, allGames: Game[]): RefereeSuggest
   const games = allGames.filter(candidate => candidate.tournament_id === game.tournament_id).map(candidate => candidate.id === game.id ? game : candidate);
   const round = refereeRound(game.round);
   if (finished(game) || round.kind === "unknown" || round.kind === "final") return [];
-  const available = (team: string) => knownTeam(team) && !participants(game).includes(team) && !games.some(candidate => {
+  const available = (team: string, outcomeReference = false) => (knownTeam(team) || outcomeReference) && !participants(game).includes(team) && !games.some(candidate => {
     if (candidate.id === game.id || finished(candidate) || candidate.court === game.court) return false;
     const concurrent = Boolean(candidate.score_locked_by_device) || Boolean(game.game_date && /[T ]\d{2}:\d{2}/.test(game.game_date) && candidate.game_date === game.game_date);
     return concurrent && (participants(candidate).includes(team) || teamName(candidate.referee) === team);
   });
-  const recommend = (teams: Array<string | undefined>, reason: string) => [...new Set(teams.filter((team): team is string => Boolean(team)))].filter(available).map(team => ({ team, reason }));
+  const recommend = (teams: Array<string | undefined>, reason: string, outcomeReference = false) => [...new Set(teams.filter((team): team is string => Boolean(team)))].filter(team => available(team, outcomeReference)).map(team => ({ team, reason }));
+  const recommendOutcome = (source: Game, loser: boolean) => {
+    const resolved = outcome(source, loser);
+    const number = (source.number ?? "").trim();
+    const reference = number ? `${loser ? "Verlierer" : "Gewinner"} Spiel ${number}` : undefined;
+    const team = resolved && knownTeam(resolved) ? resolved : reference;
+    return recommend([team], `${loser ? "Verlierer" : "Gewinner"} von Spiel ${number} · gleicher Court`, team === reference);
+  };
   if (round.kind === "group") {
     const groupGames = games.filter(candidate => refereeRound(candidate.round).group === round.group);
-    const candidates = [...new Set(groupGames.flatMap(participants))].filter(available);
+    const candidates = [...new Set(groupGames.flatMap(participants))].filter(team => available(team));
     const assignments = (team: string) => groupGames.filter(candidate => candidate.id !== game.id && teamName(candidate.referee) === team).length;
     const minimum = Math.min(...candidates.map(assignments));
     return recommend(candidates.filter(team => assignments(team) === minimum), "Spielfrei in der Gruppe · bisher am seltensten eingeteilt");
@@ -84,10 +91,10 @@ export function refereeSuggestions(game: Game, allGames: Game[]): RefereeSuggest
     if (previousRound.kind === "winner" && previousRound.stage === undefined) return [];
     const loser = previousRound.kind === "loser" || previousRound.kind === "winner" && previousRound.stage === 1
       || previousRound.kind === "knockout" && previousRound.stage === openingKnockoutStage;
-    return recommend([outcome(previous, loser)], `${loser ? "Verlierer" : "Sieger"} von Spiel ${previous.number} · gleicher Court`);
+    return recommendOutcome(previous, loser);
   }
   if (previousRound.kind !== "knockout") return [];
-  return recommend([outcome(previous, true)], `Verlierer von Spiel ${previous.number} · gleicher Court`);
+  return recommendOutcome(previous, true);
 }
 
 export function refereeOptionGroups(game: Game, games: Game[], options: string[]) {

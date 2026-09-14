@@ -33,9 +33,13 @@ test('previous match tree decides; first winner round is the loser exception',()
   assert.deepEqual(teams(target,[previous,target]),[expected]);
  }
 });
-test('live scores, unknown winner round and missing previous result produce no recommendation',()=>{
+test('later rounds recommend outcome references until the actual team is known',()=>{
  const target=game(2,'W3','c','d');
- for(const previous of [game(1,'W2','a','b',{result:'1:0'}),game(1,'W','a','b',{completed:true,result:'2:0'}),game(1,'W2','a','b',{completed:true})]) assert.deepEqual(teams(target,[previous,target]),[]);
+ for(const previous of [game(1,'W2','a','b',{result:'1:0'}),game(1,'W2','a','b',{completed:true})]) {
+  assert.deepEqual(teams(target,[previous,target]),['Gewinner Spiel 1']);
+ }
+ const unknown=game(1,'W','a','b',{completed:true,result:'2:0'});
+ assert.deepEqual(teams(target,[unknown,target]),[]);
 });
 test('double KO semifinal uses preceding loser-tree loser; final and bronze stay manual',()=>{
  const previous=game(1,'L4','a','b',{completed:true,winner_team:'a'});
@@ -99,4 +103,27 @@ test('manual choices include both outcomes of every numbered game without recomm
  assert.ok(result.remaining.includes('Verlierer Spiel 10'));
  assert.ok(result.remaining.includes('Gewinner Spiel 10'));
  assert.deepEqual(result.suggested.map(item=>item.team),['c','f','g']);
+});
+
+test('unplayed preceding matches supply the correct references on the same court',()=>{
+ for(const [round,expected] of [['W1','Verlierer Spiel 1'],['W2','Gewinner Spiel 1'],['L1','Verlierer Spiel 1']]) {
+  const previous=game(1,round,'Gewinner Spiel 7','Verlierer Spiel 8');
+  const target=game(2,'W3','c','d');
+  assert.deepEqual(teams(target,[previous,target]),[expected]);
+  assert.deepEqual(teams(target,[{...previous,court:'2'},target]),[]);
+ }
+ const previous=game(1,'8F','a','b'),target=game(2,'4F','c','d');
+ assert.deepEqual(teams(target,[previous,target]),['Verlierer Spiel 1']);
+ const loser=game(1,'L3','a','b'),semi=game(2,'HF','c','d');
+ assert.deepEqual(teams(semi,[loser,semi]),['Verlierer Spiel 1']);
+ assert.deepEqual(teams({...semi,round:'F'},[loser,semi]),[]);
+});
+test('generated recommendations remain suggestions and preserve existing assignments',()=>{
+ const previous=game(1,'W2','a','b'),target=game(2,'W3','c','d',{referee:'HVV Schiedsgericht'});
+ const schedule=[previous,target],before=JSON.stringify(schedule);
+ const result=groups(target,schedule,assignmentOptions(schedule));
+ assert.deepEqual(result.suggested.map(item=>item.team),['Gewinner Spiel 1']);
+ assert.ok(result.remaining.includes('HVV Schiedsgericht'));
+ assert.ok(!result.remaining.includes('Gewinner Spiel 1'));
+ assert.equal(JSON.stringify(schedule),before);
 });
