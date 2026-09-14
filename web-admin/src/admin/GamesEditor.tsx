@@ -4,6 +4,7 @@ import type { PdfSheetType } from "../pdfExport";
 import { draftFromGame, isPlausibleSetResult, parseScore, resultFromCompletedSetScores, scoreForSet, validateManualResult, withScoreAutomation } from "../scoreLogic";
 import type { Game, GameDraft, Tournament } from "../types";
 import { AppDialog } from "./shared";
+import { refereeOptionGroups } from "../refereeSuggestions";
 
 export function GamesEditor({
   games,
@@ -221,7 +222,7 @@ function MobileGameCard({
 }) {
   const completed = isCompleted(game);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const refereeGroups = useMemo(() => prioritizedRefereeOptions(game, games, refereeOptions), [game, games, refereeOptions]);
+  const refereeGroups = useMemo(() => refereeOptionGroups(game, games, refereeOptions), [game, games, refereeOptions]);
   const dragTargetRef = useRef<string | null>(null);
 
   async function updateAssignment(key: "court" | "referee", value: string) {
@@ -310,8 +311,8 @@ function MobileGameCard({
         >
           <option value="">Ohne Schiedsgericht</option>
           {refereeGroups.suggested.length > 0 && (
-            <optgroup label="Vorschlaege">
-              {refereeGroups.suggested.map((referee) => <option key={referee} value={referee}>{referee}</option>)}
+            <optgroup label="Empfohlen">
+              {refereeGroups.suggested.map(({ team, reason }) => <option key={team} value={team}>{team} · Empfohlen: {reason}</option>)}
             </optgroup>
           )}
           <optgroup label="Alle Teams">
@@ -516,6 +517,7 @@ function GameEditDialog({
   onSave: (draft: GameDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<GameDraft>(() => draftFromGame(game));
+  const refereeGroups = refereeOptionGroups({ ...game, ...draft }, games, refereeOptions);
   const [saving, setSaving] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"reset" | null>(null);
   const [correctionEditing, setCorrectionEditing] = useState(false);
@@ -599,7 +601,12 @@ function GameEditDialog({
           <span className="dialog-label">Schiedsgericht</span>
           <select value={draft.referee ?? ""} onChange={(event) => update("referee", event.target.value)}>
             <option value="">Nicht zugewiesen</option>
-            {refereeOptions.map((referee) => <option key={referee} value={referee}>{referee}</option>)}
+            {refereeGroups.suggested.length > 0 && <optgroup label="Empfohlen">
+              {refereeGroups.suggested.map(({ team, reason }) => <option key={team} value={team}>{team} · Empfohlen: {reason}</option>)}
+            </optgroup>}
+            <optgroup label="Alle Teams">
+              {refereeGroups.remaining.map((referee) => <option key={referee} value={referee}>{referee}</option>)}
+            </optgroup>
           </select>
         </label>
 
@@ -737,27 +744,6 @@ function assignmentOptions(games: Game[]): string[] {
     .map((value) => (value ?? "").trim())
     .filter((value): value is string => Boolean(value) && value !== "(Freilos)" && !isLegacyPreviousGameReferee(value));
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
-}
-
-function prioritizedRefereeOptions(game: Game, games: Game[], allOptions: string[]) {
-  const current = resolvedReferee(game, games);
-  const currentNumber = gameNumberSortKey(game.number);
-  const sameCourtNeighbours = games
-    .filter((candidate) => candidate.id !== game.id && candidate.court === game.court)
-    .sort((left, right) => Math.abs(gameNumberSortKey(left.number) - currentNumber) - Math.abs(gameNumberSortKey(right.number) - currentNumber))
-    .slice(0, 2);
-  const suggestedValues = [current, game.referee, ...sameCourtNeighbours.flatMap((candidate) => [candidate.team_a, candidate.team_b, candidate.referee])];
-  const suggested = uniqueAssignmentValues(suggestedValues)
-    .filter((value) => allOptions.includes(value) && value !== game.team_a && value !== game.team_b)
-    .slice(0, 5);
-  const remaining = allOptions.filter((value) => !suggested.includes(value));
-  return { suggested, remaining };
-}
-
-function uniqueAssignmentValues(values: Array<string | null | undefined>) {
-  return [...new Set(values
-    .map((value) => (value ?? "").trim())
-    .filter((value): value is string => Boolean(value) && value !== "(Freilos)" && !isLegacyPreviousGameReferee(value)))];
 }
 
 function gameRowClass(game: Game, dragging = false, dragOver = false, canDrop = false) {
