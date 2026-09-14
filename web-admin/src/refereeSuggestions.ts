@@ -95,3 +95,14 @@ export function refereeOptionGroups(game: Game, games: Game[], options: string[]
   const values = [...new Set([...options, ...(game.referee && !game.referee.startsWith("__") ? [game.referee] : [])])];
   return { suggested, remaining: values.filter(value => !suggested.some(item => item.team === value)) };
 }
+
+/** Manual choices include outcome references even when HVV has not used them yet. */
+export function assignmentOptions(games: Game[]): string[] {
+  const values = games.flatMap(game => {
+    const number = (game.number ?? "").trim();
+    return [game.team_a, game.team_b, game.referee,
+      ...(number ? [`Gewinner Spiel ${number}`, `Verlierer Spiel ${number}`] : [])];
+  }).map(value => (value ?? "").trim())
+    .filter(value => Boolean(value) && value !== "(Freilos)" && value !== "__previous_winner__" && value !== "__previous_loser__");
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
+}

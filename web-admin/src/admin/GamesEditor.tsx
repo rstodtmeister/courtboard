@@ -4,7 +4,7 @@ import type { PdfSheetType } from "../pdfExport";
 import { draftFromGame, isPlausibleSetResult, parseScore, resultFromCompletedSetScores, scoreForSet, validateManualResult, withScoreAutomation } from "../scoreLogic";
 import type { Game, GameDraft, Tournament } from "../types";
 import { AppDialog } from "./shared";
-import { refereeOptionGroups } from "../refereeSuggestions";
+import { assignmentOptions, refereeOptionGroups } from "../refereeSuggestions";
 
 export function GamesEditor({
   games,
@@ -737,13 +737,6 @@ function numericCourtOptions(games: Game[], tournament: Tournament | null = null
   const courts = [...new Set([...configuredCourts, ...gameCourts])];
   const sorted = courts.sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
   return sorted.length > 0 ? sorted : ["1", "2", "3", "4"];
-}
-
-function assignmentOptions(games: Game[]): string[] {
-  const values = games.flatMap((game) => [game.team_a, game.team_b, game.referee])
-    .map((value) => (value ?? "").trim())
-    .filter((value): value is string => Boolean(value) && value !== "(Freilos)" && !isLegacyPreviousGameReferee(value));
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
 }
 
 function gameRowClass(game: Game, dragging = false, dragOver = false, canDrop = false) {

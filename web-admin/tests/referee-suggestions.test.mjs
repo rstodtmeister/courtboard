@@ -4,7 +4,7 @@ import test from 'node:test';
 import ts from 'typescript';
 const source = await readFile(new URL('../src/refereeSuggestions.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {refereeSuggestions: suggest, refereeOptionGroups: groups, refereeRound} = await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const {refereeSuggestions: suggest, refereeOptionGroups: groups, refereeRound, assignmentOptions} = await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const game = (n, round, a, b, extra={}) => ({id:String(n),number:String(n),tournament_id:'t',round,team_a:a,team_b:b,court:'1',completed:false,...extra});
 const teams = (target, games) => suggest(target,games).map(s=>s.team);
 test('recognizes group and KO labels without confusing L and W with groups',()=>{
@@ -83,4 +83,20 @@ test('opening round recommends named participants individually and never winner 
   assert.deepEqual(teams(target,[target,known,unresolved]),['Müller / Meier','Schmidt / Schulz']);
   assert.deepEqual(teams(target,[target,unresolved]),[]);
  }
+});
+
+test('manual choices include both outcomes of every numbered game without recommending placeholders',()=>{
+ const target=game(1,'A','a','b',{referee:'HVV Schiedsgericht'});
+ const schedule=[target,game(2,'A','a','c',{referee:'Verlierer Spiel 2'}),game(10,'F','d','e',{completed:true}),game('','A','f','g')];
+ const options=assignmentOptions(schedule);
+ for(const number of [1,2,10]) for(const outcome of ['Gewinner','Verlierer']) {
+  assert.equal(options.filter(value=>value===`${outcome} Spiel ${number}`).length,1);
+ }
+ assert.ok(!options.includes('Verlierer Spiel '));
+ assert.ok(options.includes('HVV Schiedsgericht'));
+ assert.ok(options.indexOf('Verlierer Spiel 2')<options.indexOf('Verlierer Spiel 10'));
+ const result=groups(target,schedule,options);
+ assert.ok(result.remaining.includes('Verlierer Spiel 10'));
+ assert.ok(result.remaining.includes('Gewinner Spiel 10'));
+ assert.deepEqual(result.suggested.map(item=>item.team),['c','f','g']);
 });
