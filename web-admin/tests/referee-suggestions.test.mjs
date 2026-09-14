@@ -25,7 +25,7 @@ test('exclude unresolved teams and simultaneous or active duties on other courts
 test('opening KO round uses latest known matchup on same court, including later rounds',()=>{
  const target=game(1,'W1','a','b');
  const schedule=[target,game(2,'W1','c','d'),game(3,'W2','e','f'),game(4,'W2','Sieger Spiel 1','g'),game(5,'W1','h','i',{court:'2'})];
- assert.deepEqual(teams(target,schedule),['e','f']);
+ assert.deepEqual(teams(target,schedule),['g']);
 });
 test('previous match tree decides; first winner round is the loser exception',()=>{
  for(const [round,expected] of [['W1','b'],['W2','a'],['L1','b'],['L2','b']]) {
@@ -67,4 +67,20 @@ test('double KO may start with 8F/4F before explicit loser-tree labels',()=>{
  const next=game(2,'4F','c','d');
  assert.deepEqual(teams(next,[{...opening,completed:true,result:'2:0'},next,loserGame]),['b']);
  assert.deepEqual(teams(loserGame,[opening,{...late,completed:true,result:'2:0'},loserGame]),['e']);
+});
+
+test('opening round recommends named participants individually and never winner placeholders',()=>{
+ for (const round of ['W1','8F']) {
+  const target=game(1,round,'Team A','Team B');
+  for (const placeholder of ['Gewinner Spiel 12','Sieger Spiel 12','Verlierer Spiel 12','Winner Match 12','Loser Match 12','']) {
+   for (const sides of [[placeholder,'Müller / Meier'],['Müller / Meier',placeholder]]) {
+    assert.deepEqual(teams(target,[target,game(2,round,...sides)]),['Müller / Meier']);
+   }
+  }
+  const known=game(2,round,'Müller / Meier','Schmidt / Schulz');
+  assert.deepEqual(teams(target,[target,known]),['Müller / Meier','Schmidt / Schulz']);
+  const unresolved=game(3,round,'Gewinner Spiel 12','Gewinner Spiel 13');
+  assert.deepEqual(teams(target,[target,known,unresolved]),['Müller / Meier','Schmidt / Schulz']);
+  assert.deepEqual(teams(target,[target,unresolved]),[]);
+ }
 });

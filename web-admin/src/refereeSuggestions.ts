@@ -17,7 +17,7 @@ export function refereeRound(value: string | null | undefined): Round {
 
 const teamName = (value: string | null | undefined) => (value ?? "").trim();
 const participants = (game: Game) => [teamName(game.team_a), teamName(game.team_b)];
-const knownTeam = (team: string) => Boolean(team) && !/freilos|^__|\b(offen|tbd)\b|^(sieger|verlierer|winner|loser)\b|^(platz|rang)\s*\d|^(pool|gruppe)\s+\w+\s+(platz|rang)/i.test(team);
+const knownTeam = (team: string) => Boolean(team) && !/freilos|^__|\b(offen|tbd)\b|^(sieger|gewinner|verlierer|winner|loser)\b|^(platz|rang)\s*\d|^(pool|gruppe)\s+\w+\s+(platz|rang)/i.test(team);
 const finished = (game: Game) => Boolean(game.completed || (game.game_rating && game.game_rating !== "Normal"));
 const order = (game: Game) => game.display_order ?? Number(game.number.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
 const compare = (a: Game, b: Game) => order(a) - order(b) || a.number.localeCompare(b.number, "de", { numeric: true });
@@ -67,10 +67,10 @@ export function refereeSuggestions(game: Game, allGames: Game[]): RefereeSuggest
   if (firstRound) {
     const future = courtGames.slice(index + 1).filter(candidate => {
       const kind = refereeRound(candidate.round).kind;
-      return !finished(candidate) && !["group", "unknown"].includes(kind) && participants(candidate).every(knownTeam);
+      return !finished(candidate) && !["group", "unknown"].includes(kind) && participants(candidate).some(knownTeam);
     });
     for (const candidate of future.reverse()) {
-      const suggestions = recommend(participants(candidate), `Späte feststehende Begegnung · Spiel ${candidate.number}`);
+      const suggestions = recommend(participants(candidate), `Feststehendes Team aus später Begegnung · Spiel ${candidate.number}`);
       if (suggestions.length) return suggestions;
     }
     return [];
