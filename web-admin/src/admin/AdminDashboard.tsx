@@ -238,11 +238,13 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     setLinkText("");
 
     try {
-      await createScoreLinkData({ tournamentId, court });
+      const link = await createScoreLinkData({ tournamentId, court });
       setScoreLinks(await listScoreLinks(tournamentId));
       setMessage(`Ergebnislink fuer Court ${court} erzeugt.`);
+      return link.token;
     } catch (linkError) {
       setError(linkError instanceof Error ? linkError.message : "Court-Link konnte nicht erzeugt werden.");
+      return null;
     }
   }
 

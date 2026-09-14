@@ -18,7 +18,7 @@ export async function createCourtQrPdf(entries: CourtQrEntry[], title: string) {
     page.drawText(value, { x: x + (width - face.widthOfTextAtSize(value, fitted)) / 2, y, font: face, size: fitted });
   }
   centered(title, 30, 800, 535.28, 20, true);
-  centered('QR-Code scannen und Court öffnen', 30, 778, 535.28, 10);
+  centered('QR-Code scannen und als Schiedsrichter das Spiel erfassen', 30, 778, 535.28, 10);
   const top = 753;
   const availableHeight = 708;
   const availableWidth = 535.28;
@@ -57,7 +57,7 @@ export async function downloadCourtQrPdf(entries: CourtQrEntry[], title: string)
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'qr-codes-courts.pdf';
+  link.download = 'schiedsrichter-qr-codes-courts.pdf';
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

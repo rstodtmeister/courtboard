@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { courtQrTokens, findCourtScoreLink } from "../courtScoreLinks";
 import { QrCode } from "../QrCode";
 import type { CourtLock, Game, ScoreLink } from "../types";
 import { CompactLink, displayUrl, scoreUrl } from "./shared";
@@ -21,7 +22,7 @@ export function CourtLinksPanel({
   links: ScoreLink[];
   courtLocks: CourtLock[];
   tournamentId: string;
-  onCreateCourtLink: (court: string, tournamentId: string) => Promise<void>;
+  onCreateCourtLink: (court: string, tournamentId: string) => Promise<string | null>;
   onReplaceCourtLink: (court: string, tournamentId: string, linkId: string) => Promise<void>;
   onUnlockCourt: (court: string) => Promise<void>;
   courtStreams: Record<string, string>;
@@ -33,13 +34,10 @@ export function CourtLinksPanel({
     setPrintingQr(true);
     setQrError("");
     try {
-      const entries = courts.map(entry => {
-        const url = new URL(displayUrl(entry.tournamentId, displayOrientation));
-        url.searchParams.set("court", entry.court);
-        return { court: entry.court, url: url.toString() };
-      });
+      const tokens = await courtQrTokens(courts, links, onCreateCourtLink);
+      const entries = tokens.map(({ court, token }) => ({ court, url: scoreUrl(token) }));
       const { downloadCourtQrPdf } = await import("../courtQrPdf");
-      await downloadCourtQrPdf(entries, "QR Codes Courts · Öffentliche Anzeigen");
+      await downloadCourtQrPdf(entries, "Schiedsrichter · QR-Codes für alle Courts");
     } catch (error) {
       setQrError(error instanceof Error ? error.message : "PDF konnte nicht erstellt werden.");
     } finally { setPrintingQr(false); }
@@ -75,14 +73,15 @@ export function CourtLinksPanel({
           </select>
           <div className="court-display-download-actions">
             <a className="secondary-link" href={displayUrl(tournamentId, displayOrientation)} target="_blank" rel="noreferrer">Courts anzeigen</a>
-            <button type="button" className="secondary" onClick={() => void printCourtQrCodes()} disabled={printingQr || !courts.length}>{printingQr ? "PDF wird erstellt…" : "QR Codes Courts pdf"}</button>
+            <button type="button" className="secondary" onClick={() => void printCourtQrCodes()} disabled={printingQr || !courts.length}>{printingQr ? "PDF wird erstellt…" : "Schiedsrichter-QR-Codes als PDF"}</button>
           </div>
         </div>
       </div>
       {qrError && <div className="error" role="alert">{qrError}</div>}
       <div className="court-link-grid">
         {courts.map((entry) => {
-          const link = links.find((item) => item.court === entry.court);
+          const activeLink = findCourtScoreLink(links, entry);
+          const link = activeLink ?? links.find(item => item.tournament_id === entry.tournamentId && item.court === entry.court && !item.game_id && !item.disabled_at);
           const currentGame = sortedGames.find((game) => game.tournament_id === entry.tournamentId && game.court === entry.court && !isCompleted(game));
           const courtLock = courtLocks.find((lock) => lock.tournament_id === entry.tournamentId && lock.court === entry.court);
           const activeLock = Boolean(courtLock?.active_device_id && courtLock.locked_at && Date.parse(courtLock.locked_at) >= Date.now() - 30 * 60 * 1000);
@@ -90,7 +89,7 @@ export function CourtLinksPanel({
           const overlayUrl = new URL(displayUrl(entry.tournamentId));
           overlayUrl.searchParams.set("view", "overlay");
           overlayUrl.searchParams.set("court", entry.court);
-          const value = link?.token ? scoreUrl(link.token) : "";
+          const value = activeLink?.token ? scoreUrl(activeLink.token) : "";
           const sectionKey = `${entry.tournamentId}:${entry.court}`;
           const sectionProps = (section: string) => ({
             open: openSections[sectionKey] === section,
