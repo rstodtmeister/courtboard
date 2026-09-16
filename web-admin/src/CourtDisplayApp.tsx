@@ -6,6 +6,7 @@ import type { TeamKey } from "./workflowTypes";
 import { QrCode } from "./QrCode";
 import { streamEmbed } from "./stream";
 import { MyTeam, useMyTeam, isMyTeamGame } from "./MyTeam";
+import { TeamCompanion } from "./TeamCompanion";
 import { startDisplayPolling } from "./displayPolling";
 
 type GroupStanding = {
@@ -30,7 +31,7 @@ export function CourtDisplayApp({
 }: {
   court: string;
   tournamentId?: string;
-  mode?: "courts" | "groups";
+  mode?: "courts" | "groups" | "team";
   orientation?: DisplayOrientation;
   overlay?: boolean;
 }) {
@@ -93,6 +94,8 @@ export function CourtDisplayApp({
     const currentGame = openGames.find((game) => courtNumber(game.court) === selectedCourt);
     return <main className="court-overlay-page">{currentGame && <StreamScoreOverlay game={currentGame} />}</main>;
   }
+
+  if (mode === "team" && tournament) return <TeamCompanion games={games} tournament={tournament} error={loadError} />;
 
   if (mode === "groups") {
     return (

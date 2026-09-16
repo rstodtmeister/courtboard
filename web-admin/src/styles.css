@@ -6665,3 +6665,30 @@ html.court-overlay-document,
   margin: 12px 0 0;
   font-size: 0.85rem;
 }
+
+/* Personal tournament companion */
+.team-companion { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; color: #193349; }
+.companion-header, .companion-team { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.companion-header { margin-bottom: 24px; }
+.companion-header p, .companion-team p { margin: 0 0 6px; color: #537080; }
+.companion-header h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.7rem); }
+.companion-link { display: inline-block; padding: 10px 14px; border-radius: 12px; background: #e0f3ec; color: #135744; font-weight: 700; text-decoration: none; }
+.team-companion .my-team-bar { display: flex; flex-wrap: wrap; margin-bottom: 28px; }
+.team-companion .my-team-bar select { flex: 1; min-width: 0; max-width: 100%; }
+.companion-team h2 { margin: 0; overflow-wrap: anywhere; }
+.companion-team > div { min-width: 0; flex: 1 1 250px; }
+.companion-hint { color: #537080; line-height: 1.6; }
+.companion-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 24px; }
+.companion-duty { background: white; padding: 20px; border: 1px solid #cbdedb; border-radius: 16px; margin-bottom: 14px; }
+.companion-next { border-top: 5px solid #198467; background: #f4fbf8; }
+.companion-duty-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.companion-duty-top span { font-size: .85rem; color: #537080; }
+.companion-match { font-size: 1.15rem; font-weight: 650; overflow-wrap: anywhere; }
+.companion-match span { display: block; font-size: .8rem; color: #537080; font-weight: 400; margin: 6px 0; }
+.companion-count { font-weight: 700; color: #135744; }
+.companion-duty a { color: #135744; }
+.companion-empty, .companion-results { background: #fff; padding: 24px; border-radius: 16px; margin-top: 24px; }
+.companion-results article { padding: 16px 0; border-top: 1px solid #dce7e5; overflow-wrap: anywhere; }
+.companion-results article span { color: #537080; font-size: .85rem; }
+.companion-notice { padding: 14px; background: #fff0cd; border-radius: 12px; }
+@media (max-width: 540px) { .team-companion { padding: 18px 14px 40px; } .companion-header { align-items: flex-start; } }

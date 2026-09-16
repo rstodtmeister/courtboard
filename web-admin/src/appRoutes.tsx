@@ -31,6 +31,7 @@ type AppRoute =
   | { kind: "courts"; court: string; tournamentId: string; orientation: "landscape" | "normal" }
   | { kind: "groups"; tournamentId: string; orientation: "landscape" | "normal" }
   | { kind: "overlay"; court: string; tournamentId: string }
+  | { kind: "team"; tournamentId: string }
   | { kind: "admin" };
 
 function readRoute(): AppRoute {
@@ -58,6 +59,8 @@ function readRoute(): AppRoute {
     return { kind: "courts", court, tournamentId, orientation };
   }
 
+  if (view === "team") return { kind: "team", tournamentId };
+
   if (view === "groups") {
     return { kind: "groups", tournamentId, orientation };
   }
@@ -74,6 +77,7 @@ export function AppRouter() {
       {route.kind === "auth" && <AuthCredentialApp mode={route.mode} />}
       {route.kind === "score" && <ScoreEntryApp token={route.token} />}
       {route.kind === "courts" && <CourtDisplayApp court={route.court} tournamentId={route.tournamentId} orientation={route.orientation} />}
+      {route.kind === "team" && <CourtDisplayApp court="" tournamentId={route.tournamentId} mode="team" />}
       {route.kind === "groups" && <CourtDisplayApp court="" tournamentId={route.tournamentId} mode="groups" orientation={route.orientation} />}
       {route.kind === "admin" && <AdminApp dashboard={(session) => <AdminDashboard session={session} />} />}
     </Suspense>
