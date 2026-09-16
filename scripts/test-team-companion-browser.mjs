@@ -9,6 +9,7 @@ try {
  {id:'1',number:'1',team_a:'Gäste',team_b:'Andere',court:'1',completed:false},
  {id:'2',number:'2',team_a:team,team_b:'Andere',court:'1',completed:false},
  {id:'3',number:'3',team_a:'Gäste',team_b:'Andere',court:'2',referee:team,completed:false},
+ {id:'5',number:'5',team_a:team,team_b:'Gäste',court:'1',completed:false},
  {id:'4',number:'4',team_a:team,team_b:'Andere',court:'1',completed:true,result:'2:0'},
  ].map(game=>({...game,tournament_id:'t'}));
  await page.addInitScript(()=>{if(!localStorage.getItem('courtboard.localData.v1'))localStorage.setItem('courtboard.localData.v1',JSON.stringify({session:null,admins:[],tournaments:[{id:'t',name:'Testturnier',courts:['1','2'],court_streams:{}}],games:[],links:[]}));});
@@ -17,10 +18,18 @@ try {
  await page.getByRole('combobox',{name:/Mein Team/}).selectOption(team);
  await page.getByRole('link',{name:'Turnierbegleiter →'}).click();
  await page.getByRole('heading',{name:'Dein Turnierbegleiter'}).waitFor();
- assert.equal(await page.locator('.companion-duty').count(),2);
+ assert.equal(await page.locator('.companion-duty:visible').count(),2);
  assert.match(await page.locator('.companion-duty').first().innerText(),/Noch 1 Spiel vor euch/);
  assert.match(await page.locator('.companion-duty').nth(1).innerText(),/Schiedsgericht/);
+ const nextCards=page.locator('.companion-duty:visible');
+ const lastCard=await nextCards.last().boundingBox();
+ assert.ok(lastCard.y+lastCard.height<640,'Both next duties should fit a small phone screen');
+ await page.getByText('Weitere Aufgaben (1)',{exact:true}).click();
+ assert.equal(await page.locator('.companion-duty:visible').count(),3);
+ await page.getByText('Weitere Aufgaben (1)',{exact:true}).click();
+ await page.getByText('Eure Ergebnisse (1)',{exact:true}).click();
  assert.match(await page.locator('.companion-results').innerText(),/2:0/);
+ await page.getByText('Eure Ergebnisse (1)',{exact:true}).click();
  assert.ok(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth));
  const url=page.url();assert.equal(new URL(url).searchParams.get('team'),team);
  await page.screenshot({path:'/private/tmp/courtboard-companion-mobile.png',fullPage:true});
