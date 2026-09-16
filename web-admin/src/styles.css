@@ -6680,7 +6680,7 @@ html.court-overlay-document,
 .companion-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 10px; }
 .companion-duty { background: #f4fbf8; padding: 10px 14px; border: 1px solid #cbdedb; border-left: 4px solid #198467; border-radius: 12px; }
 .companion-duty-top, .companion-duty-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; }
-.companion-duty-top a { display: inline-flex; align-items: center; min-height: 44px; color: #135744; font-weight: 700; }
+.companion-duty-top .companion-court-label { color: #135744; font-weight: 700; font-size: .9rem; }
 .companion-duty-top span, .companion-duty-bottom small { font-size: .8rem; color: #537080; }
 .companion-match { margin: 2px 0 10px; font-size: .95rem; overflow-wrap: anywhere; }
 .companion-count { font-weight: 700; color: #135744; font-size: .9rem; }

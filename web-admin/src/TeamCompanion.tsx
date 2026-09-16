@@ -9,12 +9,12 @@ export function TeamCompanion({ games, tournament, error }: { games: Game[]; tou
       <a className="companion-link" href={teamViewUrl('courts', tournament.id)}>← Alle Courts</a></header>
     {error && <p className="companion-notice" role="status">{error} Die angezeigten Daten können veraltet sein.</p>}
     <MyTeam key={tournament.id} tournamentId={tournament.id} games={games} companion>
-      <TeamAgenda games={games} tournamentId={tournament.id} />
+      <TeamAgenda games={games} />
     </MyTeam>
   </main>;
 }
 
-function TeamAgenda({ games, tournamentId }: { games: Game[]; tournamentId: string }) {
+function TeamAgenda({ games }: { games: Game[] }) {
   const team = useMyTeam();
   const { duties, results } = teamCompanion(games, team);
   if (!team) return <section className="companion-empty"><h2>Welches Team seid ihr?</h2><p>Wählt oben euer Team. Hier findet ihr eure Spiele, Schiedsgerichtseinsätze und Ergebnisse.</p></section>;
@@ -31,7 +31,7 @@ function TeamAgenda({ games, tournamentId }: { games: Game[]; tournamentId: stri
     const b = resolveTeam(game.team_b, games) || 'Team noch offen';
     return <article className="companion-duty" key={`${game.id}-${role}`}>
       <div className="companion-duty-top"><strong>{role === 'play' ? 'Euer Spiel' : 'Schiedsgericht'}</strong>
-        {court ? <a href={teamViewUrl('courts', tournamentId, team, court)}>Court {court} →</a> : <span>Court offen</span>}
+        <span className="companion-court-label">{court ? `Court ${court}` : 'Court offen'}</span>
       </div>
       <p className="companion-match">{role === 'play' ? `Gegen ${a === team ? b : a}` : `${a} gegen ${b}`}</p>
       <div className="companion-duty-bottom"><span className="companion-count">{ahead === null ? 'Reihenfolge offen' : ahead === 0 ? (game.display_state?.hasPoints ? 'Läuft gerade' : 'Als Nächstes am Court') : `Noch ${ahead} ${ahead === 1 ? 'Spiel' : 'Spiele'} vor euch`}</span>
