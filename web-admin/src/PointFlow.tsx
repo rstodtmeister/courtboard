@@ -6,7 +6,9 @@ export type PointFlowEvent = {
   scoreB: number;
 };
 
-export function PointFlow({ points, reverse = false, className = '' }: { points: PointFlowEvent[]; reverse?: boolean; className?: string }) {
+export type PointFlowMarker = PointFlowEvent & { label: string; team?: 'A' | 'B' };
+
+export function PointFlow({ points, markers = [], reverse = false, className = '' }: { points: PointFlowEvent[]; markers?: PointFlowMarker[]; reverse?: boolean; className?: string }) {
   if (points.length === 0) return null;
   const displayTeam = (team: 'A' | 'B') => reverse ? (team === 'A' ? 'B' : 'A') : team;
   const segments: Array<Array<{ point: PointFlowEvent; index: number }>> = [];
@@ -24,8 +26,10 @@ export function PointFlow({ points, reverse = false, className = '' }: { points:
     {points.map((point, index) => {
       const team = displayTeam(point.team);
       const score = point.team === 'A' ? point.scoreA : point.scoreB;
+      const pointMarkers = markers.filter(marker => marker.scoreA === point.scoreA && marker.scoreB === point.scoreB);
       return <React.Fragment key={`${point.team}-${index}-${point.scoreA}-${point.scoreB}`}>
-        {team === 'A' ? <><span className="point-dot full left">{score}</span><span /></> : <><span /><span className="point-dot full right">{score}</span></>}
+        {team === 'A' ? <><span className={`point-dot full left${index === points.length - 1 ? ' final' : ''}`}>{score}</span><span /></> : <><span /><span className={`point-dot full right${index === points.length - 1 ? ' final' : ''}`}>{score}</span></>}
+        {pointMarkers.map((marker, markerIndex) => <span className={`point-flow-marker ${marker.team ? `team-${displayTeam(marker.team).toLowerCase()}` : ''}`} style={{ gridRow: index + 1 }} key={`${marker.label}-${markerIndex}`}>{marker.label}</span>)}
       </React.Fragment>;
     })}
   </div>;
