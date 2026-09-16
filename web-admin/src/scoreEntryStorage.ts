@@ -78,6 +78,7 @@ export function loadScoreEntryResume(token: string): ScoreEntryResumeState | nul
       firstServerTeamB: parsed.firstServerTeamB ?? "",
       captainTeamA: parsed.captainTeamA ?? "",
       captainTeamB: parsed.captainTeamB ?? "",
+      playerLabels: normalizePlayerLabels(parsed.playerLabels),
       sideChangeInterval: parsed.sideChangeInterval === 5 || parsed.sideChangeInterval === 7 ? parsed.sideChangeInterval : null,
       leftTeam: isTeamKey(parsed.leftTeam) ? parsed.leftTeam : "A",
       setScore: normalizeTeamNumberRecord(parsed.setScore),
@@ -132,7 +133,14 @@ function isServerSetupStep(value: unknown): value is ServerSetupStep {
 }
 
 function isResumableWorkflowStep(value: unknown): value is Exclude<ScoreWorkflowStep, "done"> {
-  return value === "confirm" || value === "preview" || value === "servers" || value === "setup-preview" || value === "live" || value === "scoring";
+  return value === "confirm" || value === "players" || value === "preview" || value === "servers" || value === "setup-preview" || value === "live" || value === "scoring";
+}
+
+function normalizePlayerLabels(value: unknown): Record<TeamKey, [string, string] | null> {
+  const record = value && typeof value === "object" ? value as Partial<Record<TeamKey, unknown>> : {};
+  const normalize = (pair: unknown): [string, string] | null => Array.isArray(pair) && pair.length === 2
+    && pair.every(item => typeof item === "string") ? [pair[0], pair[1]] : null;
+  return { A: normalize(record.A), B: normalize(record.B) };
 }
 
 function normalizeTeamNumberRecord(value: unknown): Record<TeamKey, number> {

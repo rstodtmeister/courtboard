@@ -7,19 +7,21 @@ const source = await readFile(new URL('../src/ScoreEntryApp.tsx', import.meta.ur
 const handler = source.slice(source.indexOf('  async function confirmReferee('), source.indexOf('  function startCurrentSet('));
 const compiled = ts.transpileModule(handler, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 
-for (const scenario of ['resume', 'new', 'other-game', 'manual']) {
+for (const scenario of ['resume', 'new', 'duplicate', 'other-game', 'manual']) {
   test(`referee confirmation: ${scenario}`, async () => {
     const calls = {};
     const saved = { gameId: scenario === 'other-game' ? 'other' : 'game', draft: { set1_team_a: '12' }, workflowStep: 'live', servingTeam: 'B', firstServerTeamA: 'Anna', firstServerTeamB: 'Ben', serverIndex: { A: 1, B: 0 } };
     const context = {
       serializeScoreSession: () => "saved-session",
       selectedGame: { id: 'game' }, draft: { set1_team_a: '10' },
-      resumeState: scenario === 'new' ? null : saved, token: 'token',
+      resumeState: scenario === 'new' || scenario === 'duplicate' ? null : saved, token: 'token',
       submitScore: async (_token, _game, draft) => { calls.submitted = draft; },
       setSaving: () => {}, setError: () => {}, setDraft: () => {}, setData: () => {},
       setFinalEditing: value => { calls.manual = value; },
       setWorkflowStep: value => { calls.step = value; },
       resumeLastEntry: state => { calls.resumed = state; },
+      duplicatePlayersForTeam: () => scenario === 'duplicate' ? 'Müller' : null, numberedDuplicatePlayers: name => [`${name} 1`,`${name} 2`],
+      setPlayerLabels: value => { calls.playerLabels = value; },
     };
     const confirm = new Function(...Object.keys(context), `${compiled}; return confirmReferee;`)(...Object.values(context));
     await confirm(scenario === 'manual' ? '' : 'Referee');
@@ -27,6 +29,9 @@ for (const scenario of ['resume', 'new', 'other-game', 'manual']) {
       assert.deepEqual(calls.resumed, { ...saved, draft: { ...saved.draft, referee: 'Referee', score_entry_state: 'saved-session' } });
       assert.equal(calls.submitted.set1_team_a, '12');
       assert.equal(calls.step, undefined);
+    } else if (scenario === 'duplicate') {
+      assert.equal(calls.step, 'players');
+      assert.deepEqual(calls.playerLabels,{A:['Müller 1','Müller 2'],B:['Müller 1','Müller 2']});
     } else {
       assert.equal(calls.resumed, undefined);
       assert.equal(calls.step, scenario === 'manual' ? 'scoring' : 'servers');

@@ -2,7 +2,7 @@ import type { GameDraft } from "./types";
 
 export type TeamKey = "A" | "B";
 export type AdminTab = "games" | "courts" | "settings" | "admins" | "protocols";
-export type ScoreWorkflowStep = "confirm" | "preview" | "servers" | "setup-preview" | "live" | "scoring" | "done";
+export type ScoreWorkflowStep = "confirm" | "players" | "preview" | "servers" | "setup-preview" | "live" | "scoring" | "done";
 export type ServerSetupStep = "captain-a" | "captain-b" | "serve-team" | "team-a" | "team-b" | "side-change";
 
 export type PointHistoryEntry = {
@@ -44,6 +44,7 @@ export type ScoreEntryResumeState = {
   firstServerTeamB: string;
   captainTeamA: string;
   captainTeamB: string;
+  playerLabels: Record<TeamKey, [string, string] | null>;
   sideChangeInterval: 5 | 7 | null;
   leftTeam: TeamKey;
   setScore: Record<TeamKey, number>;

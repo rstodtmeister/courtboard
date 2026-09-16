@@ -5,7 +5,7 @@ type Team = "A" | "B";
 type Pair<T> = Record<Team, T>;
 export type ScoreSession = {
   version: 1;
-  workflowStep: "confirm" | "preview" | "servers" | "setup-preview" | "live" | "scoring";
+  workflowStep: "confirm" | "players" | "preview" | "servers" | "setup-preview" | "live" | "scoring";
   serverSetupStep: "captain-a" | "captain-b" | "serve-team" | "team-a" | "team-b" | "side-change";
   activeSet: 1 | 2 | 3;
   servingTeam: Team | "";
@@ -13,6 +13,7 @@ export type ScoreSession = {
   firstServerTeamB: string;
   captainTeamA: string;
   captainTeamB: string;
+  playerLabels?: Pair<[string, string] | null>;
   sideChangeInterval: 5 | 7 | null;
   leftTeam: Team;
   setScore: Pair<number>;
@@ -40,6 +41,8 @@ const team = (v: unknown) => v === "A" || v === "B";
 const integer = (v: unknown, max: number) => Number.isSafeInteger(v) && Number(v) >= 0 && Number(v) <= max;
 const pair = (v: unknown, check: (v: unknown) => boolean) => object(v) && check(v.A) && check(v.B);
 const label = (v: unknown) => typeof v === "string" && v.length <= 160;
+const playerLabelPair = (v: unknown) => v === null || (Array.isArray(v) && v.length === 2 && v.every(label)
+  && v.every(item => String(item).trim().length > 0) && String(v[0]).trim() !== String(v[1]).trim());
 const nullableScore = (v: unknown) => v === null || integer(v, 198);
 const live = (v: Record<string, unknown>) => team(v.leftTeam) && (team(v.servingTeam) || v.servingTeam === "")
   && pair(v.setScore, n => integer(n, 99)) && pair(v.serverIndex, n => integer(n, 1))
@@ -51,10 +54,11 @@ export function parseScoreSession(value: unknown): ScoreSession | null {
   let s: unknown;
   try { s = JSON.parse(value); } catch { throw new Error("Ungültiger Erfassungszustand."); }
   if (!object(s) || s.version !== 1
-    || !["confirm", "preview", "servers", "setup-preview", "live", "scoring"].includes(String(s.workflowStep))
+    || !["confirm", "players", "preview", "servers", "setup-preview", "live", "scoring"].includes(String(s.workflowStep))
     || !["captain-a", "captain-b", "serve-team", "team-a", "team-b", "side-change"].includes(String(s.serverSetupStep))
     || ![1, 2, 3].includes(Number(s.activeSet)) || !Number.isInteger(s.activeSet)
     || !live(s) || ![s.firstServerTeamA, s.firstServerTeamB, s.captainTeamA, s.captainTeamB].every(label)
+    || !(s.playerLabels === undefined || pair(s.playerLabels, playerLabelPair))
     || ![null, 5, 7].includes(s.sideChangeInterval as number | null)
     || typeof s.correctionMode !== "boolean" || typeof s.finalEditing !== "boolean"
     || !pair(s.timeoutScore, v => v === null || (typeof v === "string" && /^\d{1,2}:\d{1,2}$/.test(v)))

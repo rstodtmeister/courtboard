@@ -8,7 +8,8 @@ import { gameRatingOptions } from "./appConfig";
 import { dataMode, scoreOutbox, heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
 import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import { clearCompletedScoreEntry, clearScoreEntryResume, type CompletedScoreEntryState, loadCompletedScoreEntry, loadScoreEntryResume, saveCompletedScoreEntry, saveScoreEntryResume } from "./scoreEntryStorage";
-import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
+import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, PlayerLabelsStep, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
+import { duplicatePlayersForTeam, numberedDuplicatePlayers, playersForTeam } from "./scoreEntryHelpers";
 import type { Game, GameDraft, ScoreEntryData } from "./types";
 import type { LiveSnapshot, ScoreEntryResumeState, ScoreWorkflowStep, ServerSetupStep, TeamKey } from "./workflowTypes";
 
@@ -36,6 +37,7 @@ function ScoreEntryContent({ token }: { token: string }) {
   const [firstServerTeamB, setFirstServerTeamB] = useState("");
   const [captainTeamA, setCaptainTeamA] = useState("");
   const [captainTeamB, setCaptainTeamB] = useState("");
+  const [playerLabels, setPlayerLabels] = useState<Record<TeamKey, [string, string] | null>>({ A: null, B: null });
   const [sideChangeInterval, setSideChangeInterval] = useState<5 | 7 | null>(null);
   const [leftTeam, setLeftTeam] = useState<TeamKey>("A");
   const [setScore, setSetScore] = useState<Record<TeamKey, number>>({ A: 0, B: 0 });
@@ -140,6 +142,11 @@ function ScoreEntryContent({ token }: { token: string }) {
   }, [token]);
 
   const selectedGame = data?.games.find((game) => game.id === selectedGameId) ?? null;
+  const scoringGame = selectedGame ? {
+    ...selectedGame,
+    team_a_players: playerLabels.A ?? playersForTeam(selectedGame.team_a, selectedGame.team_a_players),
+    team_b_players: playerLabels.B ?? playersForTeam(selectedGame.team_b, selectedGame.team_b_players),
+  } : null;
 
   useEffect(() => {
     if (!selectedGameId || workflowStep === "done" || completedState) {
@@ -204,6 +211,7 @@ function ScoreEntryContent({ token }: { token: string }) {
       firstServerTeamB,
       captainTeamA,
       captainTeamB,
+      playerLabels,
       sideChangeInterval,
       leftTeam,
       setScore,
@@ -250,6 +258,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     firstServerTeamB,
     captainTeamA,
     captainTeamB,
+    playerLabels,
     sideChangeInterval,
     leftTeam,
     setScore,
@@ -289,6 +298,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setFirstServerTeamB("");
     setCaptainTeamA("");
     setCaptainTeamB("");
+    setPlayerLabels({ A: null, B: null });
     setSideChangeInterval(null);
     setLeftTeam("A");
     setSetScore({ A: 0, B: 0 });
@@ -323,6 +333,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setFirstServerTeamB(state.firstServerTeamB);
     setCaptainTeamA(state.captainTeamA);
     setCaptainTeamB(state.captainTeamB);
+    setPlayerLabels(state.playerLabels ?? { A: null, B: null });
     setSideChangeInterval(state.sideChangeInterval);
     setLeftTeam(state.leftTeam);
     setSetScore(state.setScore);
@@ -417,7 +428,14 @@ function ScoreEntryContent({ token }: { token: string }) {
       if (savedEntry) {
         resumeLastEntry({ ...savedEntry, draft: nextDraft });
       } else {
-        setWorkflowStep("servers");
+        const duplicateA = duplicatePlayersForTeam(selectedGame.team_a, selectedGame.team_a_players);
+        const duplicateB = duplicatePlayersForTeam(selectedGame.team_b, selectedGame.team_b_players);
+        if (duplicateA || duplicateB) {
+          setPlayerLabels({ A: duplicateA ? numberedDuplicatePlayers(duplicateA) : null, B: duplicateB ? numberedDuplicatePlayers(duplicateB) : null });
+          setWorkflowStep("players");
+        } else {
+          setWorkflowStep("servers");
+        }
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Schiedsgericht konnte nicht gespeichert werden.");
@@ -784,10 +802,30 @@ function ScoreEntryContent({ token }: { token: string }) {
               />
             )}
 
-            {(workflowStep === "servers" || workflowStep === "preview") && (
+            {workflowStep === "players" && scoringGame && (
+              <PlayerLabelsStep
+                game={selectedGame}
+                labels={playerLabels}
+                onChange={(team, index, value) => setPlayerLabels(current => {
+                  const next = current[team] ? [...current[team]!] as [string, string] : ["", ""] as [string, string];
+                  next[index] = value;
+                  return { ...current, [team]: next };
+                })}
+                onBack={() => setWorkflowStep("confirm")}
+                onContinue={() => {
+                  setPlayerLabels(current => ({
+                    A: current.A ? current.A.map(value => value.trim()) as [string, string] : null,
+                    B: current.B ? current.B.map(value => value.trim()) as [string, string] : null,
+                  }));
+                  setWorkflowStep("servers");
+                }}
+              />
+            )}
+
+            {(workflowStep === "servers" || workflowStep === "preview") && scoringGame && (
               <ServerSelectionStep
                 key={`${selectedGame.id}-${activeSet}`}
-                game={selectedGame}
+                game={scoringGame}
                 servingTeam={servingTeam}
                 firstServerTeamA={firstServerTeamA}
                 firstServerTeamB={firstServerTeamB}
@@ -816,7 +854,7 @@ function ScoreEntryContent({ token }: { token: string }) {
 
             {workflowStep === "setup-preview" && (
               <SetupPreviewStep
-                game={selectedGame}
+                game={scoringGame ?? selectedGame}
                 activeSet={activeSet}
                 servingTeam={servingTeam}
                 firstServerTeamA={firstServerTeamA}
@@ -836,7 +874,7 @@ function ScoreEntryContent({ token }: { token: string }) {
             {workflowStep === "live" && (
               <LiveSetStep
                 saving={saving}
-                game={selectedGame}
+                game={scoringGame ?? selectedGame}
                 draft={draft}
                 leftTeam={leftTeam}
                 setScore={setScore}

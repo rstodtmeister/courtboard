@@ -41,7 +41,7 @@ export function restoreScoreSession(gameId: string, draft: GameDraft, now = Date
   }
   const remaining = session.timeoutEndsAt === null ? 0 : Math.max(0, Math.min(30, Math.ceil((session.timeoutEndsAt - now) / 1000)));
   return {
-    ...settings, gameId, draft, timeoutRemaining: remaining,
+    ...settings, playerLabels: settings.playerLabels ?? { A: null, B: null }, gameId, draft, timeoutRemaining: remaining,
     activeTimeoutTeam: remaining > 0 ? session.activeTimeoutTeam : null,
     timeoutEndsAt: remaining > 0 ? session.timeoutEndsAt : null,
     pointHistory,

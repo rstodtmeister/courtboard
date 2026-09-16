@@ -7,6 +7,23 @@ import type { LiveSnapshot, ScoreEntryResumeState, ServerSetupStep, TeamKey } fr
 
 type UpdateDraftField = <K extends keyof GameDraft>(key: K, value: GameDraft[K]) => void;
 
+export function PlayerLabelsStep({ game, labels, onChange, onBack, onContinue }: { game: Game; labels: Record<TeamKey, [string, string] | null>; onChange: (team: TeamKey, index: 0 | 1, value: string) => void; onBack: () => void; onContinue: () => void }) {
+  const teams = (["A", "B"] as const).filter(team => labels[team]);
+  const valid = teams.every(team => {
+    const pair = labels[team]!;
+    return pair.every(value => value.trim()) && pair[0].trim().localeCompare(pair[1].trim(), "de", { sensitivity: "base" }) !== 0;
+  });
+  return <section className="score-step-card player-label-step">
+    <h2>Spieler unterscheiden</h2>
+    <p>Die beiden Spieler haben denselben Nachnamen. Diese Bezeichnungen gelten für Kapitän und Aufschlagreihenfolge und bleiben auf anderen Geräten erhalten.</p>
+    {teams.map(team => <fieldset key={team}><legend>{team === "A" ? game.team_a : game.team_b}</legend>
+      {labels[team]!.map((value, index) => <label key={index}>Spieler {index + 1}<input value={value} maxLength={40} onChange={event => onChange(team, index as 0 | 1, event.target.value)} /></label>)}
+    </fieldset>)}
+    {!valid && <p className="error-text">Bitte zwei unterschiedliche Bezeichnungen eingeben.</p>}
+    <div className="score-flow-actions"><button type="button" className="secondary" onClick={onBack}>Zurück</button><button type="button" disabled={!valid} onClick={onContinue}>Weiter</button></div>
+  </section>;
+}
+
 export function LockedScoreEntry({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="score-step-card locked-entry-card">

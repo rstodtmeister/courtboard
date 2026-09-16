@@ -63,6 +63,15 @@ export function playersForTeam(team: string | null, players?: string[]) {
   return [`${teamName} Spieler 1`, `${teamName} Spieler 2`];
 }
 
+export function duplicatePlayersForTeam(team: string | null, players?: string[]) {
+  const values = playersForTeam(team, players);
+  return values.length === 2 && values[0].localeCompare(values[1], "de", { sensitivity: "base" }) === 0 ? values[0] : null;
+}
+
+export function numberedDuplicatePlayers(name: string): [string, string] {
+  return [`${name} 1`, `${name} 2`];
+}
+
 export function shortTeamLabel(value: string | null | undefined, fallback: string) {
   const label = value?.replace(/\s*\(\d+\)\s*$/, "").trim() || fallback;
   return label.replace(/\s+-\s+/g, " / ");
