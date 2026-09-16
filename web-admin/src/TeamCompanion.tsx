@@ -30,12 +30,12 @@ function TeamAgenda({ games }: { games: Game[] }) {
     const a = resolveTeam(game.team_a, games) || 'Team noch offen';
     const b = resolveTeam(game.team_b, games) || 'Team noch offen';
     return <article className="companion-duty" key={`${game.id}-${role}`}>
-      <div className="companion-duty-top"><strong>{role === 'play' ? 'Euer Spiel' : 'Schiedsgericht'}</strong>
+      <div className="companion-duty-top"><strong>{role === 'play' ? 'Euer Spiel' : 'Schiedsgericht'} – Spiel {game.number}</strong>
         <span className="companion-court-label">{court ? `Court ${court}` : 'Court offen'}</span>
       </div>
       <p className="companion-match">{role === 'play' ? `Gegen ${a === team ? b : a}` : `${a} gegen ${b}`}</p>
-      <div className="companion-duty-bottom"><span className="companion-count">{ahead === null ? 'Reihenfolge offen' : ahead === 0 ? (game.display_state?.hasPoints ? 'Läuft gerade' : 'Als Nächstes am Court') : `Noch ${ahead} ${ahead === 1 ? 'Spiel' : 'Spiele'} vor euch`}</span>
-        <small>Spiel {game.number}{game.round ? ` · ${game.round}` : ''}</small></div>
+      <div className="companion-duty-bottom"><span className="companion-count">{ahead === null ? 'Reihenfolge offen' : ahead === 0 ? (game.display_state?.hasPoints ? 'Läuft gerade' : 'Jetzt am Court') : `Noch ${ahead} ${ahead === 1 ? 'Spiel' : 'Spiele'} vor euch`}</span>
+        {game.round && <small>{game.round}</small>}</div>
     </article>;
   }
   return <>
