@@ -87,7 +87,7 @@ export function HvvTournamentDialog({
     <div className="app-dialog-backdrop" role="presentation">
       <section className="app-dialog hvv-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-tournament-title">
         <h3 id="hvv-tournament-title">{mode === "create" ? "HVV Turnier importieren" : "HVV Turnier auswaehlen"}</h3>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+        <label className="checkbox-label" style={{ marginBottom: "1rem" }}>
           <input type="checkbox" checked={includePast} disabled={Boolean(busyId)}
             onChange={(event) => setIncludePast(event.target.checked)} />
           Auch vergangene Turniere anzeigen
