@@ -74,6 +74,8 @@ export function HvvTournamentDialog({
   onClose: () => void;
 }) {
   const [busyId, setBusyId] = useState("");
+  const [includePast, setIncludePast] = useState(false);
+  const visibleTournaments = tournaments.filter((item) => includePast || !item.is_expired);
 
   async function selectTournament(tournament: HvvTournamentOption) {
     setBusyId(tournament.hvv_turnier_id);
@@ -85,6 +87,11 @@ export function HvvTournamentDialog({
     <div className="app-dialog-backdrop" role="presentation">
       <section className="app-dialog hvv-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="hvv-tournament-title">
         <h3 id="hvv-tournament-title">{mode === "create" ? "HVV Turnier importieren" : "HVV Turnier auswaehlen"}</h3>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+          <input type="checkbox" checked={includePast} disabled={Boolean(busyId)}
+            onChange={(event) => setIncludePast(event.target.checked)} />
+          Auch vergangene Turniere anzeigen
+        </label>
         <div className="table-wrap hvv-tournament-table-wrap">
           <table className="admin-table hvv-tournament-table">
             <thead>
@@ -99,7 +106,7 @@ export function HvvTournamentDialog({
               </tr>
             </thead>
             <tbody>
-              {tournaments.map((item) => {
+              {visibleTournaments.map((item) => {
                 const selected = item.hvv_turnier_id === selectedTournamentId;
                 return (
                   <tr key={`${item.hvv_veranstaltung_id}:${item.hvv_turnier_id}`}>
@@ -117,9 +124,9 @@ export function HvvTournamentDialog({
                   </tr>
                 );
               })}
-              {tournaments.length === 0 && (
+              {visibleTournaments.length === 0 && (
                 <tr>
-                  <td colSpan={7}>Keine HVV-Turniere gefunden.</td>
+                  <td colSpan={7}>{includePast ? "Keine HVV-Turniere gefunden." : "Keine aktuellen HVV-Turniere gefunden. Vergangene Turniere können über die Checkbox eingeblendet werden."}</td>
                 </tr>
               )}
             </tbody>

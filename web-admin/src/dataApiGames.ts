@@ -125,7 +125,7 @@ export async function syncGamesFromHvv(options: { tournamentId: string; overwrit
   return data;
 }
 
-export async function listHvvTournaments(source: string): Promise<HvvTournamentOption[]> {
+export async function listHvvTournaments(source: string, includePast = false): Promise<HvvTournamentOption[]> {
   if (dataMode === "local") {
     throw new Error("HVV-Turnierauswahl ist im lokalen Browsermodus nicht verfuegbar.");
   }
@@ -133,6 +133,7 @@ export async function listHvvTournaments(source: string): Promise<HvvTournamentO
   const { data, error } = await getSupabase().functions.invoke<{ tournaments: HvvTournamentOption[] }>("list-hvv-tournaments", {
     body: {
       source,
+      includePast,
       hvvCredentials: requireHvvCredentials(),
     },
   });

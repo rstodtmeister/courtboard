@@ -401,7 +401,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
     setError("");
     setMessage("");
     try {
-      const options = await listHvvTournaments(source);
+      const options = await listHvvTournaments(source, true);
       setHvvTournamentOptions(sortHvvTournamentsByDate(options));
       setShowHvvTournamentDialog(true);
       if (options.length === 0) {

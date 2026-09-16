@@ -30,6 +30,7 @@ export type PushHvvResult = {
 };
 
 export type HvvTournamentOption = {
+  is_expired?: boolean;
   name: string;
   hvv_turnier_id: string;
   hvv_veranstaltung_id: string;

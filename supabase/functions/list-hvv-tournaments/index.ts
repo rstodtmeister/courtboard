@@ -8,6 +8,7 @@ type HvvCredentials = {
 
 type ListHvvTournamentsRequest = {
   source?: string;
+  includePast?: boolean;
   hvvCredentials?: HvvCredentials;
 };
 
@@ -59,7 +60,7 @@ Deno.serve(async (req) => {
 
   try {
     const page = await loadHvvPage(hvvInitialUrl(source), body.hvvCredentials ?? {});
-    const options = await parseTournamentOptions(page.html, page.url, body.hvvCredentials ?? {}, page.cookies);
+    const options = await parseTournamentOptions(page.html, page.url, body.hvvCredentials ?? {}, page.cookies, body.includePast === true);
     return jsonResponse({ tournaments: options });
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -98,6 +99,7 @@ async function parseTournamentOptions(
   overviewUrl: string,
   credentials: HvvCredentials,
   cookies: Map<string, string>,
+  includePast = false,
 ) {
   const rows = tournamentOverviewRows(html);
   const options: HvvTournamentOption[] = [];
@@ -127,7 +129,8 @@ async function parseTournamentOptions(
 
   const today = todayInTimeZone("Europe/Berlin");
   return options
-    .filter((option) => !isExpiredTournament(option, today))
+    .map((option) => ({ ...option, is_expired: isExpiredTournament(option, today) }))
+    .filter((option) => includePast || !option.is_expired)
     .sort(compareTournamentOptionsByDate);
 }
 
