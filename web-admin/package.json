@@ -12,7 +12,7 @@
     "check": "npm run test:auth && npm run test:score && npm run test:display && npm run test:hvv && npm run test:protocols && npm run test:court-qr && npm run test:referees && npm run test:companion && npm run typecheck && npm run build",
     "preview": "vite preview --host 127.0.0.1",
     "test:display": "node --test tests/display-loading.test.mjs",
-    "test:hvv": "node --test tests/hvv-delivery.test.mjs",
+    "test:hvv": "node --test tests/hvv-delivery.test.mjs tests/hvv-import.test.mjs",
     "test:court-qr": "node --test tests/court-qr.test.mjs",
     "test:protocols": "node --test tests/game-protocols.test.mjs",
     "test:referees": "node --test tests/referee-suggestions.test.mjs",

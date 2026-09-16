@@ -1,3 +1,4 @@
+import { uniqueImportGames } from "../_shared/import-games.ts";
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, createUserClient } from "../_shared/supabase.ts";
 
@@ -116,7 +117,7 @@ Deno.serve(async (req) => {
       hvvTurnierId: tournament.hvv_turnier_id ?? "",
       hvvVeranstaltungId: tournament.hvv_veranstaltung_id ?? "",
     });
-    const importedGames = parseBeachGames(page.html, page.url, tournament.id);
+    const importedGames = uniqueImportGames(parseBeachGames(page.html, page.url, tournament.id));
     if (importedGames.length === 0) {
       return jsonResponse({
         error: "Im HVV-Spielplan wurden keine Spiele erkannt. Vorhandene Spiele und Ergebnislinks bleiben unveraendert.",
