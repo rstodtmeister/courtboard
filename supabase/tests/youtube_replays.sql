@@ -23,4 +23,36 @@ begin
  if (select to_jsonb(v) ? 'score_entry_state' from public.public_games v where id=g) then raise exception 'private state leaked'; end if;
 end;
 $$;
+
+do $$
+declare
+ t uuid:=gen_random_uuid();
+ g uuid:=gen_random_uuid();
+ started timestamptz:='2026-09-16T11:51:00Z';
+begin
+ insert into public.tournaments(id,name,hvv_edit_url,court_streams)
+ values(t,'Server-side YouTube mapping test','', '{"1":"https://www.youtube.com/watch?v=z_roj8C-BAc"}');
+ insert into public.games(id,tournament_id,number,court,team_a,team_b)
+ values(g,t,'1','1','Alpha','Beta');
+ insert into public.score_entry_links(tournament_id,game_id,token_hash)
+ values(t,g,'youtube-server-test');
+
+ perform public.submit_score_operation(
+   'youtube-server-test',g,'device',gen_random_uuid(),0,
+   jsonb_build_object('referee','Ref','completed',false,'matchStartedAt',started),
+   '{"drop":0,"keep":0,"append":[]}'
+ );
+ if (select match_video_id from public.games where id=g)<>'z_roj8C-BAc' then
+   raise exception 'current court stream was not captured';
+ end if;
+
+ update public.tournaments
+ set court_streams='{"1":"https://youtu.be/abcdefghijk"}'
+ where id=t;
+ update public.games set result='test' where id=g;
+ if (select match_video_id from public.games where id=g)<>'z_roj8C-BAc' then
+   raise exception 'captured stream was replaced';
+ end if;
+end;
+$$;
 rollback;
