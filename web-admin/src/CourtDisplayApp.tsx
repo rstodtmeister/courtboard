@@ -8,6 +8,7 @@ import { streamEmbed } from "./stream";
 import { MyTeam, useMyTeam, isMyTeamGame } from "./MyTeam";
 import { TeamCompanion } from "./TeamCompanion";
 import { startDisplayPolling } from "./displayPolling";
+import { PointFlow } from "./PointFlow";
 
 type GroupStanding = {
   team: string;
@@ -291,41 +292,7 @@ function SingleCourtPointFlow({ game }: { game: Game }) {
     .filter((entry) => entry.set === currentSet)
     .slice(-18);
 
-  if (points.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="single-court-point-flow" aria-label="Punkteverlauf">
-      {points.length > 1 && (
-        <svg
-          className="point-flow-connector"
-          viewBox={`0 0 100 ${points.length * 24}`}
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <polyline
-            points={points.map((point, index) => `${point.team === "A" ? 25 : 75},${index * 24 + 12}`).join(" ")}
-          />
-        </svg>
-      )}
-      {points.map((point, index) => (
-        <React.Fragment key={`${point.team}-${index}-${point.scoreA}-${point.scoreB}`}>
-          {point.team === "A" ? (
-            <>
-              <span className="point-dot full left">{point.scoreA}</span>
-              <span />
-            </>
-          ) : (
-            <>
-              <span />
-              <span className="point-dot full right">{point.scoreB}</span>
-            </>
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
+  return <PointFlow points={points} className="single-court-point-flow" />;
 }
 
 function SingleCourtSetHistory({ game }: { game: Game }) {

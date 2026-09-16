@@ -4306,10 +4306,9 @@ tbody tr:nth-child(even) {
   font-weight: 700;
 }
 
-.single-court-point-flow {
+.point-flow {
   width: min(100%, clamp(86px, 13vmin, 140px));
   display: grid;
-  grid-column: 2;
   grid-template-columns: repeat(2, max-content);
   grid-auto-rows: max-content;
   gap: 2px clamp(8px, 1.1vmin, 12px);
@@ -4323,6 +4322,8 @@ tbody tr:nth-child(even) {
   border-bottom: 0;
   color: #374151;
 }
+
+.single-court-point-flow { grid-column: 2; }
 
 .point-flow-connector {
   position: absolute;
@@ -6709,11 +6710,13 @@ html.court-overlay-document,
 .result-loss { color: #a53333; }
 .companion-result-details summary { font-size: .85rem; }
 
-.companion-history svg { display: block; width: 100%; height: auto; }
-.companion-history svg text { font-size: 10px; fill: #537080; }
-.history-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: .8rem; }
-.history-legend span:first-child { color: #137b59; font-weight: 700; }
-.history-set h3 { margin: 12px 0 4px; font-size: .95rem; }
+.companion-history svg { display: block; width: 100%; height: 100%; }
+.history-set { margin-top: 12px; padding: 10px; background: #f5f9f7; border-radius: 10px; }
+.history-set h3 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; font-size: .95rem; }
+.history-set h3 strong { font-size: 1.05rem; }
+.history-flow-labels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 180px; margin: 0 auto 7px; color: #537080; font-size: .72rem; font-weight: 700; text-align: center; }
+.history-point-flow { width: 100%; max-width: 180px; margin: 0 auto; gap: 2px 24px; }
+.history-point-flow .point-dot { width: 24px; height: 24px; font-size: .72rem; }
 .history-timeouts { font-size: .8rem; padding-left: 20px; }
 
 .companion-replay { display: inline-flex; align-items: center; min-height: 44px; color: #135744; font-weight: 650; font-size: .9rem; }
