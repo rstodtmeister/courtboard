@@ -3,10 +3,13 @@ import { historyDelta, scoreFields, type ScoreCommand } from './scorePatch';
 export type ScoreAck = { ok: boolean; operationId: string; revision: number; completed: boolean };
 type Operation = { id: string; draft: GameDraft; command?: ScoreCommand };
 export type OutboxRecord = { version: 2; token: string; game: Game; context: ScoreEntryData; deviceId: string; revision: number;
-  acknowledged: GameDraft; pending: Operation[]; blocked?: string; updatedAt: number };
-export type OutboxStatus = { pending: number; blocked: string; offline: boolean; saving: boolean; completing: boolean; storageFailure: boolean };
+  acknowledged: GameDraft; pending: Operation[]; blocked?: string; blockedCode?: string; updatedAt: number };
+export type OutboxStatus = { pending: number; blocked: string; revisionConflict: boolean; offline: boolean; saving: boolean; completing: boolean; storageFailure: boolean };
 export class ScoreTransportError extends Error {
-  constructor(message: string, readonly permanent: boolean) { super(message); }
+  constructor(message: string, readonly permanent: boolean, readonly code?: string) { super(message); }
+}
+export function isRevisionConflictMessage(message: string) {
+  return message.includes('Das Spiel wurde zwischenzeitlich geändert.') || message === 'score_revision_conflict';
 }
 // Storage writes are synchronous: a point is journaled before submitScore returns.
 // The caller holds an exclusive Web Lock for this origin's scoring page.
@@ -35,7 +38,7 @@ export function createScoreOutbox(options: {
   function write(id: string, record: OutboxRecord) {
     try { options.storage.setItem(prefix + id, JSON.stringify(record)); }
     catch {
-      storageErrors.set(id, { ...storageErrors.get(id), message: 'Lokaler Speicher nicht verfügbar. Bitte keine weiteren Punkte eingeben und die Sicherung herunterladen.' });
+      storageErrors.set(id, { ...storageErrors.get(id), message: 'Die Erfassung ist auf diesem Gerät momentan nicht verfügbar.' });
       notify();
       throw new Error('Die Eingabe konnte nicht lokal gesichert werden.');
     }
@@ -84,7 +87,7 @@ export function createScoreOutbox(options: {
         } catch (error) {
           if (!active || run !== generation) return;
           if (error instanceof ScoreTransportError && error.permanent) {
-            record = read(id)!; record.blocked = error.message; write(id, record);
+            record = read(id)!; record.blocked = error.message; record.blockedCode = error.code; write(id, record);
             for (const pending of record.pending) settle(pending.id, error);
           } else {
             const attempts = (failures.get(id) ?? 0) + 1; failures.set(id, attempts);
@@ -122,10 +125,9 @@ export function createScoreOutbox(options: {
       const record = read(id);
       if (!active || !record?.blocked || running.has(id) || storageErrors.has(id)) throw new Error('Der Abgleich ist gerade nicht möglich.');
       if (game.id !== id || !Number.isSafeInteger(game.score_revision)) throw new Error('Unpassender Serverstand.');
-      // Preserve the entire local journal before replacing the active session.
-      options.storage.setItem(`courtboard.conflict-backup.${id}.${options.uuid()}`, JSON.stringify(record));
+      // A revision conflict is resolved in favor of the authoritative server snapshot.
       const next: OutboxRecord = { ...record, game, context: { ...context, games: [game] }, revision: game.score_revision!,
-        acknowledged: draft, pending: [], blocked: undefined, updatedAt: Date.now() };
+        acknowledged: draft, pending: [], blocked: undefined, blockedCode: undefined, updatedAt: Date.now() };
       write(id, next); failures.delete(id); notify();
     },
     cached(token: string) { return records().filter((record) => record.token === token).sort((a,b) =>
@@ -133,7 +135,7 @@ export function createScoreOutbox(options: {
     latest(id: string) { const record = read(id); return record?.pending.at(-1)?.draft ?? record?.acknowledged ?? null; },
     status(id: string): OutboxStatus {
       const record = read(id);
-      return { pending: record?.pending.length ?? 0, storageFailure: storageErrors.has(id), blocked: storageErrors.get(id)?.message || record?.blocked || '',
+      return { pending: record?.pending.length ?? 0, revisionConflict: record?.blockedCode === 'revision_conflict' || isRevisionConflictMessage(record?.blocked ?? ''), storageFailure: storageErrors.has(id), blocked: storageErrors.get(id)?.message || record?.blocked || '',
         offline: !options.online() || failures.has(id), saving: running.has(id), completing: record?.pending.some((op) => op.draft.completed) ?? false };
     },
     async resumeStorage(id: string): Promise<void> {
@@ -161,11 +163,11 @@ export function createScoreOutbox(options: {
       let operation = record.pending.at(-1);
       if (!operation || !sameSubmission(operation.draft)) {
         if (record.pending.some((op) => op.draft.completed)) return Promise.reject(new Error('Der Spielabschluss wartet noch auf Bestätigung.'));
-        if (record.pending.length >= 250) { storageErrors.set(id, { message: '250 Eingaben warten auf Übertragung. Die letzte Eingabe ist noch nicht gesichert. Bitte Verbindung wiederherstellen und Sicherung herunterladen.', draft }); notify(); return Promise.reject(new Error('Lokale Warteschlange voll.')); }
+        if (record.pending.length >= 250) { storageErrors.set(id, { message: 'Die Verbindung muss wiederhergestellt werden, bevor weitere Punkte erfasst werden können.', draft }); notify(); return Promise.reject(new Error('Lokale Warteschlange voll.')); }
         operation = { id: options.uuid(), draft: { ...draft } };
         record.pending.push(operation); record.updatedAt = Date.now();
         try { write(id, record); } catch (error) {
-          storageErrors.set(id, { message: 'Diese letzte Eingabe ist NICHT lokal gesichert. Sicherung herunterladen und Speicherproblem beheben.', draft });
+          storageErrors.set(id, { message: 'Die letzte Eingabe konnte auf diesem Gerät nicht gespeichert werden.', draft });
           notify(); return Promise.reject(error);
         }
       }

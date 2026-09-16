@@ -17,8 +17,9 @@ export const scoreOutbox = createScoreOutbox({
     });
     if (error || !data) {
       const status = error?.context instanceof Response ? error.context.status : 0;
+      const payload = error?.context instanceof Response ? await error.context.clone().json().catch(() => null) : null;
       throw new ScoreTransportError(await supabaseFunctionErrorMessage(error, "Verbindung unterbrochen. Eingaben bleiben lokal gesichert."),
-        [400,401,403,404,409,410,413,422,423].includes(status));
+        [400,401,403,404,409,410,413,422,423].includes(status), payload?.code);
     }
     return data;
   },
@@ -249,7 +250,7 @@ export async function loadScoreConflict(gameId: string): Promise<ScoreEntryData>
   const record = scoreOutbox.read(gameId);
   if (!record?.blocked) throw new Error("Kein gesperrter Spielstand vorhanden.");
   const { data, error } = await getSupabase().functions.invoke<ScoreEntryData>(
-    `submit-score?token=${encodeURIComponent(record.token)}&deviceId=${encodeURIComponent(record.deviceId)}`, { method: "GET" },
+    `submit-score?token=${encodeURIComponent(record.token)}&deviceId=${encodeURIComponent(record.deviceId)}`, { method: "GET", signal: AbortSignal.timeout(12_000) },
   );
   if (error || !data) throw new Error(await supabaseFunctionErrorMessage(error, "Serverstand konnte nicht geladen werden."));
   if (!data.games.some(game => game.id === gameId)) throw new Error("Dieses Spiel ist über den Ergebnislink nicht mehr verfügbar. Bitte die Turnierleitung kontaktieren.");

@@ -1,5 +1,6 @@
 import { resumeForGame, serializeScoreSession } from "./scoreSession";
 import { ScoreWriterGuard } from "./ScoreWriterGuard";
+import { isRevisionConflictMessage } from "./scoreOutbox";
 import { ScoreSyncStatus } from "./ScoreSyncStatus";
 import { HvvDeliveryStatus } from "./HvvDeliveryStatus";
 import React, { FormEvent, useEffect, useRef, useState } from "react";
@@ -339,6 +340,29 @@ function ScoreEntryContent({ token }: { token: string }) {
     setMessage("");
     setError("");
     setLiveError("");
+  }
+
+  function applyServerEntry(entry: ScoreEntryData) {
+    const game = entry.games.find(item => item.id === selectedGameId);
+    if (!game) return;
+    const nextDraft = draftFromGame(game);
+    const restored = resumeForGame(game, nextDraft, null);
+    scoreOutbox.adoptServer(game.id, game, entry, nextDraft);
+    latestLiveSave.current += 1;
+    cancelPendingSideSwap();
+    clearScoreEntryResume(token); clearCompletedScoreEntry(token);
+    setData(entry); setDraft(nextDraft); setCompletedState(null); setResumeState(restored);
+    setSaving(false); setError(""); setLiveError(""); setMessage("");
+    lastSessionSave.current = "";
+    if (game.completed) {
+      const completed = { game, draft: nextDraft, completedAt: new Date().toISOString() };
+      saveCompletedScoreEntry(token, completed); setCompletedState(completed); setWorkflowStep("done");
+    } else if (restored) {
+      resumeLastEntry(restored);
+    } else {
+      setWorkflowStep("confirm"); setFinalEditing(false);
+      setActiveTimeoutTeam(null); setTimeoutEndsAt(null); setTimeoutRemaining(0);
+    }
   }
 
   function update<K extends keyof GameDraft>(key: K, value: GameDraft[K]) {
@@ -729,7 +753,7 @@ function ScoreEntryContent({ token }: { token: string }) {
         {!loading && lockedMessage && (
           <LockedScoreEntry message={lockedMessage} onRetry={loadEntry} />
         )}
-        {error && <div className="error">{error}</div>}
+        {error && !isRevisionConflictMessage(error) && <div className="error">{error}</div>}
         {message && <div className="success">{message}</div>}
         {completedState && <HvvDeliveryStatus token={token} gameId={completedState.game.id} />}
         {!loading && !lockedMessage && selectedGame && draft && (
@@ -818,7 +842,7 @@ function ScoreEntryContent({ token }: { token: string }) {
                 setScore={setScore}
                 servingTeam={servingTeam || "A"}
                 serverIndex={serverIndex}
-                liveError={liveError}
+                liveError={isRevisionConflictMessage(liveError) ? "" : liveError}
                 activeSet={activeSet}
                 firstServerTeamA={firstServerTeamA}
                 firstServerTeamB={firstServerTeamB}
@@ -889,10 +913,7 @@ function ScoreEntryContent({ token }: { token: string }) {
             )}
           </div>
         )}
-        <ScoreSyncStatus gameId={selectedGameId} onResolved={() => {
-          clearScoreEntryResume(token); clearCompletedScoreEntry(token);
-          setLiveError(""); setError(""); void loadEntry();
-        }} />
+        <ScoreSyncStatus gameId={selectedGameId} onResolved={applyServerEntry} />
       </section>
     </main>
   );

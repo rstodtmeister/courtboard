@@ -97,16 +97,15 @@ test('offline match timestamps and captured video survive reload and queued deli
  } finally{second.box.stop();}
 });
 
-test('explicit conflict recovery backs up pending inputs and resumes on server revision', async()=>{
+test('server-authoritative recovery replaces pending inputs and resumes on server revision', async()=>{
  const {box,state,map}=setup();
  try {
   await box.enqueue('g',draft(1));
   state.calls[0].reject(new ScoreTransportError('revision conflict',true)); await flush();
-  const original=box.read('g');
   const game={id:'g',score_revision:8};
   box.adoptServer('g',game,{games:[game]},draft(3));
-  const backup=[...map.entries()].find(([key])=>key.startsWith('courtboard.conflict-backup.'));
-  assert.deepEqual(JSON.parse(backup[1]),original);
+  assert.equal([...map.keys()].some(key=>key.startsWith('courtboard.conflict-backup.')),false);
+  assert.deepEqual(box.latest('g'),draft(3));
   assert.equal(box.status('g').blocked,''); assert.equal(box.status('g').pending,0);
   await box.enqueue('g',draft(4));
   assert.equal(state.calls[1].command.baseRevision,8);
@@ -114,7 +113,7 @@ test('explicit conflict recovery backs up pending inputs and resumes on server r
   state.calls[1].resolve(); await flush();
  }finally{box.stop()}
 });
-test('failed recovery backup leaves blocked journal and local inputs intact',async()=>{
+test('failed server snapshot write leaves blocked journal intact',async()=>{
  const {box,state}=setup();
  try {
   await box.enqueue('g',draft(1));state.calls[0].reject(new ScoreTransportError('revision conflict',true));await flush();
@@ -131,4 +130,20 @@ test('recovery cannot replace an active write or a different game',async()=>{
   state.calls[0].reject(new ScoreTransportError('revision conflict',true)); await flush();
   assert.throws(()=>box.adoptServer('g',{id:'other',score_revision:8},{games:[]},draft(3)));
  }finally{box.stop()}
+});
+
+test('automatic recovery recognizes typed and older persisted revision conflicts only',async()=>{
+ for (const [message,code,expected] of [
+  ['Server changed','revision_conflict',true],
+  ['Das Spiel wurde zwischenzeitlich geändert. Lokale Eingaben bleiben erhalten; bitte mit der Turnierleitung abgleichen.',undefined,true],
+  ['Court is locked','lock_conflict',false],
+ ]) {
+  const {box,state}=setup();
+  try {
+   await box.enqueue('g',draft(1));
+   state.calls[0].reject(new ScoreTransportError(message,true,code)); await flush();
+   assert.equal(box.status('g').revisionConflict,expected);
+   assert.equal(box.read('g').blockedCode,code);
+  } finally {box.stop()}
+ }
 });
