@@ -59,6 +59,8 @@ export type Tournament = {
   court_streams: Record<string, string>;
 };
 
+export type TeamPhoto = { tournament_id: string; seed_number: number; team_name: string; storage_path: string; updated_at: string; url: string };
+
 export type ScoreLinkResponse = {
   id: string;
   token: string;

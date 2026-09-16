@@ -9,6 +9,8 @@ import { MyTeam, useMyTeam, isMyTeamGame } from "./MyTeam";
 import { TeamCompanion } from "./TeamCompanion";
 import { startDisplayPolling } from "./displayPolling";
 import { PointFlow } from "./PointFlow";
+import { listTeamPhotos,teamSeed } from "./teamPhotos";
+import type { TeamPhoto } from "./types";
 
 type GroupStanding = {
   team: string;
@@ -38,6 +40,7 @@ export function CourtDisplayApp({
 }) {
   const [games, setGames] = useState<Game[]>([]);
   const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [teamPhotos,setTeamPhotos]=useState<TeamPhoto[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [loadError, setLoadError] = useState("");
@@ -59,6 +62,7 @@ export function CourtDisplayApp({
     const stop = startDisplayPolling(async () => {
       if (!cachedTournament || Date.now() - tournamentLoadedAt >= 60_000) {
         cachedTournament = await getPublicTournament(tournamentId);
+        setTeamPhotos(await listTeamPhotos(cachedTournament.id));
         tournamentLoadedAt = Date.now();
       }
       if (disposed) return;
@@ -93,7 +97,7 @@ export function CourtDisplayApp({
 
   if (overlay) {
     const currentGame = openGames.find((game) => courtNumber(game.court) === selectedCourt);
-    return <main className="court-overlay-page">{currentGame && <StreamScoreOverlay game={currentGame} />}</main>;
+    return <main className="court-overlay-page">{currentGame && <StreamScoreOverlay game={currentGame} photos={teamPhotos} />}</main>;
   }
 
   if (mode === "team" && tournament) return <TeamCompanion games={games} tournament={tournament} error={loadError} />;
@@ -109,7 +113,7 @@ export function CourtDisplayApp({
   if (Number.isFinite(selectedCourt) && selectedCourt > 0) {
     return (
       <DisplayViewport orientation={orientation}>
-        <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} orientation={orientation} streamUrl={tournament?.court_streams?.[String(selectedCourt)]} />
+        <SingleCourtDisplay court={selectedCourt} tournamentId={tournament?.id ?? tournamentId} games={openGames.filter((game) => courtNumber(game.court) === selectedCourt)} orientation={orientation} streamUrl={tournament?.court_streams?.[String(selectedCourt)]} photos={teamPhotos} />
       </DisplayViewport>
     );
   }
@@ -154,7 +158,7 @@ function DisplayViewport({ orientation, children }: { orientation: DisplayOrient
     : <>{children}</>;
 }
 
-function StreamScoreOverlay({ game: currentGame }: { game: Game }) {
+function StreamScoreOverlay({ game: currentGame,photos }: { game: Game;photos:TeamPhoto[] }) {
   const result = liveScoreParts(currentGame);
   const started = hasStartedScore(gameScoreState(currentGame));
   const completedSets = completedPreviousSetNumbers(currentGame);
@@ -168,6 +172,7 @@ function StreamScoreOverlay({ game: currentGame }: { game: Game }) {
       </div>
       <div className="stream-score-main">
         <div className="stream-score-team left">
+          <TeamPhotoImage team={currentGame.team_a} photos={photos}/>
           <span>{currentGame.team_a || "Team A offen"}</span>
           <strong>{started ? result?.pointsA ?? "0" : "–"}</strong>
         </div>
@@ -178,6 +183,7 @@ function StreamScoreOverlay({ game: currentGame }: { game: Game }) {
         <div className="stream-score-team right">
           <strong>{started ? result?.pointsB ?? "0" : "–"}</strong>
           <span>{currentGame.team_b || "Team B offen"}</span>
+          <TeamPhotoImage team={currentGame.team_b} photos={photos}/>
         </div>
       </div>
       {completedSets.length > 0 && (
@@ -192,7 +198,7 @@ function StreamScoreOverlay({ game: currentGame }: { game: Game }) {
   );
 }
 
-function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string }) {
+function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl,photos }: { court: number; tournamentId?: string; games: Game[]; orientation: DisplayOrientation; streamUrl?: string;photos:TeamPhoto[] }) {
   const currentGame = games[0] ?? null;
   const result = currentGame ? liveScoreParts(currentGame) : null;
   const scoreState = currentGame ? gameScoreState(currentGame) : null;
@@ -222,11 +228,13 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
           <>
             <div className={started ? "single-court-match" : "single-court-match not-started"}>
               <div className="single-court-team">
+                <TeamPhotoImage team={currentGame.team_a} photos={photos}/>
                 <strong>{currentGame.team_a || "Team A offen"}</strong>
                 {started && <span>{result?.pointsA ?? "0"}</span>}
               </div>
               {started && <SingleCourtPointFlow game={currentGame} />}
               <div className="single-court-team">
+                <TeamPhotoImage team={currentGame.team_b} photos={photos}/>
                 <strong>{currentGame.team_b || "Team B offen"}</strong>
                 {started && <span>{result?.pointsB ?? "0"}</span>}
               </div>
@@ -250,6 +258,8 @@ function SingleCourtDisplay({ court, tournamentId, games, orientation, streamUrl
     </main>
   );
 }
+
+function TeamPhotoImage({team,photos}:{team:string|null;photos:TeamPhoto[]}){const seed=teamSeed(team),photo=photos.find(item=>item.seed_number===seed);return photo?<img className="court-team-photo" src={photo.url} alt={`Teamfoto ${team??''}`}/>:null;}
 
 function singleCourtGameStatus(game: Game, scoreState: ReturnType<typeof gameScoreState>) {
   if (hasStartedScore(scoreState)) {

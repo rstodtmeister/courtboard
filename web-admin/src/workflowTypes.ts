@@ -1,7 +1,7 @@
 import type { GameDraft } from "./types";
 
 export type TeamKey = "A" | "B";
-export type AdminTab = "games" | "courts" | "settings" | "admins" | "protocols";
+export type AdminTab = "games" | "courts" | "photos" | "settings" | "admins" | "protocols";
 export type ScoreWorkflowStep = "confirm" | "players" | "preview" | "servers" | "setup-preview" | "live" | "scoring" | "done";
 export type ServerSetupStep = "captain-a" | "captain-b" | "serve-team" | "team-a" | "team-b" | "side-change";
 

@@ -35,6 +35,7 @@ import { CourtLinksPanel, HvvCredentialsDialog, HvvProgressDialog, HvvTournament
 import { GamesEditor, isAssignedCourt, isCompleted, resolvedReferee } from "./GamesEditor";
 import { AppDialog, formatSyncTime, LinkOutput, scoreUrl } from "./shared";
 import { normalizeStreamUrl } from "../stream";
+import { TeamPhotosPanel } from "./TeamPhotosPanel";
 
 const GameProtocolsPage = lazy(() => import("./GameProtocolsPage").then(module => ({ default: module.GameProtocolsPage })));
 
@@ -724,6 +725,7 @@ export function AdminDashboard({ session }: { session: AppSession }) {
               <div className="empty">Noch keine numerischen Courts konfiguriert.</div>
             )
           )}
+          {activeTab === "photos" && (tournament ? <TeamPhotosPanel tournamentId={tournament.id} games={games}/> : <div className="empty">Kein Turnier ausgewählt.</div>)}
           {activeTab === "settings" && (
             tournament ? (
               <TournamentPanel
@@ -832,6 +834,7 @@ function AdminTabs({
   const tabs: Array<{ id: AdminTab; label: string; count?: number }> = [
     { id: "games", label: "Spiele", count: gamesCount },
     { id: "courts", label: "Courts", count: courtsCount },
+    { id: "photos", label: "Teamfotos" },
     { id: "settings", label: "Turnier" },
     { id: "protocols", label: "Spielprotokolle" },
   ];

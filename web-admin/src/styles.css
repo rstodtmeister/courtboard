@@ -6744,6 +6744,22 @@ html.court-overlay-document,
 .player-label-step legend { padding: 0 6px; font-weight: 750; }
 .player-label-step label { display: grid; gap: 5px; font-size: .82rem; font-weight: 650; }
 .player-label-step input { width: 100%; min-width: 0; box-sizing: border-box; }
+.team-photos-panel header p { color: #526579; }
+.visually-hidden { position: absolute!important; width: 1px!important; height: 1px!important; padding: 0!important; margin: -1px!important; overflow: hidden!important; clip: rect(0,0,0,0)!important; white-space: nowrap!important; border: 0!important; }
+.team-photo-list { display: grid; gap: 10px; }
+.team-photo-list article { display: grid; grid-template-columns: 64px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid #d5e3df; border-radius: 12px; background: #fff; }
+.team-photo-list article > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.team-photo-thumb,.court-team-photo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: #e8f1ee; }
+.team-photo-thumb { display: grid; place-items: center; overflow: hidden; color: #137b59; font-weight: 800; }
+.team-photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photo-editor-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(8,25,22,.72); }
+.photo-editor { width: min(420px,100%); padding: 18px; border-radius: 16px; background: #fff; }
+.photo-crop-preview { width: min(78vw,320px); aspect-ratio: 1; margin: 12px auto; overflow: hidden; border-radius: 14px; background: #dbe7e3; }
+.photo-crop-preview img { width: 100%; height: 100%; object-fit: cover; transition: transform .12s ease; }
+.photo-editor label { display: grid; gap: 7px; }
+.stream-score-team .court-team-photo { width: 52px; height: 52px; flex: 0 0 auto; border: 2px solid rgba(255,255,255,.85); }
+.single-court-team .court-team-photo { width: clamp(72px,10vmin,130px); height: clamp(72px,10vmin,130px); margin: 0 auto .5rem; }
+@media(max-width:600px){.team-photo-list article{grid-template-columns:52px minmax(0,1fr)}.team-photo-list article>div:last-child{grid-column:1/-1;justify-content:stretch}.team-photo-list button{flex:1}.team-photo-thumb{width:48px;height:48px}}
 .youtube-recording-settings { width: 100%; }
 .youtube-recording-settings summary { cursor: pointer; padding: 12px 0; }
 .youtube-recording-settings label { display: grid; gap: 5px; margin: 10px 0; }
