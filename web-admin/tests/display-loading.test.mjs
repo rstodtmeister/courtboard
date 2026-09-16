@@ -53,6 +53,7 @@ test('display queries filter courts, omit bulk histories and fetch only unfinish
       eq: (key, value) => { call[key] = value; return query; },
       in: (key, value) => { call[key] = value; return query; },
       order: () => query,
+      returns: () => query,
       then: (resolve) => Promise.resolve({ data: call.fields === 'id,point_history' ? [{ id: 'live', point_history: 'history' }] : rows, error: null }).then(resolve),
     }; return query;
   } };
@@ -71,5 +72,10 @@ test('display queries filter courts, omit bulk histories and fetch only unfinish
     assert.deepEqual(calls[0].court, ['1', '01']);
     assert.equal(calls[0].tournament_id, 't');
     assert.deepEqual(calls[1].id, ['live', 'future']);
+    calls.length = 0;
+    await listDisplayGames('t', undefined, false, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].fields.includes('point_history'), true);
+    assert.equal(calls[0].tournament_id, 't');
   } finally { delete globalThis.__displayDb; }
 });

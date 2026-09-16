@@ -66,7 +66,7 @@ export function CourtDisplayApp({
       const courtLabels = singleCourt
         ? [...new Set([String(selected), ...cachedTournament.courts.filter((label) => courtNumber(label) === selected)])]
         : undefined;
-      const gameData = await listDisplayGames(cachedTournament.id, courtLabels, mode === "groups" && !overlay);
+      const gameData = await listDisplayGames(cachedTournament.id, courtLabels, mode === "groups" && !overlay, mode === "team");
       if (disposed) return;
       setGames(gameData);
       setTournament(cachedTournament);

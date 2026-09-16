@@ -6708,8 +6708,10 @@ html.court-overlay-document,
 .result-win { color: #136247; }
 .result-loss { color: #a53333; }
 .companion-result-details summary { font-size: .85rem; }
-.companion-result-details dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: .85rem; margin: 0 0 12px; }
-.companion-result-details dd { margin: 0; overflow-wrap: anywhere; }
-.companion-result-details table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: .85rem; }
-.companion-result-details caption { text-align: left; margin-bottom: 8px; color: #537080; }
-.companion-result-details th, .companion-result-details td { padding: 7px; text-align: center; border-bottom: 1px solid #dce7e5; }
+
+.companion-history svg { display: block; width: 100%; height: auto; }
+.companion-history svg text { font-size: 10px; fill: #537080; }
+.history-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: .8rem; }
+.history-legend span:first-child { color: #137b59; font-weight: 700; }
+.history-set h3 { margin: 12px 0 4px; font-size: .95rem; }
+.history-timeouts { font-size: .8rem; padding-left: 20px; }

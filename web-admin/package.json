@@ -16,7 +16,7 @@
     "test:court-qr": "node --test tests/court-qr.test.mjs",
     "test:protocols": "node --test tests/game-protocols.test.mjs",
     "test:referees": "node --test tests/referee-suggestions.test.mjs",
-    "test:companion": "node --test tests/team-companion.test.mjs"
+    "test:companion": "node --test tests/team-companion.test.mjs tests/match-history.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",

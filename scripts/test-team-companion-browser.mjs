@@ -9,8 +9,9 @@ try {
  {id:'1',number:'1',team_a:'Gäste',team_b:'Andere',court:'1',completed:false},
  {id:'2',number:'2',team_a:team,team_b:'Andere',court:'1',completed:false},
  {id:'3',number:'3',team_a:'Gäste',team_b:'Andere',court:'2',referee:team,completed:false},
+ {id:'6',number:'6',team_a:team,team_b:'Import-Team',court:'1',completed:true,result:'2:0'},
  {id:'5',number:'5',team_a:team,team_b:'Gäste',court:'1',completed:false},
- {id:'4',number:'4',team_a:'Andere',team_b:team,court:'1',round:'W2',referee:'Gäste',completed:true,result:'0:2',set1_team_a:'18',set1_team_b:'21',set2_team_a:'19',set2_team_b:'21'},
+ {id:'4',number:'4',team_a:'Andere',team_b:team,court:'1',round:'W2',referee:'Gäste',completed:true,result:'0:2',set1_team_a:'18',set1_team_b:'21',set2_team_a:'19',set2_team_b:'21',point_history:JSON.stringify([{set:1,team:'B',scoreA:0,scoreB:1},{set:1,team:'A',scoreA:1,scoreB:1},{set:1,team:'B',scoreA:1,scoreB:2},{set:1,team:'B',type:'timeout',scoreA:1,scoreB:2,startedAt:'2026-09-16T09:00:00Z'}])},
  ].map(game=>({...game,tournament_id:'t'}));
  await page.addInitScript(()=>{if(!localStorage.getItem('courtboard.localData.v1'))localStorage.setItem('courtboard.localData.v1',JSON.stringify({session:null,admins:[],tournaments:[{id:'t',name:'Testturnier',courts:['1','2'],court_streams:{}}],games:[],links:[]}));});
  await page.route('**/api/games',route=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:{games}}));
@@ -34,15 +35,18 @@ try {
  await page.getByText('Weitere Aufgaben (1)',{exact:true}).click();
  assert.equal(await page.locator('.companion-duty:visible').count(),3);
  await page.getByText('Weitere Aufgaben (1)',{exact:true}).click();
- await page.getByText('Eure Ergebnisse (1)',{exact:true}).click();
+ await page.getByText('Eure Ergebnisse (2)',{exact:true}).click();
+ assert.equal(await page.locator('.companion-results .companion-result').count(),2);
+ assert.equal(await page.getByText('Spielverlauf',{exact:true}).count(),1);
  assert.match(await page.locator('.companion-results').innerText(),/Sieg/);
  assert.match(await page.locator('.companion-results').innerText(),/2:0/);
- assert.match(await page.locator('.companion-result-score').innerText(),/21:18/);
- await page.getByText('Spieldetails',{exact:true}).click();
- assert.match(await page.locator('.companion-result-details').innerText(),/Gäste/);
- assert.equal(await page.locator('.companion-result-details tbody tr').count(),2);
+ assert.match(await page.locator('.companion-result-score').last().innerText(),/21:18/);
+ await page.getByText('Spielverlauf',{exact:true}).click();
+ assert.match(await page.locator('.companion-result-details').innerText(),/Auszeit eures Teams bei 2:1/);
+ assert.equal(await page.locator('.companion-result-details svg').count(),1);
+ await page.locator('.companion-results').screenshot({path:'/private/tmp/courtboard-history-mobile.png'});
  assert.ok(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth));
- await page.getByText('Eure Ergebnisse (1)',{exact:true}).click();
+ await page.getByText('Eure Ergebnisse (2)',{exact:true}).click();
  assert.ok(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth));
  const url=page.url();assert.equal(new URL(url).searchParams.get('team'),team);
  await page.screenshot({path:'/private/tmp/courtboard-companion-mobile.png',fullPage:true});

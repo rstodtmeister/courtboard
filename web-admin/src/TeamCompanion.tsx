@@ -1,4 +1,5 @@
 import React from 'react';
+import { MatchHistory } from './MatchHistory';
 import { MyTeam, useMyTeam } from './MyTeam';
 import { resolveTeam, teamCompanion, teamViewUrl, teamResult } from './teamCompanionLogic';
 import type { Game, Tournament } from './types';
@@ -61,10 +62,7 @@ function TeamAgenda({ games }: { games: Game[] }) {
             {result.sets.length > 0 && <span aria-label="Satzergebnisse aus eurer Sicht">{result.sets.map(set => <span key={set.number} title={`Satz ${set.number}`}>{set.own}:{set.opponent}</span>)}</span>}
           </div>
           {result.rating && <p className="companion-hint">Sonderwertung: {result.rating}</p>}
-          <details className="companion-result-details"><summary>Spieldetails</summary>
-            <dl><dt>Court</dt><dd>{game.court && Number(game.court) > 0 ? game.court : 'Nicht zugewiesen'}</dd><dt>Runde</dt><dd>{game.round || 'Nicht angegeben'}</dd><dt>Schiedsgericht</dt><dd>{resolveTeam(game.referee, games) || 'Nicht angegeben'}</dd></dl>
-            {result.sets.length > 0 ? <table><caption>Punkte aus eurer Sicht</caption><thead><tr><th>Satz</th><th>Ihr</th><th>Gegner</th></tr></thead><tbody>{result.sets.map(set => <tr key={set.number}><th>{set.number}</th><td>{set.own}</td><td>{set.opponent}</td></tr>)}</tbody></table> : <p>Keine Satzergebnisse vorhanden.</p>}
-          </details>
+          <MatchHistory game={game} games={games} team={team} />
         </article>;
       })}
     </details>
