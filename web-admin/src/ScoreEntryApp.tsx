@@ -889,7 +889,10 @@ function ScoreEntryContent({ token }: { token: string }) {
             )}
           </div>
         )}
-        <ScoreSyncStatus gameId={selectedGameId} />
+        <ScoreSyncStatus gameId={selectedGameId} onResolved={() => {
+          clearScoreEntryResume(token); clearCompletedScoreEntry(token);
+          setLiveError(""); setError(""); void loadEntry();
+        }} />
       </section>
     </main>
   );

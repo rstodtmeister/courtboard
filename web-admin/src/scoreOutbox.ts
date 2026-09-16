@@ -118,6 +118,16 @@ export function createScoreOutbox(options: {
         revision: game.score_revision!, acknowledged: draft, pending: [], updatedAt: Date.now() };
       write(game.id, record); return record;
     },
+    adoptServer(id: string, game: Game, context: ScoreEntryData, draft: GameDraft) {
+      const record = read(id);
+      if (!active || !record?.blocked || running.has(id) || storageErrors.has(id)) throw new Error('Der Abgleich ist gerade nicht möglich.');
+      if (game.id !== id || !Number.isSafeInteger(game.score_revision)) throw new Error('Unpassender Serverstand.');
+      // Preserve the entire local journal before replacing the active session.
+      options.storage.setItem(`courtboard.conflict-backup.${id}.${options.uuid()}`, JSON.stringify(record));
+      const next: OutboxRecord = { ...record, game, context: { ...context, games: [game] }, revision: game.score_revision!,
+        acknowledged: draft, pending: [], blocked: undefined, updatedAt: Date.now() };
+      write(id, next); failures.delete(id); notify();
+    },
     cached(token: string) { return records().filter((record) => record.token === token).sort((a,b) =>
       Number(b.pending.length > 0) - Number(a.pending.length > 0) || b.updatedAt - a.updatedAt)[0] ?? null; },
     latest(id: string) { const record = read(id); return record?.pending.at(-1)?.draft ?? record?.acknowledged ?? null; },

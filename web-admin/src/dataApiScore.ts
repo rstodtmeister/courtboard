@@ -244,3 +244,14 @@ export async function getScoreDeliveryStatus(token: string, gameId: string): Pro
   if (error) throw new Error("HVV-Status ist momentan nicht verfügbar.");
   return data.status;
 }
+
+export async function loadScoreConflict(gameId: string): Promise<ScoreEntryData> {
+  const record = scoreOutbox.read(gameId);
+  if (!record?.blocked) throw new Error("Kein gesperrter Spielstand vorhanden.");
+  const { data, error } = await getSupabase().functions.invoke<ScoreEntryData>(
+    `submit-score?token=${encodeURIComponent(record.token)}&deviceId=${encodeURIComponent(record.deviceId)}`, { method: "GET" },
+  );
+  if (error || !data) throw new Error(await supabaseFunctionErrorMessage(error, "Serverstand konnte nicht geladen werden."));
+  if (!data.games.some(game => game.id === gameId)) throw new Error("Dieses Spiel ist über den Ergebnislink nicht mehr verfügbar. Bitte die Turnierleitung kontaktieren.");
+  return data;
+}
