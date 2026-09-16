@@ -1,3 +1,5 @@
+import { hvvRefereeOptions, resolveHvvRefereeOption } from "./hvv-referee.ts";
+
 export type HvvCredentials = {
   username?: string;
   password?: string;
@@ -62,7 +64,6 @@ export async function submitGameToHvv(game: HvvGameUpdate, credentials: HvvCrede
   const resetResult = isNormalRating(game.game_rating) && !hasSetScores(game);
   let changedFields = 0;
   changedFields += replaceFormValue(form.html, formFields, game.court ?? "", ["court", "feld", "platz"]);
-  changedFields += replaceFormValue(form.html, formFields, game.referee ?? "", ["schiri", "schieds", "referee"]);
   changedFields += replaceGameRating(form.html, formFields, game.game_rating ?? "");
   changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set1_team_a, resetResult), ["s1pa", "satz1teama", "satz1a", "set1teama", "set1a"]);
   changedFields += replaceFormValue(form.html, formFields, scoreValue(game.set1_team_b, resetResult), ["s1pb", "satz1teamb", "satz1b", "set1teamb", "set1b"]);
@@ -85,6 +86,83 @@ export async function submitGameToHvv(game: HvvGameUpdate, credentials: HvvCrede
     body: new URLSearchParams(formFields).toString(),
   });
   await response.text();
+  if (game.referee?.trim()) {
+    await submitRefereeToHvv(game, editPage.url, credentials, cookies);
+  }
+}
+
+async function submitRefereeToHvv(
+  game: HvvGameUpdate,
+  baseUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const spielId = new URLSearchParams(game.edit_data ?? "").get("spielid") || new URL(game.edit_url!).searchParams.get("spielid");
+  if (!spielId || !/^\d+$/.test(spielId)) {
+    throw new Error("Schiri1: HVV-Spiel-ID fehlt.");
+  }
+
+  const detailUrl = new URL(`beach_beach_turnier_spiel!browse.action?spielid=${encodeURIComponent(spielId)}`, baseUrl).toString();
+  const detailResponse = await fetchWithSession(detailUrl, credentials, cookies);
+  const detailHtml = await detailResponse.text();
+  const assignmentBrowse = formByAction(detailHtml, "spielansetzung!browse");
+  if (!assignmentBrowse) throw new Error("Schiri1: HVV-Ansetzungsseite wurde nicht gefunden.");
+
+  const browseResponse = await submitReadForm(assignmentBrowse, detailResponse.url || detailUrl, credentials, cookies);
+  const browseHtml = await browseResponse.text();
+  const assignmentInput = formByAction(browseHtml, "spielansetzung!input");
+  if (!assignmentInput) throw new Error("Schiri1: HVV-Bearbeitungslink wurde nicht gefunden.");
+
+  const inputResponse = await submitReadForm(assignmentInput, browseResponse.url || detailUrl, credentials, cookies);
+  const inputHtml = await inputResponse.text();
+  const editForm = formWithField(inputHtml, "schiri1par");
+  if (!editForm) throw new Error("Schiri1: HVV-Ansetzungsformular wurde nicht gefunden.");
+  const refereeField = findField(editForm.html, ["schiri1par"]);
+  if (!refereeField || !/^<select\b/i.test(refereeField.html)) throw new Error("Schiri1: HVV-Auswahlfeld wurde nicht gefunden.");
+
+  const fields = formData(editForm.html);
+  fields[refereeField.name] = resolveHvvRefereeOption(game.referee!, [], hvvRefereeOptions(refereeField.html));
+  const freeTextField = findField(editForm.html, ["schiri1parf"]);
+  if (freeTextField) fields[freeTextField.name] = "";
+  addSubmitButtonValue(editForm.html, fields);
+  const action = attr(editForm.openingTag, "action");
+  const actionUrl = action ? new URL(action, inputResponse.url || detailUrl).toString() : inputResponse.url;
+  const method = (attr(editForm.openingTag, "method") || "POST").toUpperCase();
+  const saveResponse = await fetchWithSession(actionUrl, credentials, cookies, {
+    method,
+    headers: method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : undefined,
+    body: method === "POST" ? new URLSearchParams(fields).toString() : undefined,
+  });
+  await saveResponse.text();
+}
+
+function formByAction(html: string, actionToken: string) {
+  for (const match of html.matchAll(/<form\b[^>]*>[\s\S]*?<\/form>/gi)) {
+    const openingTag = match[0].match(/<form\b[^>]*>/i)?.[0] ?? "";
+    if (normalizeToken(attr(openingTag, "action")).includes(normalizeToken(actionToken))) return { html: match[0], openingTag };
+  }
+  return null;
+}
+
+function formWithField(html: string, fieldName: string) {
+  for (const match of html.matchAll(/<form\b[^>]*>[\s\S]*?<\/form>/gi)) {
+    if (new RegExp(`name=["']${escapeRegex(fieldName)}["']`, "i").test(match[0])) {
+      return { html: match[0], openingTag: match[0].match(/<form\b[^>]*>/i)?.[0] ?? "" };
+    }
+  }
+  return null;
+}
+
+function submitReadForm(
+  form: { html: string; openingTag: string },
+  pageUrl: string,
+  credentials: HvvCredentials,
+  cookies: Map<string, string>,
+) {
+  const actionUrl = new URL(attr(form.openingTag, "action"), pageUrl);
+  const fields = formData(form.html);
+  for (const [name, value] of Object.entries(fields)) actionUrl.searchParams.set(name, value);
+  return fetchWithSession(actionUrl.toString(), credentials, cookies);
 }
 
 export async function refreshTournamentGamesFromHvv(
