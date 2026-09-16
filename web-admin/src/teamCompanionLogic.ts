@@ -50,3 +50,25 @@ export function teamViewUrl(view: 'team' | 'courts', tournamentId: string, team 
   if (court) url.searchParams.set('court', court);
   return url.href;
 }
+
+export function teamResult(game: Game, team: string, games: Game[]) {
+  const a = resolveTeam(game.team_a, games), b = resolveTeam(game.team_b, games);
+  const side = team === a ? 0 : 1;
+  const result = game.result?.match(/^\s*(\d+)\s*:\s*(\d+)\s*$/);
+  const totals = result ? [Number(result[1]), Number(result[2])] : null;
+  const winner = game.winner_team?.trim();
+  let winnerSide = winner && [a, game.team_a, '1'].includes(winner) ? 0
+    : winner && [b, game.team_b, '2'].includes(winner) ? 1 : -1;
+  if (winnerSide < 0 && totals && totals[0] !== totals[1]) winnerSide = totals[0] > totals[1] ? 0 : 1;
+  const status = winnerSide < 0 ? 'Abgeschlossen' : winnerSide === side ? 'Sieg' : 'Niederlage';
+  const sets = [
+    [game.set1_team_a, game.set1_team_b],
+    [game.set2_team_a, game.set2_team_b],
+    [game.set3_team_a, game.set3_team_b],
+  ].flatMap((points, index) => {
+    if (!points.every(value => value != null && /^\d+$/.test(value.trim())) || points.every(value => Number(value) === 0)) return [];
+    return [{ number: index + 1, own: Number(points[side]), opponent: Number(points[1 - side]) }];
+  });
+  return { status, opponent: side === 0 ? b : a, total: totals ? `${totals[side]}:${totals[1-side]}` : null, sets,
+    rating: game.game_rating?.trim() && game.game_rating.trim() !== 'Normal' ? game.game_rating.trim() : null };
+}

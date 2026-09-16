@@ -6698,3 +6698,18 @@ html.court-overlay-document,
 .companion-preceding ol { margin: 0; padding: 0; list-style: none; }
 .companion-preceding li { border-top: 1px solid #cbdedb; padding: 10px 0; font-size: .85rem; overflow-wrap: anywhere; }
 .companion-preceding li span { display: block; margin-top: 4px; }
+
+.companion-result-heading, .companion-result-score { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.companion-result-heading { justify-content: space-between; }
+.companion-result p { margin: 8px 0; }
+.companion-result-score > strong { font-size: 1.2rem; }
+.companion-result-score > span { display: flex; gap: 8px; flex-wrap: wrap; }
+.companion-result-score > span > span { padding: 3px 7px; background: #edf4f1; border-radius: 5px; }
+.result-win { color: #136247; }
+.result-loss { color: #a53333; }
+.companion-result-details summary { font-size: .85rem; }
+.companion-result-details dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: .85rem; margin: 0 0 12px; }
+.companion-result-details dd { margin: 0; overflow-wrap: anywhere; }
+.companion-result-details table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: .85rem; }
+.companion-result-details caption { text-align: left; margin-bottom: 8px; color: #537080; }
+.companion-result-details th, .companion-result-details td { padding: 7px; text-align: center; border-bottom: 1px solid #dce7e5; }

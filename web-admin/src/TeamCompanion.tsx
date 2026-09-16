@@ -1,6 +1,6 @@
 import React from 'react';
 import { MyTeam, useMyTeam } from './MyTeam';
-import { resolveTeam, teamCompanion, teamViewUrl } from './teamCompanionLogic';
+import { resolveTeam, teamCompanion, teamViewUrl, teamResult } from './teamCompanionLogic';
 import type { Game, Tournament } from './types';
 
 export function TeamCompanion({ games, tournament, error }: { games: Game[]; tournament: Tournament; error: string }) {
@@ -52,7 +52,21 @@ function TeamAgenda({ games }: { games: Game[] }) {
     </section>
     {later.length > 0 && <details className="companion-details"><summary>Weitere Aufgaben ({later.length})</summary><div className="companion-courts">{later.map(card)}</div></details>}
     <details className="companion-details companion-results"><summary>Eure Ergebnisse ({results.length})</summary>
-      {results.length === 0 ? <p>Noch keine abgeschlossenen Spiele.</p> : results.map(game => <article key={game.id}><span>Spiel {game.number} · Court {game.court || 'offen'}</span><p>{resolveTeam(game.team_a, games)} gegen {resolveTeam(game.team_b, games)}</p><strong>{game.result || game.game_rating || 'Abgeschlossen'}</strong></article>)}
+      {results.length === 0 ? <p>Noch keine abgeschlossenen Spiele.</p> : results.map(game => {
+        const result = teamResult(game, team, games);
+        return <article key={game.id} className="companion-result">
+          <div className="companion-result-heading"><strong className={result.status === 'Sieg' ? 'result-win' : result.status === 'Niederlage' ? 'result-loss' : ''}>{result.status}</strong><span>Spiel {game.number}{game.round ? ` · ${game.round}` : ''}</span></div>
+          <p>Gegen {result.opponent || 'Team noch offen'}</p>
+          <div className="companion-result-score"><strong>{result.total || 'Ergebnis nicht verfügbar'}</strong>
+            {result.sets.length > 0 && <span aria-label="Satzergebnisse aus eurer Sicht">{result.sets.map(set => <span key={set.number} title={`Satz ${set.number}`}>{set.own}:{set.opponent}</span>)}</span>}
+          </div>
+          {result.rating && <p className="companion-hint">Sonderwertung: {result.rating}</p>}
+          <details className="companion-result-details"><summary>Spieldetails</summary>
+            <dl><dt>Court</dt><dd>{game.court && Number(game.court) > 0 ? game.court : 'Nicht zugewiesen'}</dd><dt>Runde</dt><dd>{game.round || 'Nicht angegeben'}</dd><dt>Schiedsgericht</dt><dd>{resolveTeam(game.referee, games) || 'Nicht angegeben'}</dd></dl>
+            {result.sets.length > 0 ? <table><caption>Punkte aus eurer Sicht</caption><thead><tr><th>Satz</th><th>Ihr</th><th>Gegner</th></tr></thead><tbody>{result.sets.map(set => <tr key={set.number}><th>{set.number}</th><td>{set.own}</td><td>{set.opponent}</td></tr>)}</tbody></table> : <p>Keine Satzergebnisse vorhanden.</p>}
+          </details>
+        </article>;
+      })}
     </details>
   </>;
 }
