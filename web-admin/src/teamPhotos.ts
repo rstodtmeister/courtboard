@@ -19,7 +19,7 @@ export async function listTeamPhotos(tournamentId:string):Promise<TeamPhoto[]> {
 export async function saveTeamPhoto(tournamentId:string,seed:number,teamName:string,blob:Blob){
   const path=`${tournamentId}/${seed}.webp`;
   const client=getSupabase();
-  const uploaded=await client.storage.from('team-photos').upload(path,blob,{contentType:'image/webp',upsert:true,cacheControl:'3600'});
+  const uploaded=await client.storage.from('team-photos').upload(path,blob,{contentType:blob.type||'image/webp',upsert:true,cacheControl:'3600'});
   if(uploaded.error) throw new Error(uploaded.error.message);
   const {error}=await client.from('team_photos').upsert({tournament_id:tournamentId,seed_number:seed,team_name:teamName,storage_path:path,updated_at:new Date().toISOString()});
   if(error) throw new Error(error.message);
