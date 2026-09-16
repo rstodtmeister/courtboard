@@ -6692,3 +6692,9 @@ html.court-overlay-document,
 .companion-results article span { color: #537080; font-size: .8rem; }
 .companion-notice { padding: 12px; background: #fff0cd; border-radius: 12px; }
 @media (max-width: 540px) { .team-companion { padding: 12px 12px 28px; } .companion-header h1 { font-size: 1.15rem; } .companion-header .companion-link { font-size: .85rem; } }
+
+.companion-current { margin: 0; }
+.companion-preceding summary { cursor: pointer; padding: 10px 0; min-height: 44px; box-sizing: border-box; }
+.companion-preceding ol { margin: 0; padding: 0; list-style: none; }
+.companion-preceding li { border-top: 1px solid #cbdedb; padding: 10px 0; font-size: .85rem; overflow-wrap: anywhere; }
+.companion-preceding li span { display: block; margin-top: 4px; }

@@ -33,3 +33,15 @@ test('no recommendations become assignments and absent teams have no duties',()=
  assert.deepEqual(teamCompanion([game(1)],'C'),{duties:[],results:[]});
  assert.deepEqual(teamCompanion([game(1)],''),{duties:[],results:[]});
 });
+
+test('preceding list follows court order, excludes finished and other-court games, and updates after completion',()=>{
+ const target=game(9,{display_order:30});
+ const first=game(5,{display_order:10,team_a:'C',team_b:'D'});
+ const second=game(2,{display_order:20,team_a:'C',team_b:'D'});
+ const schedule=[target,second,first,game(1,{completed:true}),game(3,{court:'2',team_a:'C',team_b:'D'})];
+ const duty=teamCompanion(schedule,'A').duties[0];
+ assert.deepEqual(duty.preceding.map(g=>g.id),['5','2']);
+ assert.equal(duty.ahead,duty.preceding.length);
+ const updated=teamCompanion(schedule.map(g=>g.id==='5'?{...g,completed:true}:g),'A').duties[0];
+ assert.deepEqual(updated.preceding.map(g=>g.id),['2']);
+});

@@ -26,16 +26,22 @@ function TeamAgenda({ games }: { games: Game[] }) {
     return true;
   });
   const later = duties.filter(duty => !next.includes(duty));
-  function card({ game, role, ahead, court }: typeof duties[number]) {
+  function card({ game, role, ahead, court, preceding }: typeof duties[number]) {
     const a = resolveTeam(game.team_a, games) || 'Team noch offen';
     const b = resolveTeam(game.team_b, games) || 'Team noch offen';
     return <article className="companion-duty" key={`${game.id}-${role}`}>
-      <div className="companion-duty-top"><strong>{role === 'play' ? 'Euer Spiel' : 'Schiedsgericht'} – Spiel {game.number}</strong>
+      <div className="companion-duty-top"><strong>{role === 'play' ? 'Euer Spiel' : 'Schiedsgericht'} – Spiel {game.number}{game.round ? ` · ${game.round}` : ''}</strong>
         <span className="companion-court-label">{court ? `Court ${court}` : 'Court offen'}</span>
       </div>
       <p className="companion-match">{role === 'play' ? `Gegen ${a === team ? b : a}` : `${a} gegen ${b}`}</p>
-      <div className="companion-duty-bottom"><span className="companion-count">{ahead === null ? 'Reihenfolge offen' : ahead === 0 ? (game.display_state?.hasPoints ? 'Läuft gerade' : 'Jetzt am Court') : `Noch ${ahead} ${ahead === 1 ? 'Spiel' : 'Spiele'} vor euch`}</span>
-        {game.round && <small>{game.round}</small>}</div>
+      {ahead !== null && ahead > 0 ? <details className="companion-preceding">
+        <summary className="companion-count">Noch {ahead} {ahead === 1 ? 'Spiel' : 'Spiele'} vor euch</summary>
+        <ol>{preceding.map(prior => <li key={prior.id}>
+          <strong>Spiel {prior.number}{prior.round ? ` · ${prior.round}` : ''}{prior.display_state?.hasPoints ? ' · Läuft gerade' : ''}</strong>
+          <span>{resolveTeam(prior.team_a, games) || 'Team noch offen'} gegen {resolveTeam(prior.team_b, games) || 'Team noch offen'}</span>
+        </li>)}</ol>
+      </details> : <p className="companion-count companion-current">{ahead === null ? 'Reihenfolge offen' : `${game.display_state?.hasPoints ? 'Läuft gerade' : 'Jetzt am Court'}: Spiel ${game.number}`}</p>}
+
     </article>;
   }
   return <>

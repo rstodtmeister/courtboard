@@ -21,6 +21,13 @@ try {
  assert.equal(await page.locator('.companion-duty:visible').count(),2);
  assert.match(await page.locator('.companion-duty').first().innerText(),/Noch 1 Spiel vor euch/);
  assert.match(await page.locator('.companion-duty').nth(1).innerText(),/Schiedsgericht/);
+ assert.match(await page.locator('.companion-duty').nth(1).innerText(),/Jetzt am Court: Spiel 3/);
+ const preceding=page.locator('.companion-duty').first().locator('.companion-preceding');
+ assert.equal(await preceding.locator('li:visible').count(),0);
+ await preceding.locator('summary').click();
+ assert.equal(await preceding.locator('li:visible').count(),1);
+ assert.match(await preceding.locator('li').innerText(),/Spiel 1.*Gäste gegen Andere/s);
+ await preceding.locator('summary').click();
  const nextCards=page.locator('.companion-duty:visible');
  const lastCard=await nextCards.last().boundingBox();
  assert.ok(lastCard.y+lastCard.height<640,'Both next duties should fit a small phone screen');

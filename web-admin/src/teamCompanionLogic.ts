@@ -34,7 +34,9 @@ export function teamCompanion(games: Game[], team: string) {
     const court = (game.court ?? '').trim();
     const assigned = Boolean(court && court !== '-' && court !== '0' && !court.startsWith('-'));
     const queue = assigned ? games.filter(item => !completedGame(item) && item.court?.trim() === court).sort(compareCourtGames) : [];
-    return roles.map(role => ({ game, role, court: assigned ? court : '', ahead: assigned ? queue.findIndex(item => item.id === game.id) : null }));
+    const ahead = assigned ? queue.findIndex(item => item.id === game.id) : null;
+    const preceding = ahead === null ? [] : queue.slice(0, ahead);
+    return roles.map(role => ({ game, role, court: assigned ? court : '', ahead, preceding }));
   });
   duties.sort((a, b) => a.court.localeCompare(b.court, 'de', { numeric: true }) || compareCourtGames(a.game, b.game));
   return { duties, results: games.filter(game => completedGame(game) && involved(game)).sort((a,b) => b.number.localeCompare(a.number, 'de', { numeric: true })) };
