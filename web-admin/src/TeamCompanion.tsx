@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MyTeam, useMyTeam } from './MyTeam';
 import { resolveTeam, teamCompanion, teamViewUrl } from './teamCompanionLogic';
 import type { Game, Tournament } from './types';
@@ -17,19 +17,10 @@ export function TeamCompanion({ games, tournament, error }: { games: Game[]; tou
 function TeamAgenda({ games, tournamentId }: { games: Game[]; tournamentId: string }) {
   const team = useMyTeam();
   const { duties, results } = teamCompanion(games, team);
-  const [shareStatus, setShareStatus] = useState('');
-  const [manualLink, setManualLink] = useState(false);
-  const link = teamViewUrl('team', tournamentId, team);
-  async function share() {
-    try { await navigator.clipboard.writeText(link); setShareStatus('Teamlink kopiert'); setManualLink(false); }
-    catch { setShareStatus('Den Teamlink kannst du hier kopieren.'); setManualLink(true); }
-  }
   if (!team) return <section className="companion-empty"><h2>Welches Team seid ihr?</h2><p>Wählt oben euer Team. Hier findet ihr eure Spiele, Schiedsgerichtseinsätze und Ergebnisse.</p></section>;
   const courts = [...new Set(duties.map(duty => duty.court))];
   return <>
-    <section className="companion-team"><div><p>Mein Team</p><h2>{team}</h2></div><button onClick={share}>Teamlink kopieren</button></section>
-    <p role="status">{shareStatus}</p>
-    {manualLink && <label>Teamlink<input readOnly value={link} onFocus={event => event.target.select()} /></label>}
+    <section className="companion-team"><div><p>Mein Team</p><h2>{team}</h2></div></section>
     <section aria-labelledby="companion-duties"><h2 id="companion-duties">Eure nächsten Aufgaben</h2>
       <p className="companion-hint">Die Reihenfolge gilt je Court. Laufende Spiele zählen bei „Spiele vor euch“ mit. Einsätze erscheinen erst, wenn ihr zugewiesen seid.</p>
       {duties.length === 0 && <p className="companion-empty">Aktuell ist kein weiterer Einsatz für euch fest zugeordnet. Weitere KO-Begegnungen können noch offen sein.</p>}
