@@ -1,3 +1,4 @@
+import { youtubeId, refreshYoutubeRecording } from "../_shared/youtube.ts";
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { sha256Hex } from "../_shared/token.ts";
@@ -6,6 +7,9 @@ declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 import { ScoreValidationError, validateScoreSubmission } from "../_shared/score-validation.ts";
 
 type SubmitScoreRequest = {
+  matchStartedAt?: string | null;
+  matchEndedAt?: string | null;
+  matchVideoId?: string | null;
   token: string;
   protocol?: number;
   operationId?: string;
@@ -30,7 +34,7 @@ type SubmitScoreRequest = {
 };
 
 const gameSelect =
-  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until,score_revision,score_entry_state";
+  "id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,printed,dirty,completed,point_history,score_locked_by_device,score_locked_at,score_blocked_device,score_blocked_until,score_revision,score_entry_state,match_started_at,match_ended_at,match_video_id,match_court";
 
 const scoreLockTimeout = "30 minutes";
 
@@ -122,7 +126,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: gamesError.message }, 500);
     }
 
-    const candidateGames = sortGames(games ?? []);
+    const { data: streamTournament } = await adminClient.from('tournaments').select('court_streams').eq('id', link.tournament_id).single();
+    const candidateGames = sortGames((games ?? []).map(game => ({ ...game,
+      configured_video_id: youtubeId(streamTournament?.court_streams?.[game.court ?? '']) })));
+
     let lockGame = link.court && !link.game_id
       ? candidateGames.find((game) => !game.completed)
       : candidateGames[0];
@@ -231,6 +238,12 @@ Deno.serve(async (req) => {
     return scoreDatabaseError(updateError.message);
   }
   const completed = validated?.completed ?? false;
+  if (completed && body?.matchVideoId && Deno.env.get("YOUTUBE_API_KEY") && !(reliable && updatedGame?.replayed)) {
+    EdgeRuntime.waitUntil((async () => {
+      const { data: game } = await adminClient.from('games').select('tournament_id,match_video_id').eq('id', gameId).single();
+      if (game?.match_video_id) await refreshYoutubeRecording(adminClient, game.tournament_id, game.match_video_id);
+    })().catch(() => console.error('YouTube metadata refresh failed; admin can retry.')));
+  }
   if (completed && (reliable ? updatedGame?.hvvStatus === "queued" && !updatedGame.replayed : updatedGame?.edit_url)) {
     EdgeRuntime.waitUntil(processHvvDelivery(adminClient).catch(() => {
       console.error("HVV background attempt failed; durable job will be retried");

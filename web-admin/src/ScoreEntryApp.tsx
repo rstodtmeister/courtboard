@@ -423,6 +423,8 @@ function ScoreEntryContent({ token }: { token: string }) {
     setActiveTimeoutTeam(null);
     setTimeoutRemaining(0);
     setTimeoutEndsAt(null);
+    setDraft(current => current && !current.match_started_at ? { ...current,
+      match_started_at: new Date().toISOString(), match_video_id: selectedGame?.configured_video_id ?? null } : current);
     setWorkflowStep("live");
   }
 
@@ -610,6 +612,7 @@ function ScoreEntryContent({ token }: { token: string }) {
 
       const result = matchResult(nextDraft);
       if (result.teamA >= 2 || result.teamB >= 2 || activeSet === 3) {
+        setDraft({ ...nextDraft, match_ended_at: nextDraft.match_started_at ? new Date().toISOString() : null });
         setFinalEditing(false);
         setWorkflowStep("scoring");
         return;
@@ -672,7 +675,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     setMessage("");
 
     try {
-      const completedDraft = { ...nextDraft, score_entry_state: null, completed: true, game_rating: nextDraft.game_rating || "Normal" };
+      const completedDraft = { ...nextDraft, match_ended_at: nextDraft.match_started_at ? (nextDraft.match_ended_at ?? new Date().toISOString()) : null, score_entry_state: null, completed: true, game_rating: nextDraft.game_rating || "Normal" };
       await submitScore(token, selectedGame, completedDraft);
       clearScoreEntryResume(token);
       const completedGame = { ...selectedGame, ...completedDraft, completed: true };

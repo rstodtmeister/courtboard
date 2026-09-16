@@ -26,6 +26,13 @@ export type Game = {
   printed: boolean;
   dirty: boolean;
   completed: boolean;
+  match_started_at?: string | null;
+  match_ended_at?: string | null;
+  match_video_id?: string | null;
+  match_court?: string | null;
+  configured_video_id?: string | null;
+  video_started_at?: string | null;
+  video_offset_seconds?: number | null;
   score_revision?: number;
   point_history?: string | null;
   score_entry_state?: string | null;
@@ -134,4 +141,7 @@ export type GameDraft = Pick<
   | "completed"
   | "point_history"
   | "score_entry_state"
+  | "match_started_at"
+  | "match_ended_at"
+  | "match_video_id"
 >;

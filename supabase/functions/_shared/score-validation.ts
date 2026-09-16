@@ -1,5 +1,8 @@
 import { parseScoreSession } from "./score-session.ts";
 export type ScoreSubmissionInput = {
+  matchStartedAt?: unknown;
+  matchEndedAt?: unknown;
+  matchVideoId?: unknown;
   referee?: unknown;
   gameRating?: unknown;
   set1TeamA?: unknown;
@@ -43,6 +46,19 @@ const gameRatings = new Set([
 ]);
 
 export function validateScoreSubmission(input: ScoreSubmissionInput, game: ScoreValidationGame) {
+  const timing: Record<string, string | null> = {};
+  for (const key of ['matchStartedAt', 'matchEndedAt'] as const) {
+    const value = input[key];
+    if (value !== undefined) {
+      if (value !== null && (typeof value !== 'string' || !/^\d{4}-\d\d-\d\dT/.test(value) || !Number.isFinite(Date.parse(value)) || Date.parse(value) > Date.now() + 300000 || Date.parse(value) < Date.UTC(2020,0,1))) throw new ScoreValidationError('Ungültige Spielzeit.');
+      timing[key] = value as string | null;
+    }
+  }
+  if (timing.matchEndedAt && (!timing.matchStartedAt || Date.parse(timing.matchEndedAt) < Date.parse(timing.matchStartedAt))) throw new ScoreValidationError('Spielende liegt vor dem Spielbeginn.');
+  if (input.matchVideoId !== undefined) {
+    if (input.matchVideoId !== null && (typeof input.matchVideoId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(input.matchVideoId))) throw new ScoreValidationError('Ungültiges YouTube-Video.');
+    timing.matchVideoId = input.matchVideoId as string | null;
+  }
   const referee = boundedString(input.referee, "Schiedsrichter", 160);
   const gameRating = boundedString(input.gameRating, "Spielwertung", 80) || "Normal";
   if (!gameRatings.has(gameRating)) {
@@ -79,6 +95,7 @@ export function validateScoreSubmission(input: ScoreSubmissionInput, game: Score
     : winnerFromSpecialRating(gameRating, game);
 
   return {
+    ...timing,
     referee,
     gameRating,
     set1TeamA: setScores[0][0],

@@ -103,6 +103,9 @@ export function draftFromGame(game: Game): GameDraft {
     completed: game.completed,
     point_history: game.point_history ?? "",
     score_entry_state: game.score_entry_state ?? null,
+    match_started_at: game.match_started_at ?? null,
+    match_ended_at: game.match_ended_at ?? null,
+    match_video_id: game.match_video_id ?? null,
   };
 }
 

@@ -54,7 +54,7 @@ export async function listDisplayGames(tournamentId: string, courts?: string[], 
     return games.filter((game) => !courts || courts.includes((game.court ?? "").trim()));
   }
   let query = getSupabase().from("public_games")
-    .select("id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,completed,score_locked_by_device,display_state" + (includeHistory ? ",point_history" : ""))
+    .select("id,tournament_id,number,round,game_date,court,display_order,team_a,team_b,referee,result,winner_team,game_rating,set1_team_a,set1_team_b,set2_team_a,set2_team_b,set3_team_a,set3_team_b,completed,score_locked_by_device,display_state,match_started_at,match_ended_at,match_video_id,match_court,video_started_at,video_offset_seconds" + (includeHistory ? ",point_history" : ""))
     .eq("tournament_id", tournamentId);
   if (courts) query = query.in("court", courts);
   const { data, error } = await query.order("number", { ascending: true }).returns<Array<Omit<Game, "printed" | "dirty">>>();

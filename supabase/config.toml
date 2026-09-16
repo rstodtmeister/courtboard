@@ -424,3 +424,6 @@ verify_jwt = false
 
 [functions.process-hvv-deliveries]
 verify_jwt = false
+
+[functions.youtube-recording]
+verify_jwt = false

@@ -1,3 +1,4 @@
+import { YoutubeRecordingSettings } from "./YoutubeRecordingSettings";
 import React, { useEffect, useState } from "react";
 import { courtQrTokens, findCourtScoreLink } from "../courtScoreLinks";
 import { QrCode } from "../QrCode";
@@ -128,6 +129,7 @@ export function CourtLinksPanel({
                   <button type="button" className="secondary" onClick={() => saveStream(entry.court)} disabled={savingStreamCourt === entry.court}>
                     {savingStreamCourt === entry.court ? "Speichert…" : streamDrafts[entry.court] ? "Stream speichern" : "Stream entfernen"}
                   </button>
+                  <YoutubeRecordingSettings tournamentId={entry.tournamentId} url={courtStreams[entry.court] ?? ""} />
                 </div>
               </CourtSection>
               <CourtSection title="Spielstand für Streaming" {...sectionProps("overlay")}>

@@ -81,3 +81,18 @@ test('reopening an acknowledged session is a no-op, but a side change is persist
  assert.equal(state.calls.length,1);
  }finally{box.stop()}
 });
+
+test('offline match timestamps and captured video survive reload and queued delivery',async()=>{
+ const first=setup();first.state.online=false;
+ const timing={match_started_at:'2026-01-01T09:00:00Z',match_ended_at:'2026-01-01T09:30:00Z',match_video_id:'abcdefghijk'};
+ await first.box.enqueue('g',{...draft(1),...timing});first.box.stop();
+ const second=setup(first.map);
+ try {
+  second.box.retry();
+  await flush();
+  assert.equal(second.state.calls[0].command.matchStartedAt,timing.match_started_at);
+  assert.equal(second.state.calls[0].command.matchEndedAt,timing.match_ended_at);
+  assert.equal(second.state.calls[0].command.matchVideoId,timing.match_video_id);
+  second.state.calls[0].resolve();await flush();
+ } finally{second.box.stop();}
+});

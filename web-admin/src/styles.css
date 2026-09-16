@@ -6715,3 +6715,10 @@ html.court-overlay-document,
 .history-legend span:first-child { color: #137b59; font-weight: 700; }
 .history-set h3 { margin: 12px 0 4px; font-size: .95rem; }
 .history-timeouts { font-size: .8rem; padding-left: 20px; }
+
+.companion-replay { display: inline-flex; align-items: center; min-height: 44px; color: #135744; font-weight: 650; font-size: .9rem; }
+.youtube-recording-settings { width: 100%; }
+.youtube-recording-settings summary { cursor: pointer; padding: 12px 0; }
+.youtube-recording-settings label { display: grid; gap: 5px; margin: 10px 0; }
+.youtube-recording-settings input, .youtube-recording-settings select { width: 100%; min-width: 0; box-sizing: border-box; }
+.youtube-recording-settings button { margin: 5px 8px 5px 0; }

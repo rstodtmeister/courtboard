@@ -17,7 +17,7 @@ export function historyDelta(before: string | null | undefined, after: string | 
   return { drop, keep, append: next.slice(keep) };
 }
 export function scoreFields(draft: GameDraft) {
-  return { referee: draft.referee, gameRating: draft.game_rating || 'Normal',
+  return { matchStartedAt: draft.match_started_at ?? null, matchEndedAt: draft.match_ended_at ?? null, matchVideoId: draft.match_video_id ?? null, referee: draft.referee, gameRating: draft.game_rating || 'Normal',
     set1TeamA: (draft.set1_team_a ?? ""), set1TeamB: (draft.set1_team_b ?? ""),
     set2TeamA: (draft.set2_team_a ?? ""), set2TeamB: (draft.set2_team_b ?? ""),
     set3TeamA: (draft.set3_team_a ?? ""), set3TeamB: (draft.set3_team_b ?? ""), completed: draft.completed, scoreEntryState: draft.score_entry_state ?? null };

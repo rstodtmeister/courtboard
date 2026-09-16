@@ -42,6 +42,7 @@ test('score endpoint acknowledges a durable completion without waiting for HVV, 
   globalThis.__scoreClient={rpc:async(name,args)=>{calls.push({name,args});return {data:{id:'test',edit_url:'https://example.invalid/edit'},error:null};}};
   let code=await readFile(new URL('submit-score/index.ts',root),'utf8');
   for(const [path,replacement] of [
+    ['../_shared/youtube.ts',url('export const youtubeId=()=>null; export const refreshYoutubeRecording=async()=>{};')],
     ['../_shared/cors.ts',url(await readFile(new URL('_shared/cors.ts',root),'utf8'))],
     ['../_shared/token.ts',url(await readFile(new URL('_shared/token.ts',root),'utf8'))],
     ['../_shared/score-validation.ts',url((await readFile(new URL('_shared/score-validation.ts',root),'utf8')).replace('"./score-session.ts"', JSON.stringify(url(await readFile(new URL('_shared/score-session.ts',root),'utf8')))))],

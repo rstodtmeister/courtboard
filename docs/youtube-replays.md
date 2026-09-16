@@ -1,0 +1,13 @@
+# YouTube-Spielaufzeichnungen
+
+Im Adminbereich unter Courts → Livestream einen konkreten YouTube-Video-/Live-Link speichern. Ein Kanal-Link reicht nicht. Bei einem Stream-Neustart mit neuer Video-ID den neuen Link vor dem nächsten Spiel eintragen und die Schiedsrichteransicht neu laden.
+
+Unter „Videozeit für Spielaufzeichnungen“ können Beginn und Zeitkorrektur je Video eingestellt werden. Der Beginn ist der Zeitpunkt, der Position 0 der Aufzeichnung entspricht; die Eingabe verwendet die Ortszeit des Admin-Geräts. Positive Korrektur springt später, negative früher. Alte verwendete Video-IDs bleiben dort auswählbar. Eine manuelle Beginn-Eingabe wird von automatischen Abrufen nicht überschrieben. Zum Wechsel auf automatische Ermittlung das Beginn-Feld leeren und speichern.
+
+Für den automatischen Abruf in der Google Cloud Console die YouTube Data API v3 aktivieren, einen darauf beschränkten API-Schlüssel erstellen und im Supabase-Projekt unter Edge Functions → Secrets als `YOUTUBE_API_KEY` eintragen. Nicht im Browser, Git oder Chat hinterlegen. Anschließend „Von YouTube abrufen“ verwenden. Neue Spielabschlüsse lösen ebenfalls einen Abruf aus, sofern noch kein Beginn gespeichert ist. Noch nicht gestartete Streams liefern keinen tatsächlichen Start; später erneut abrufen. Ohne Schlüssel funktioniert die manuelle Beginn-Eingabe.
+
+Beim Start des ersten Satzes werden Gerätezeit, damaliger Court und geladene Video-ID fixiert. Beim Abschluss des letzten Satzes wird die Endzeit erfasst; bei direktem Abschluss dient die Siegerbestätigung als Endmarke. Diese Daten durchlaufen dieselbe dauerhafte Offline-Warteschlange wie Punkte und bleiben beim Gerätewechsel erhalten. Die ursprüngliche Zuordnung wird durch spätere Court-/Streamänderungen nicht ersetzt. Geräteuhren müssen korrekt eingestellt sein.
+
+Der öffentliche Videolink erscheint erst bei abgeschlossenem Spiel mit gültigen Spielzeiten, Video-ID und Aufzeichnungsbeginn. Berechnung: Spielbeginn minus Aufzeichnungsbeginn plus Zeitkorrektur, abzüglich 15 Sekunden Vorlauf, frühestens Position 0. Fehlende Zeitdaten oder Spiele vor Aufzeichnungsbeginn ergeben keinen Link. Bereits vorhandene Spiele werden nicht rückwirkend zugeordnet.
+
+Die Videoaufzeichnung muss auf YouTube weiterhin verfügbar sein. Nachträgliche Schnitte oder Unterbrechungen können eine neue Kalibrierung erfordern; bei mehreren unterschiedlichen Zeitversätzen innerhalb desselben Videos reicht eine globale Korrektur nicht. YouTube-Metadatenfehler blockieren die Speicherung der Spielergebnisse nicht.

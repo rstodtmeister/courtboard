@@ -90,3 +90,12 @@ test('120 undo steps stay compact even when every history has rolled past 120 en
  const restored=restoreScoreSession('game',{...before.draft,score_entry_state:encoded});
  assert.deepEqual(restored.pointHistory.map(s=>s.draft.point_history),before.pointHistory.map(s=>s.draft.point_history));
 });
+
+test('client capture times survive validation and reject malformed or reversed times',()=>{
+ const capture={matchStartedAt:'2026-01-01T09:00:00Z',matchEndedAt:'2026-01-01T09:30:00Z',matchVideoId:'abcdefghijk'};
+ const validated=validateScoreSubmission(capture,{team_a:'A',team_b:'B'});
+ for(const key of Object.keys(capture))assert.equal(validated[key],capture[key]);
+ assert.throws(()=>validateScoreSubmission({...capture,matchStartedAt:'bad'},{team_a:'A',team_b:'B'}));
+ assert.throws(()=>validateScoreSubmission({...capture,matchEndedAt:'2025-12-31T00:00:00Z'},{team_a:'A',team_b:'B'}));
+ assert.throws(()=>validateScoreSubmission({...capture,matchVideoId:'https://bad.test'},{team_a:'A',team_b:'B'}));
+});

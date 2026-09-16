@@ -1,4 +1,5 @@
 import React from 'react';
+import { youtubeReplay } from './youtubeReplay';
 import { MatchHistory } from './MatchHistory';
 import { MyTeam, useMyTeam } from './MyTeam';
 import { resolveTeam, teamCompanion, teamViewUrl, teamResult } from './teamCompanionLogic';
@@ -55,6 +56,7 @@ function TeamAgenda({ games }: { games: Game[] }) {
     <details className="companion-details companion-results"><summary>Eure Ergebnisse ({results.length})</summary>
       {results.length === 0 ? <p>Noch keine abgeschlossenen Spiele.</p> : results.map(game => {
         const result = teamResult(game, team, games);
+        const replay = youtubeReplay(game);
         return <article key={game.id} className="companion-result">
           <div className="companion-result-heading"><strong className={result.status === 'Sieg' ? 'result-win' : result.status === 'Niederlage' ? 'result-loss' : ''}>{result.status}</strong><span>Spiel {game.number}{game.round ? ` · ${game.round}` : ''}</span></div>
           <p>Gegen {result.opponent || 'Team noch offen'}</p>
@@ -62,6 +64,7 @@ function TeamAgenda({ games }: { games: Game[] }) {
             {result.sets.length > 0 && <span aria-label="Satzergebnisse aus eurer Sicht">{result.sets.map(set => <span key={set.number} title={`Satz ${set.number}`}>{set.own}:{set.opponent}</span>)}</span>}
           </div>
           {result.rating && <p className="companion-hint">Sonderwertung: {result.rating}</p>}
+          {replay && <a className="companion-replay" href={replay.url} target="_blank" rel="noreferrer">▶ Spiel auf YouTube ansehen</a>}
           <MatchHistory game={game} games={games} team={team} />
         </article>;
       })}
