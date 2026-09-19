@@ -77,6 +77,27 @@ Google Chrome headless bei 1920 × 1080 und 800 × 450 Pixeln gerendert und visu
 Reihenfolge, Symmetrie und Überlappungen geprüft. Das belegt die CSS-Darstellung der gewählten
 Beispiele, aber keinen Lauf mit echten Supabase-Daten, realen Teamfotos oder Streamsoftware.
 
+## Direkter Satzstart und Ein-Tipp-Punkteingabe (19.09.2026)
+
+Auf HEAD `9a4d93b795bb451a9763a298f17fd3f961ee8249` mit lokalen Änderungen waren
+`npm --prefix web-admin run test:score`, `npm --prefix web-admin run typecheck`,
+`npm --prefix web-admin run build` und `git diff --check` erfolgreich. Der neue Unit-Test
+bestätigt, dass der erste Tipp angenommen, ein Doppeltipp innerhalb von 350 Millisekunden
+verworfen und ein späterer Tipp wieder angenommen wird.
+
+`scripts/test-score-device-handover.mjs` lief mit vollständig simulierten Supabase-Antworten
+in Google Chrome headless erfolgreich. Der Browserlauf bestätigte den direkten Übergang von
+der letzten Satzparameter-Auswahl zur Punkteingabe sowie Aufschlagrotation, Seitenwechsel,
+Auszeit, Rückgängig, Geräteübergabe, Folgesatz und Abschluss.
+
+Der separate Lauf `scripts/test-score-browser.mjs` wurde nach drei erfolglosen Versuchen
+gemäß Schleifenregel nicht erneut gestartet. Versuch eins verwendete versehentlich einen
+lokalen statt synthetischen Cloud-Build. Versuche zwei und drei bestätigten zunächst im
+Browser, dass der unmittelbare zweite Tipp keinen weiteren Punkt erzeugt, stoppten danach
+aber an veralteten Erwartungen zur inzwischen ausgeblendeten Offline-Statusanzeige. Diese
+Testannahmen wurden korrigiert, jedoch in diesem Auftrag nicht durch einen vollständigen
+erfolgreichen Lauf bestätigt. Kein echtes Backend und keine Live-Spieldaten wurden verwendet.
+
 ## Neuer Nachweis: Vorlage
 
 Für zukünftige Läufe einen Beleg in `knowledge/raw/` oder `docs/reports/` ablegen und hier verlinken:

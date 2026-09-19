@@ -1,7 +1,7 @@
 // Run against a cloud-mode preview with synthetic credentials; no production requests.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const browser = await chromium.launch({headless:true});
+const browser = await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})});
 const game={id:'11111111-1111-4111-8111-111111111111',tournament_id:'22222222-2222-4222-8222-222222222222',number:'1',court:'1',team_a:'Alpha / Alice',team_b:'Beta / Bob',referee:'Ref / Ref2',game_rating:'Normal',set1_team_a:'0',set1_team_b:'0',set2_team_a:'',set2_team_b:'',set3_team_a:'',set3_team_b:'',point_history:'[]',completed:false,score_revision:0,score_entry_state:null};
 const entry={games:[game],allTeams:['Ref / Ref2'],link:{id:'link',game_id:null,court:'1',expires_at:null,used_at:null}};
 const commands=[], errors=[], receipts=new Map();
@@ -44,12 +44,11 @@ try {
  await page.getByRole('button',{name:'Alice',exact:true}).click();
  await page.getByRole('button',{name:'Bob',exact:true}).click();
  await page.getByRole('button',{name:/alle 5 Punkte/}).click();
- await page.getByRole('button',{name:'Satz starten',exact:true}).click();
  await page.locator('.team-point-button').first().waitFor();await saved(page);
  assert.equal(session().firstServerTeamA,'Alice');assert.equal(session().firstServerTeamB,'Bob');
  assert.equal(session().setScore.A,0,'setup persists before first point');
  // Alternating rally winners exercise service rotation; at five points swap sides.
- for(const index of [0,1,0,1,0])await page.locator('.team-point-button').nth(index).click();
+ for(const index of [0,1,0,1,0]){await page.locator('.team-point-button').nth(index).click();await page.waitForTimeout(400)}
  await page.getByRole('button',{name:'Seiten gewechselt'}).click();
  await page.waitForFunction(()=>!document.querySelector('.team-point-button:disabled'));
  await saved(page);assert.equal(session().leftTeam,'B');assert.equal(session().sideChangeAck,5);

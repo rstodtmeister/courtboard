@@ -135,3 +135,18 @@ Neue Einträge anhängen; frühere Ereignisse nicht nachträglich umdeuten.
   `npm --prefix web-admin run build` und `git diff --check` erfolgreich.
 - Synthetische Vorschau in Google Chrome headless bei 1920 × 1080 und 800 × 450 Pixeln
   ohne sichtbare Überlappung geprüft. Kein Live-Stream-, Supabase- oder Produktivdatenlauf.
+
+## [2026-09-19] frontend | Direkter Satzstart und geschützte Punkteingabe
+
+- Nach der letzten Satzparameter-Auswahl startet die Live-Punkteingabe nun ohne die
+  zusätzliche Kontrollseite. Bestehende gespeicherte Sitzungen mit dem alten Schritt bleiben
+  weiterhin lesbar.
+- Ein Tipp auf eine Teamfläche zählt einen Punkt; weitere Tipps innerhalb von 350 Millisekunden
+  werden als unbeabsichtigter Doppeltipp verworfen. Rückgängig und Korrekturmodus bleiben frei.
+- Auf HEAD `9a4d93b795bb451a9763a298f17fd3f961ee8249` mit lokalen Änderungen waren Score-Tests,
+  TypeScript-Prüfung, Produktionsbuild und `git diff --check` erfolgreich.
+- Der synthetische Geräteübergabe-Browserlauf war vollständig erfolgreich und bestätigte
+  direkten Satzstart sowie den übrigen Live-Ablauf. Der separate Offline-Browserlauf wurde
+  nach drei Versuchen gestoppt: Die Doppeltipp-Prüfung erreichte den erwarteten Stand, danach
+  scheiterten veraltete Testannahmen zur ausgeblendeten Statusanzeige. Annahmen korrigiert,
+  aber nicht erneut vollständig ausgeführt. Kein Live-Backend oder Produktivspiel verwendet.

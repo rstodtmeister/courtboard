@@ -1,7 +1,7 @@
 // Built cloud-mode preview only; intercepts every Supabase request with synthetic data.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const browser = await chromium.launch({headless:true});
+const browser = await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})});
 const waitForSaved = page => page.waitForFunction(() => {
  const key = Object.keys(localStorage).find(key => key.startsWith('courtboard.outbox.v2.'));
  const record = key && JSON.parse(localStorage.getItem(key));
@@ -45,9 +45,13 @@ try{
  const second=await context.newPage();await second.goto(page.url());await second.getByText(/bereits in einem anderen Tab/).waitFor();await second.close();
  await context.setOffline(true);
  await page.locator('.team-point-button').first().click();await page.locator('.team-point-button').first().click();
+ await page.waitForFunction(()=>document.querySelector('.live-score')?.textContent==='1');
+ assert.equal(await page.locator('.live-score').first().textContent(),'1','immediate duplicate tap must not add a point');
+ await page.waitForTimeout(400);await page.locator('.team-point-button').first().click();
+ await page.waitForFunction(()=>document.querySelector('.live-score')?.textContent==='2');
  await page.getByRole('button',{name:'Letzte Punkteingabe rückgängig'}).click();
- await page.getByText(/3 Eingabe\(n\) lokal gesichert/).waitFor();
- assert.equal(await page.evaluate(() => document.querySelector('.score-panel').lastElementChild.matches('.score-sync-notice')),true);
+ await page.waitForFunction(id=>JSON.parse(localStorage.getItem('courtboard.outbox.v2.'+id))?.pending.length===3,game.id);
+ assert.equal(await page.locator('.score-sync-notice').count(),0);
  const before=await page.evaluate(id=>JSON.parse(localStorage.getItem('courtboard.outbox.v2.'+id)),game.id);
  assert.equal(before.pending.at(-1).draft.set1_team_a,'1');
  await page.reload({waitUntil:'domcontentloaded'});
@@ -67,9 +71,9 @@ try{
  await inputs.nth(0).fill('21');await inputs.nth(1).fill('19');await inputs.nth(2).fill('21');await inputs.nth(3).fill('19');
  await context.setOffline(true);
  await page.getByRole('button',{name:'Ergebnis speichern',exact:true}).click();
- await page.getByText(/1 Eingabe\(n\) lokal gesichert/).waitFor();
+ await page.waitForFunction(id=>JSON.parse(localStorage.getItem('courtboard.outbox.v2.'+id))?.pending.length===1,game.id);
  await page.reload({waitUntil:'domcontentloaded'});
- await page.getByText(/1 Eingabe\(n\) lokal gesichert/).waitFor();
+ await page.waitForFunction(id=>JSON.parse(localStorage.getItem('courtboard.outbox.v2.'+id))?.pending.length===1,game.id);
  assert.equal(await page.locator('.score-form[inert]').count(),1);
  assert.equal(await page.getByRole('heading',{name:'Spiel abgeschlossen'}).count(),0);
  await context.setOffline(false);

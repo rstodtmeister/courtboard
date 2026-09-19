@@ -9,10 +9,17 @@ const patchUrl = url(await read('../src/scorePatch.ts'));
 const logicUrl = url(await read('../src/scoreLogic.ts'));
 const sessionUrl = url((await read('../src/scoreSession.ts')).replace('"../../supabase/functions/_shared/score-session"', JSON.stringify(schemaUrl)).replace('"./scoreLogic"',JSON.stringify(logicUrl)).replace('"./scorePatch"',JSON.stringify(patchUrl)));
 const { serializeScoreSession, restoreScoreSession, resumeForGame } = await import(sessionUrl);
+const { canAcceptPointInput, pointInputGuardMs } = await import(logicUrl);
 const { parseScoreSession } = await import(schemaUrl);
 const { validateScoreSubmission } = await import(url((await read('../../supabase/functions/_shared/score-validation.ts')).replace('"./score-session.ts"',JSON.stringify(schemaUrl))));
 const baseDraft = {team_a:'A',team_b:'B',referee:'Ref',completed:false,game_rating:'Normal',set1_team_a:'8',set1_team_b:'6',set2_team_a:'',set2_team_b:'',set3_team_a:'',set3_team_b:'',point_history:JSON.stringify([{set:1,team:'A',scoreA:8,scoreB:6}])};
 const state = () => ({gameId:'game',draft:{...baseDraft},workflowStep:'live',serverSetupStep:'serve-team',activeSet:1,servingTeam:'B',firstServerTeamA:'Müller 1',firstServerTeamB:'Ben',captainTeamA:'Müller 2',captainTeamB:'Bob',playerLabels:{A:['Müller 1','Müller 2'],B:null},sideChangeInterval:7,leftTeam:'B',setScore:{A:8,B:6},serverIndex:{A:1,B:0},serveCounts:{A:4,B:3},correctionMode:true,sideChangeAck:14,timeoutScore:{A:'8:6',B:null},activeTimeoutTeam:'A',timeoutEndsAt:30000,timeoutRemaining:30,finalEditing:false,pointHistory:[]});
+
+test('one deliberate tap counts while an immediate duplicate tap is ignored', () => {
+ assert.equal(canAcceptPointInput(null,1000),true);
+ assert.equal(canAcceptPointInput(1000,1000+pointInputGuardMs-1),false);
+ assert.equal(canAcceptPointInput(1000,1000+pointInputGuardMs),true);
+});
 
 test('fresh device restores complete live state and an elapsed timeout', () => {
  const before=state(); const draft={...before.draft,score_entry_state:serializeScoreSession(before)};

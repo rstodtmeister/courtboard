@@ -1,8 +1,8 @@
 ---
 title: Zuverlässige Ergebniserfassung
-updated: 2026-09-17
+updated: 2026-09-19
 status: source-reviewed
-source_commit: 0fa17d309b986079df46f12883f9996d7c3af467
+source_commit: 9a4d93b795bb451a9763a298f17fd3f961ee8249
 ---
 
 # Zuverlässige Ergebniserfassung
@@ -26,6 +26,12 @@ Bei gleichen Spielernachnamen können unterscheidbare Bezeichnungen eingegeben w
 Sie gelten für Kapitän und Aufschlagreihenfolge und werden im Score-Session-Zustand
 für Gerätewechsel erhalten (`5937a46`).
 
+Die Live-Erfassung zählt einen Punkt mit einem Tipp auf die jeweilige Teamfläche. Ein
+350-Millisekunden-Schutz verwirft einen unmittelbar folgenden Doppeltipp; Korrekturmodus
+und Rückgängig bleiben davon unberührt. Nach der letzten Satzparameter-Auswahl startet
+die Punkteingabe direkt. Die frühere zusätzliche Kontrollseite wird im neuen Ablauf nicht
+mehr angesteuert; ihr Zustand bleibt für bereits gespeicherte ältere Sitzungen lesbar.
+
 ## Aktueller Konfliktabgleich
 
 Die Historie `724a533` dokumentiert zunächst eine manuelle Wiederherstellung mit Sicherung;
@@ -44,6 +50,7 @@ von 11.09. beschreibt deshalb nicht den vollständigen heutigen Bedienablauf.
 - [Gerätewechsel-Dokumentation](../../../docs/web-admin-setup.md)
 - [Automatische Wiederaufnahme](../../../web-admin/src/ScoreSyncStatus.tsx) und [Übernahme des Serverstands](../../../web-admin/src/ScoreEntryApp.tsx)
 - [Spielerbezeichnungen](../../../web-admin/src/scoreEntrySteps.tsx) und [Sitzungsserialisierung](../../../web-admin/src/scoreSession.ts)
+- [Erfassungsablauf](../../../web-admin/src/ScoreEntryApp.tsx), [Doppeltipp-Regel](../../../web-admin/src/scoreLogic.ts) und [Sitzungstest](../../../web-admin/tests/score-session.test.mjs)
 - [Konflikttests](../../../web-admin/tests/score-outbox.test.mjs)
 - [Outbox-Implementierung](../../../web-admin/src/scoreOutbox.ts)
 - [Atomare Operationen](../../../supabase/migrations/20260911080000_reliable_score_operations.sql)

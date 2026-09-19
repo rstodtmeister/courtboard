@@ -60,6 +60,12 @@ export function isPlausibleSetResult(score: Record<TeamKey, number>) {
   return high >= 15 && diff >= 2;
 }
 
+export const pointInputGuardMs = 350;
+
+export function canAcceptPointInput(lastAcceptedAt: number | null, now: number) {
+  return lastAcceptedAt === null || now - lastAcceptedAt >= pointInputGuardMs;
+}
+
 export function finalSetRows(draft: GameDraft) {
   return [
     { label: "Satz 1", teamA: draft.set1_team_a ?? "", teamB: draft.set1_team_b ?? "" },

@@ -6,7 +6,7 @@ import { HvvDeliveryStatus } from "./HvvDeliveryStatus";
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { gameRatingOptions } from "./appConfig";
 import { dataMode, scoreOutbox, heartbeatScoreEntry, loadScoreEntry, submitScore } from "./dataApi";
-import { draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
+import { canAcceptPointInput, draftFromGame, draftWithSetScore, hasTwoSetLeadAfterSecondSet, isPlausibleSetResult, parsePointHistory, parseTimeoutHistory, rebuildUndoHistory, scoreForSet, serializePointHistory, validateManualResult, withScoreAutomation } from "./scoreLogic";
 import { clearCompletedScoreEntry, clearScoreEntryResume, type CompletedScoreEntryState, loadCompletedScoreEntry, loadScoreEntryResume, saveCompletedScoreEntry, saveScoreEntryResume } from "./scoreEntryStorage";
 import { FinalReviewStep, LiveSetStep, LockedScoreEntry, ManualResultTable, ManualResultValidation, PlayerLabelsStep, RefereeSelectStep, ScoreContextBox, ServerSelectionStep, SetupPreviewStep, ThankYouStep } from "./scoreEntrySteps";
 import { duplicatePlayersForTeam, numberedDuplicatePlayers, playersForTeam } from "./scoreEntryHelpers";
@@ -60,6 +60,7 @@ function ScoreEntryContent({ token }: { token: string }) {
   const sideSwapTimeouts = useRef<number[]>([]);
   const latestLiveSave = useRef(0);
   const finishingSet = useRef(false);
+  const lastPointInputAt = useRef<number | null>(null);
   const [syncVersion, setSyncVersion] = useState(0);
   useEffect(() => scoreOutbox.subscribe(() => setSyncVersion((value) => value+1)), []);
   const syncStatus = dataMode === "supabase" ? scoreOutbox.status(selectedGameId) : null;
@@ -449,6 +450,7 @@ function ScoreEntryContent({ token }: { token: string }) {
       return;
     }
     cancelPendingSideSwap();
+    lastPointInputAt.current = null;
     setSideChangeInterval(nextSideChangeInterval);
     setServerSetupStep("serve-team");
     const nextScore = scoreForSet(draft, activeSet);
@@ -504,6 +506,13 @@ function ScoreEntryContent({ token }: { token: string }) {
     if (!draft || isSwappingSides || finishingSet.current || syncBlocked) {
       return;
     }
+    if (delta > 0 && !correctionMode) {
+      const now = performance.now();
+      if (!canAcceptPointInput(lastPointInputAt.current, now)) {
+        return;
+      }
+      lastPointInputAt.current = now;
+    }
     setPointHistory((current) => [...current, currentLiveSnapshot(draft)].slice(-120));
 
     const nextScore = { ...setScore, [team]: Math.max(0, setScore[team] + delta) };
@@ -548,6 +557,7 @@ function ScoreEntryContent({ token }: { token: string }) {
     if (!previous) {
       return;
     }
+    lastPointInputAt.current = null;
     const previousTotalPoints = previous.setScore.A + previous.setScore.B;
     const restoredSideChangeAck = previous.sideChangeAck
       ?? (sideChangeInterval && previousTotalPoints > 0 && previousTotalPoints % sideChangeInterval === 0
@@ -842,13 +852,7 @@ function ScoreEntryContent({ token }: { token: string }) {
                 onChangeStep={setServerSetupStep}
                 onBack={() => setWorkflowStep("confirm")}
                 activeSet={activeSet}
-                onContinue={(interval) => {
-                  if (activeSet === 1) {
-                    setWorkflowStep("setup-preview");
-                    return;
-                  }
-                  startCurrentSet(interval);
-                }}
+                onContinue={startCurrentSet}
               />
             )}
 
