@@ -150,3 +150,15 @@ Neue Einträge anhängen; frühere Ereignisse nicht nachträglich umdeuten.
   nach drei Versuchen gestoppt: Die Doppeltipp-Prüfung erreichte den erwarteten Stand, danach
   scheiterten veraltete Testannahmen zur ausgeblendeten Statusanzeige. Annahmen korrigiert,
   aber nicht erneut vollständig ausgeführt. Kein Live-Backend oder Produktivspiel verwendet.
+
+## [2026-09-19] tooling | Projektlokale Browser-Testfreigaben
+
+- `.codex/rules/default.rules` ergänzt; die Regeln gelten nur für die vertrauenswürdige
+  Projektebene und verändern die vorhandenen benutzerweiten Regeln nicht.
+- Freigegeben sind ausschließlich Headless-Google-Chrome, der lokale Web-Preview-Server,
+  einzeln aufgezählte Playwright-Skripte und der konkrete lokale Score-Browsertestaufruf.
+  Allgemeine Präfixe für `node`, `npm` oder `bash` wurden nicht erlaubt.
+- `codex execpolicy check` bestätigte `allow` für Chrome, aufgezählten Node-Test und
+  Score-Test mit lokalen Umgebungswerten. Ein nicht aufgezähltes Node-Skript ergab keine
+  Regelübereinstimmung. Die beim Check ausgegebene PATH-Alias-Warnung änderte die Ergebnisse nicht.
+- Keine Anwendungstests, Browserstarts, Netzwerkaufrufe oder Änderungen an globalen Regeln.

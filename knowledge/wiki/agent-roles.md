@@ -2,7 +2,7 @@
 title: Agentenrollen und Übergaben
 updated: 2026-09-19
 status: source-reviewed
-source_commit: 6b93bf9ff60bc042d1b9e38aa55e20fa4943aea8
+source_commit: 239318c045d87ee8fd02e15d83fcbead8217c81e
 ---
 
 # Agentenrollen und Übergaben
@@ -38,6 +38,15 @@ Nach Aufträgen mit Änderungen fragt der Hauptagent abschließend nach Commit u
 Subagenten übergeben ihren Arbeitsstand und führen diese Git-Aktionen nicht selbst aus.
 Ein bereits erteilter Commit-/Push-Auftrag wird ohne erneute Nachfrage ausgeführt.
 
+## Projektlokale Browserfreigaben
+
+Die [Projektregeln](../../.codex/rules/default.rules) erlauben außerhalb der Sandbox nur
+den installierten Google Chrome im Headless-Modus, den lokalen Web-Preview-Server und die
+einzeln aufgezählten Playwright-Regressionsskripte. Für die Score-Browsertests ist zusätzlich
+der konkrete lokale Playwright-/Chrome-Aufruf freigegeben. Andere Node-Skripte erhalten aus
+diesen Regeln keine Freigabe. Die Regeln gelten nur bei einer vertrauenswürdigen
+Projektkonfiguration und werden nach einem Codex-Neustart geladen.
+
 ## Schleifen vermeiden
 
 Die [Projektanweisungen](../../AGENTS.md) begrenzen denselben fehlgeschlagenen Schritt
@@ -54,6 +63,7 @@ Dies ist eine Verhaltensregel, kein technisch erzwungener Versuchszähler.
 
 - [Projektanweisungen](../../AGENTS.md)
 - [Projektkonfiguration](../../.codex/config.toml)
+- [Projektlokale Ausführungsregeln](../../.codex/rules/default.rules)
 - Rollen-TOML-Dateien in der Tabelle und [Teststrategie](testing/strategy.md)
 - [Wiki-Pflegeregeln](AGENTS.md)
 

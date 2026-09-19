@@ -1,0 +1,53 @@
+# Project-local permission rules for browser-based regression tests.
+# These rules are loaded only when this repository is trusted.
+
+prefix_rule(
+    pattern=[
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "--headless",
+    ],
+    decision="allow",
+    justification="Allow project-local headless Chrome checks and screenshots.",
+)
+
+prefix_rule(
+    pattern=["npm", "--prefix", "web-admin", "run", "preview"],
+    decision="allow",
+    justification="Allow the local CourtBoard preview server used by browser tests.",
+)
+
+prefix_rule(
+    pattern=[
+        "node",
+        [
+            "scripts/test-admin-logout-browser.mjs",
+            "scripts/test-court-stream-browser.mjs",
+            "scripts/test-my-team-browser.mjs",
+            "scripts/test-protocol-browser.mjs",
+            "scripts/test-referee-suggestions-browser.mjs",
+            "scripts/test-score-browser.mjs",
+            "scripts/test-score-conflict-browser.mjs",
+            "scripts/test-score-device-handover.mjs",
+            "scripts/test-team-companion-browser.mjs",
+            "scripts/test-youtube-settings-browser.mjs",
+        ],
+    ],
+    decision="allow",
+    justification="Allow only the repository's enumerated Playwright regression scripts.",
+)
+
+prefix_rule(
+    pattern=[
+        "env",
+        "PLAYWRIGHT_MODULE=file:///Users/rstodtmeister/Documents/Develop/java/BeachGameAPP/web-admin/node_modules/playwright-core/index.mjs",
+        "PLAYWRIGHT_EXECUTABLE_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "SCORE_PREVIEW_URL=http://127.0.0.1:4173/",
+        "node",
+        [
+            "scripts/test-score-browser.mjs",
+            "scripts/test-score-device-handover.mjs",
+        ],
+    ],
+    decision="allow",
+    justification="Allow the score browser tests with the project's local Playwright and Google Chrome.",
+)
