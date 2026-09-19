@@ -115,3 +115,11 @@ Neue Einträge anhängen; frühere Ereignisse nicht nachträglich umdeuten.
   mit lokalen Änderungen: mobiler Playwright-/Chrome-Lauf bei 390 × 844 Pixeln,
   `npm --prefix web-admin run test:companion` und `npm --prefix web-admin run build`
   erfolgreich. Browser-Backend vollständig simuliert; kein Live-YouTube-/Supabase-Zugriff.
+
+## [2026-09-19] rules | Commit-/Push-Frage am Auftragsende
+
+- Projektanweisung ergänzt: Nach Aufträgen mit Änderungen fragt der Hauptagent abschließend,
+  ob jetzt committed und gepusht werden soll. Ein bereits im Auftrag erteilter Git-Auftrag
+  wird ohne doppelte Nachfrage ausgeführt.
+- Subagenten übergeben Änderungen an den Hauptagenten und committen oder pushen nicht selbst.
+- Reine Anweisungs-/Wiki-Änderung; keine Anwendungstests oder externen Git-Aktionen.

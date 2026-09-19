@@ -1,8 +1,8 @@
 ---
 title: Agentenrollen und Übergaben
-updated: 2026-09-17
+updated: 2026-09-19
 status: source-reviewed
-source_commit: 0fa17d309b986079df46f12883f9996d7c3af467
+source_commit: 6b93bf9ff60bc042d1b9e38aa55e20fa4943aea8
 ---
 
 # Agentenrollen und Übergaben
@@ -33,6 +33,10 @@ Prüfungen mit Umgebung und Ergebnis sowie offene Aufgaben. Historische Nachweis
 keinen heutigen Testlauf. Nur ein zugewiesener Agent schreibt gemeinsame Wiki-Seiten.
 Modelle und Reasoning werden laut Projektkonfiguration nicht je Rolle überschrieben;
 tatsächliche Werkzeugrechte ergeben sich aus der Sitzung. Rollen sind keine Pfad-Sandboxen.
+
+Nach Aufträgen mit Änderungen fragt der Hauptagent abschließend nach Commit und Push.
+Subagenten übergeben ihren Arbeitsstand und führen diese Git-Aktionen nicht selbst aus.
+Ein bereits erteilter Commit-/Push-Auftrag wird ohne erneute Nachfrage ausgeführt.
 
 ## Schleifen vermeiden
 

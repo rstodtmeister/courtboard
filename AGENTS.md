@@ -26,6 +26,15 @@ Befugnisse für Deployments und externe Aktionen ergeben sich aus dem Nutzerauft
 
 Strukturprüfung: `python3 scripts/check-knowledge.py`.
 
+## Abschluss und Git
+
+- Nach Abschluss eines Auftrags, der Änderungen am Arbeitsbaum erzeugt, fragt der
+  Hauptagent abschließend: „Soll ich die Änderungen jetzt committen und pushen?“
+- Commit und Push erst nach ausdrücklicher Zustimmung ausführen. Hat der Nutzer Commit
+  und Push bereits im laufenden Auftrag beauftragt, ist keine erneute Nachfrage nötig.
+- Subagenten committen oder pushen nicht selbst; sie übergeben ihren Arbeitsstand an den
+  Hauptagenten.
+
 ## Schleifen vermeiden
 
 - Wiederhole denselben fehlgeschlagenen Schritt höchstens dreimal.
