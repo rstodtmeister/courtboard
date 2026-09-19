@@ -55,6 +55,16 @@ Zustand, Linkänderung, Entfernen, geleertes Feld und fehlenden horizontalen Üb
 `playwright-core` wurde dafür nur im ignorierten `node_modules` installiert; Manifest und
 Lockfile blieben unverändert. Keine Netzwerk-, Backend- oder Live-YouTube-Interaktion.
 
+## Mobile Einrichtung des Aufzeichnungsbeginns (19.09.2026)
+
+Auf HEAD `4351b5717318ff4231d202aacbb15de3b5daa85b` mit lokalen Änderungen steuerte
+`scripts/test-youtube-settings-browser.mjs` Google Chrome headless bei 390 × 844 Pixeln.
+Der Test bestätigte Speichern der aktuellen Gerätezeit mit einem Tipp, kompakten Status,
+manuelle Bearbeitung, nur bei mehreren Videos sichtbare Auswahl, Feineinstellung mit
+Fünf-Sekunden-Schritt und fehlenden horizontalen Überlauf. Supabase-Antworten waren
+vollständig simuliert; kein Live-YouTube- oder Datenbankzugriff. Zusätzlich erfolgreich:
+`npm --prefix web-admin run test:companion` und `npm --prefix web-admin run build`.
+
 ## Neuer Nachweis: Vorlage
 
 Für zukünftige Läufe einen Beleg in `knowledge/raw/` oder `docs/reports/` ablegen und hier verlinken:

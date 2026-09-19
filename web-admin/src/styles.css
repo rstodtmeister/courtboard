@@ -6767,8 +6767,69 @@ html.court-overlay-document,
 .stream-score-team .court-team-photo { width: 52px; height: 52px; flex: 0 0 auto; border: 2px solid rgba(255,255,255,.85); }
 .single-court-team .court-team-photo { width: clamp(72px,10vmin,130px); height: clamp(72px,10vmin,130px); margin: 0 auto .5rem; }
 @media(max-width:600px){.team-photo-list article{grid-template-columns:52px minmax(0,1fr)}.team-photo-list article>div:last-child{grid-column:1/-1;justify-content:stretch}.team-photo-list button{flex:1}.team-photo-thumb{width:48px;height:48px}}
-.youtube-recording-settings { width: 100%; }
-.youtube-recording-settings summary { cursor: pointer; padding: 12px 0; }
-.youtube-recording-settings label { display: grid; gap: 5px; margin: 10px 0; }
-.youtube-recording-settings input, .youtube-recording-settings select { width: 100%; min-width: 0; box-sizing: border-box; }
-.youtube-recording-settings button { margin: 5px 8px 5px 0; }
+.youtube-recording-settings {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #d8dee8;
+}
+
+.youtube-recording-settings h5 { margin: 0; font-size: 1rem; }
+.youtube-recording-settings label { display: grid; gap: 5px; }
+.youtube-recording-settings input,
+.youtube-recording-settings select { width: 100%; min-width: 0; box-sizing: border-box; }
+
+.youtube-recording-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.youtube-recording-actions button,
+.youtube-recording-wide-action {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+}
+
+.youtube-recording-status {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.youtube-recording-status > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 900;
+}
+
+.youtube-recording-status div { display: grid; gap: 3px; }
+.youtube-recording-status small { color: #64748b; }
+
+.youtube-recording-advanced {
+  padding: 0 10px 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.youtube-recording-advanced summary { cursor: pointer; padding: 12px 0; font-weight: 800; }
+
+.youtube-recording-offset {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(72px, auto);
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.youtube-recording-offset button { min-height: 44px; margin: 0; }
+.youtube-recording-offset input { text-align: center; }

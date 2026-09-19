@@ -103,3 +103,15 @@ Neue Einträge anhängen; frühere Ereignisse nicht nachträglich umdeuten.
   unveränderten/geänderten Zustand, Entfernen, Rücksetzen des Feldes und mobile Breite.
   Dafür wurde `playwright-core` temporär nur unter dem ignorierten `node_modules` ergänzt;
   Manifest und Lockfile blieben unverändert. Kein Backend- oder Live-YouTube-Aufruf.
+
+## [2026-09-19] frontend | Mobile Einrichtung des Aufzeichnungsbeginns
+
+- Dauerhaft sichtbare Videozeit-Felder durch eine einmalige mobile Einrichtung ersetzt:
+  aktuelle Gerätezeit direkt speichern, von YouTube übernehmen oder anderen Zeitpunkt wählen.
+- Nach der Einrichtung bleiben Zeitpunkt, Quelle und „Einstellung ändern“ sichtbar. Videoauswahl
+  erscheint nur bei mehreren Aufzeichnungen; Versatz und ±5-Sekunden-Schritte liegen unter
+  „Feineinstellung“. Aktionen sind untereinander angeordnet und mindestens 48 Pixel hoch.
+- Tatsächliche lokale Prüfungen auf HEAD `4351b5717318ff4231d202aacbb15de3b5daa85b`
+  mit lokalen Änderungen: mobiler Playwright-/Chrome-Lauf bei 390 × 844 Pixeln,
+  `npm --prefix web-admin run test:companion` und `npm --prefix web-admin run build`
+  erfolgreich. Browser-Backend vollständig simuliert; kein Live-YouTube-/Supabase-Zugriff.
