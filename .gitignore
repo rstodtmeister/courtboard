@@ -8,6 +8,8 @@ supabase/.branches/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
+__pycache__/
+*.py[cod]
 
 ### IntelliJ IDEA ###
 .idea/
