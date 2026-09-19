@@ -123,3 +123,15 @@ Neue Einträge anhängen; frühere Ereignisse nicht nachträglich umdeuten.
   wird ohne doppelte Nachfrage ausgeführt.
 - Subagenten übergeben Änderungen an den Hauptagenten und committen oder pushen nicht selbst.
 - Reine Anweisungs-/Wiki-Änderung; keine Anwendungstests oder externen Git-Aktionen.
+
+## [2026-09-19] frontend | Größere Teamfotos im Stream-Overlay
+
+- Stream-Spielstand auf ein gespiegeltes Drei-Bereich-Raster umgestellt: Teamfoto außen,
+  Teamname mittig und Punkte direkt an der zentralen Satzanzeige.
+- Runde 52-Pixel-Bilder durch abgerundete Quadrate mit 88 bis 112 Pixeln ersetzt; schmale
+  Ansichten verwenden responsive 48 bis 72 Pixel. Die Bereiche bleiben auch ohne Foto stabil.
+- Auf HEAD `1c3170d01e9197e0fdf965d057639073c5096c10` mit lokalen Änderungen waren
+  `npm --prefix web-admin run test:display`, `npm --prefix web-admin run typecheck`,
+  `npm --prefix web-admin run build` und `git diff --check` erfolgreich.
+- Synthetische Vorschau in Google Chrome headless bei 1920 × 1080 und 800 × 450 Pixeln
+  ohne sichtbare Überlappung geprüft. Kein Live-Stream-, Supabase- oder Produktivdatenlauf.

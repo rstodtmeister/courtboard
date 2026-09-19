@@ -173,16 +173,16 @@ function StreamScoreOverlay({ game: currentGame,photos }: { game: Game;photos:Te
       <div className="stream-score-main">
         <div className="stream-score-team left">
           <TeamPhotoImage team={currentGame.team_a} photos={photos}/>
-          <span>{currentGame.team_a || "Team A offen"}</span>
-          <strong>{started ? result?.pointsA ?? "0" : "–"}</strong>
+          <span className="stream-score-team-name">{currentGame.team_a || "Team A offen"}</span>
+          <strong className="stream-score-points">{started ? result?.pointsA ?? "0" : "–"}</strong>
         </div>
         <div className="stream-score-sets">
           <span>Sätze</span>
           <strong>{started ? result?.sets ?? "0:0" : "0:0"}</strong>
         </div>
         <div className="stream-score-team right">
-          <strong>{started ? result?.pointsB ?? "0" : "–"}</strong>
-          <span>{currentGame.team_b || "Team B offen"}</span>
+          <strong className="stream-score-points">{started ? result?.pointsB ?? "0" : "–"}</strong>
+          <span className="stream-score-team-name">{currentGame.team_b || "Team B offen"}</span>
           <TeamPhotoImage team={currentGame.team_b} photos={photos}/>
         </div>
       </div>

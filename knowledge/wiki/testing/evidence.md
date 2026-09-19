@@ -65,6 +65,18 @@ Fünf-Sekunden-Schritt und fehlenden horizontalen Überlauf. Supabase-Antworten 
 vollständig simuliert; kein Live-YouTube- oder Datenbankzugriff. Zusätzlich erfolgreich:
 `npm --prefix web-admin run test:companion` und `npm --prefix web-admin run build`.
 
+## Teamfotos im Stream-Overlay (19.09.2026)
+
+Auf HEAD `1c3170d01e9197e0fdf965d057639073c5096c10` mit lokalen Änderungen waren
+`npm --prefix web-admin run test:display`, `npm --prefix web-admin run typecheck`,
+`npm --prefix web-admin run build` und `git diff --check` erfolgreich. Der ergänzte
+Anzeige-Test prüft die gespiegelten Rasterbereiche sowie die vorgesehenen großen Bildmaße.
+
+Zusätzlich wurde eine lokale HTML-Vorschau mit synthetischen Teamfotos durch den installierten
+Google Chrome headless bei 1920 × 1080 und 800 × 450 Pixeln gerendert und visuell auf
+Reihenfolge, Symmetrie und Überlappungen geprüft. Das belegt die CSS-Darstellung der gewählten
+Beispiele, aber keinen Lauf mit echten Supabase-Daten, realen Teamfotos oder Streamsoftware.
+
 ## Neuer Nachweis: Vorlage
 
 Für zukünftige Läufe einen Beleg in `knowledge/raw/` oder `docs/reports/` ablegen und hier verlinken:

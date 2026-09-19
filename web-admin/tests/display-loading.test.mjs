@@ -79,3 +79,13 @@ test('display queries filter courts, omit bulk histories and fetch only unfinish
     assert.equal(calls[0].tournament_id, 't');
   } finally { delete globalThis.__displayDb; }
 });
+
+test('stream score overlay uses a mirrored three-part broadcast layout with prominent team photos', async () => {
+  const component = await readFile(new URL('../src/CourtDisplayApp.tsx', import.meta.url), 'utf8');
+  const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(component, /className="stream-score-team-name"/);
+  assert.match(component, /className="stream-score-points"/);
+  assert.match(styles, /grid-template-areas:\s*"photo name points"/);
+  assert.match(styles, /grid-template-areas:\s*"points name photo"/);
+  assert.match(styles, /\.stream-score-team \.court-team-photo\s*\{[^}]*width:\s*clamp\(88px,9vmin,112px\)[^}]*border-radius:\s*14px/s);
+});
