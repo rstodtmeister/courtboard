@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { courtQrTokens, findCourtScoreLink } from "../courtScoreLinks";
 import { QrCode } from "../QrCode";
 import type { CourtLock, Game, ScoreLink } from "../types";
+import { courtStreamButtonState } from "../stream";
 import { CompactLink, displayUrl, scoreUrl } from "./shared";
 import { isCompleted, sortGames } from "./GamesEditor";
 
@@ -47,16 +48,16 @@ export function CourtLinksPanel({
   const [openSections, setOpenSections] = useState<Record<string, string>>({});
   const [displayOrientation, setDisplayOrientation] = useState<"normal" | "landscape">("normal");
   const [streamDrafts, setStreamDrafts] = useState<Record<string, string>>(courtStreams);
-  const [savingStreamCourt, setSavingStreamCourt] = useState("");
+  const [streamAction, setStreamAction] = useState<{ court: string; kind: "save" | "remove" } | null>(null);
 
   useEffect(() => setStreamDrafts(courtStreams), [courtStreams]);
 
-  async function saveStream(court: string) {
-    setSavingStreamCourt(court);
+  async function saveStream(court: string, value: string, kind: "save" | "remove") {
+    setStreamAction({ court, kind });
     try {
-      await onSaveCourtStream(court, streamDrafts[court] ?? "");
+      await onSaveCourtStream(court, value);
     } finally {
-      setSavingStreamCourt("");
+      setStreamAction(null);
     }
   }
 
@@ -91,6 +92,9 @@ export function CourtLinksPanel({
           overlayUrl.searchParams.set("view", "overlay");
           overlayUrl.searchParams.set("court", entry.court);
           const value = activeLink?.token ? scoreUrl(activeLink.token) : "";
+          const streamDraft = streamDrafts[entry.court] ?? "";
+          const streamButtons = courtStreamButtonState(courtStreams[entry.court], streamDraft);
+          const streamBusy = streamAction?.court === entry.court;
           const sectionKey = `${entry.tournamentId}:${entry.court}`;
           const sectionProps = (section: string) => ({
             open: openSections[sectionKey] === section,
@@ -123,18 +127,22 @@ export function CourtLinksPanel({
                     type="url"
                     inputMode="url"
                     placeholder="YouTube- oder Twitch-Link"
-                    value={streamDrafts[entry.court] ?? ""}
+                    value={streamDraft}
                     onChange={(event) => setStreamDrafts((current) => ({ ...current, [entry.court]: event.target.value }))}
                   />
-                  <button type="button" className="secondary" onClick={() => saveStream(entry.court)} disabled={savingStreamCourt === entry.court}>
-                    {savingStreamCourt === entry.court ? "Speichert…" : streamDrafts[entry.court] ? "Stream speichern" : "Stream entfernen"}
-                  </button>
+                  <div className="court-stream-actions">
+                    <button type="button" onClick={() => void saveStream(entry.court, streamDraft, "save")} disabled={streamBusy || !streamButtons.canSave}>
+                      {streamAction?.court === entry.court && streamAction.kind === "save" ? "Speichert…" : "Stream speichern"}
+                    </button>
+                    <button type="button" className="secondary" onClick={() => void saveStream(entry.court, "", "remove")} disabled={streamBusy || !streamButtons.canRemove}>
+                      {streamAction?.court === entry.court && streamAction.kind === "remove" ? "Entfernt…" : "Stream entfernen"}
+                    </button>
+                  </div>
                   <YoutubeRecordingSettings tournamentId={entry.tournamentId} url={courtStreams[entry.court] ?? ""} />
                 </div>
               </CourtSection>
               <CourtSection title="Spielstand für Streaming" {...sectionProps("overlay")}>
                 <div className="court-stream-control">
-                  <span className="court-panel-help">Als Web-Quelle einbinden. Transparenter Hintergrund, automatische Aktualisierung.</span>
                   <CompactLink value={overlayUrl.toString()} hideQr mobileCompact />
                   <a className="secondary-link" href={overlayUrl.toString()} target="_blank" rel="noreferrer">Vorschau</a>
                 </div>

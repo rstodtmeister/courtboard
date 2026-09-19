@@ -13,7 +13,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test:display": "node --test tests/display-loading.test.mjs",
     "test:hvv": "node --test tests/hvv-delivery.test.mjs tests/hvv-import.test.mjs tests/hvv-referee.test.mjs tests/hvv-referee-submit.test.mjs",
-    "test:court-qr": "node --test tests/court-qr.test.mjs",
+    "test:court-qr": "node --test tests/court-qr.test.mjs tests/court-stream.test.mjs",
     "test:protocols": "node --test tests/game-protocols.test.mjs",
     "test:referees": "node --test tests/referee-suggestions.test.mjs",
     "test:companion": "node --test tests/team-companion.test.mjs tests/match-history.test.mjs tests/youtube-replay.test.mjs"

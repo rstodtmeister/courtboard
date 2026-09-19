@@ -5,6 +5,15 @@ export type StreamEmbed = {
   url: string;
 };
 
+export function courtStreamButtonState(savedValue: string | null | undefined, draftValue: string | null | undefined) {
+  const saved = savedValue?.trim() ?? "";
+  const draft = draftValue?.trim() ?? "";
+  return {
+    canSave: Boolean(draft) && draft !== saved,
+    canRemove: Boolean(saved),
+  };
+}
+
 export function youtubeVideoId(value: string | null | undefined): string {
   const url = parseUrl(value);
   if (!url) {

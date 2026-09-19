@@ -4162,6 +4162,12 @@ tbody tr:nth-child(even) {
   min-width: 0;
 }
 
+.court-stream-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .single-court-content.with-stream {
     grid-template-columns: 1fr;
